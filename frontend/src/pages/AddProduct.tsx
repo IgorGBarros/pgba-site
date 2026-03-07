@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ScanBarcode, Camera, RefreshCw, DollarSign, ChevronRight, ChevronLeft,
-  Check, Loader2, X, Package, ImagePlus
+  Check, Loader2, X, Package, ImagePlus, Search
 } from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
-import { api } from "../services/api";
 import { useToast } from "../hooks/use-toast";
 import { productService } from "../lib/productService";
 import { processImageForData } from "../lib/ocrService";
+import { api } from "../services/api";
 
 const STEPS = [
   { id: "scan", label: "Código", icon: ScanBarcode },
@@ -20,6 +20,7 @@ const STEPS = [
 
 interface ProductData {
   barcode: string;
+  natura_sku?: string;
   product_name: string;
   category: string;
   expiry_date: string;
@@ -27,16 +28,20 @@ interface ProductData {
   quantity: number;
   cost_price: number;
   sale_price: number;
+  image_url?: string;
 }
 
 export default function AddProduct() {
   const [step, setStep] = useState(0);
   const [showScanner, setShowScanner] = useState(true);
   const [loading, setLoading] = useState(false);
-  
-  // OCR States
   const [ocrLoading, setOcrLoading] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
+  
+  // Busca Manual (Nome/SKU)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
 
   const [data, setData] = useState<ProductData>({
     barcode: "",
@@ -53,7 +58,19 @@ export default function AddProduct() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Passo 1: Código Escaneado -> Busca na API
+  // --- LÓGICA DE PREENCHIMENTO ---
+  const fillProductData = (productData: any) => {
+    setData(prev => ({
+        ...prev,
+        product_name: productData.name,
+        category: productData.category || "Geral",
+        sale_price: Number(productData.sale_price || productData.official_price || 0),
+        natura_sku: productData.natura_sku,
+        image_url: productData.image_url
+    }));
+  };
+
+  // --- PASSO 1A: SCAN CÓDIGO DE BARRAS ---
   const handleBarcodeScan = async (barcode: string) => {
     setShowScanner(false);
     setData((prev) => ({ ...prev, barcode }));
@@ -63,34 +80,55 @@ export default function AddProduct() {
       const response = await productService.lookupByEan(barcode);
       
       if (response.found) {
-         // Lógica para extrair dados (local ou remote)
          const foundData = response.source === 'local' ? response.data : (response.data as any).remote || response.data;
-         
-         setData((prev) => ({
-          ...prev,
-          product_name: foundData.name || prev.product_name,
-          category: foundData.category || prev.category,
-          sale_price: foundData.sale_price || foundData.price || 0 
-        }));
-        
-        toast({ title: "Identificado!", description: foundData.name });
+         fillProductData(foundData);
+         toast({ title: "Identificado!", description: foundData.name });
       } else {
         toast({ title: "Novo", description: "Produto não cadastrado." });
       }
     } catch (error) {
       console.error("Erro no lookup:", error);
     }
-    setStep(1); // Avança para Validade
+    setStep(1); 
   };
 
-  // Passo 2: Câmera Nativa e OCR
+  // --- PASSO 1B: BUSCA MANUAL (NOME/SKU) ---
+  const handleManualSearch = async (term: string) => {
+      setSearchTerm(term);
+      if (term.length > 2) {
+          try {
+              // Chama o endpoint inteligente que busca por Nome ou SKU
+              const { data } = await api.get(`/products/lookup/?q=${term}`);
+              if (data.candidates && data.candidates.length > 0) {
+                  setSuggestions(data.candidates);
+                  setShowSuggestions(true);
+              } else {
+                  setShowSuggestions(false);
+              }
+          } catch { setShowSuggestions(false); }
+      } else {
+          setShowSuggestions(false);
+      }
+  };
+
+  const selectSuggestion = (item: any) => {
+      fillProductData(item);
+      setSearchTerm(""); // Limpa a busca
+      setShowSuggestions(false);
+      // Se tiver barcode na sugestão, usa. Se não, mantém o atual ou gera um provisório.
+      if (item.bar_code) setData(prev => ({ ...prev, barcode: item.bar_code }));
+      
+      toast({ title: "Selecionado!", description: item.name });
+      setStep(1); // Avança
+  };
+
+  // --- PASSO 2: OCR ---
   const handleNativeCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const objectUrl = URL.createObjectURL(file);
     setPhoto(objectUrl);
-    
     setOcrLoading(true);
     toast({ title: "Processando...", description: "Lendo validade na imagem." });
 
@@ -114,18 +152,20 @@ export default function AddProduct() {
     reader.readAsDataURL(file);
   };
 
-  // Passo Final: Salvar
+  // --- PASSO FINAL: SALVAR ---
   const handleSave = async () => {
     setLoading(true);
     try {
       await productService.addStock({
         bar_code: data.barcode,
+        natura_sku: data.natura_sku,
         quantity: data.quantity,
         cost_price: data.cost_price,
         sale_price: data.sale_price,
         expiration_date: data.expiry_date || null,
         batch_code: data.batch_code,
-        name: data.product_name // Manda nome caso precise criar
+        name: data.product_name,
+        category: data.category
       });
       
       toast({ title: "Sucesso!", description: "Estoque atualizado." });
@@ -139,7 +179,7 @@ export default function AddProduct() {
   };
 
   const canAdvance = () => {
-    if (step === 0) return !!data.barcode;
+    if (step === 0) return !!data.barcode || !!data.product_name; // Aceita se tiver nome (via busca manual)
     if (step === 1) return true; 
     if (step === 2) return data.quantity > 0 && !!data.product_name; 
     return true;
@@ -176,25 +216,81 @@ export default function AddProduct() {
       <main className="mx-auto max-w-lg px-4 py-6">
         <AnimatePresence mode="wait">
           
-          {/* Step 0: Scan */}
+          {/* Step 0: Scan ou Busca Manual */}
           {step === 0 && (
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner ? (
-                <BarcodeScanner onScan={handleBarcodeScan} onClose={() => navigate("/")} />
+                <div className="space-y-4">
+                    <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowScanner(false)} />
+                    
+                    {/* Botão para mudar para busca manual */}
+                    <button 
+                        onClick={() => setShowScanner(false)} 
+                        className="w-full text-center text-sm text-muted-foreground underline mt-4"
+                    >
+                        Não tem código? Buscar por nome/SKU
+                    </button>
+                </div>
               ) : (
-                <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-                   {/* ... Card de confirmação do código (igual ao seu original) ... */}
-                   <div className="text-center">
-                      <p className="font-mono text-xl">{data.barcode}</p>
-                      <p className="text-sm text-muted-foreground">{data.product_name || "Produto Novo"}</p>
+                <div className="space-y-6 rounded-xl border border-border bg-card p-5">
+                   {/* CARD DE BUSCA MANUAL */}
+                   <div className="space-y-2 relative">
+                        <label className="text-sm font-medium">Buscar Produto (Nome ou SKU)</label>
+                        <div className="flex gap-2">
+                            <input 
+                                value={searchTerm}
+                                onChange={(e) => handleManualSearch(e.target.value)}
+                                placeholder="Ex: Kaiak ou 38854"
+                                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                            />
+                            <button className="bg-primary/10 text-primary p-2 rounded-lg">
+                                <Search size={20} />
+                            </button>
+                        </div>
+
+                        {/* LISTA DE SUGESTÕES (MODAL) */}
+                        {showSuggestions && (
+                            <div className="absolute z-10 w-full bg-white border rounded-xl shadow-xl mt-1 max-h-60 overflow-y-auto">
+                                {suggestions.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => selectSuggestion(item)}
+                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b flex justify-between items-center"
+                                    >
+                                        <div>
+                                            <p className="font-bold text-sm text-gray-800">{item.name}</p>
+                                            <p className="text-xs text-gray-500">SKU: {item.natura_sku}</p>
+                                        </div>
+                                        <ChevronRight size={16} className="text-gray-400" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                    </div>
-                   <button onClick={() => setShowScanner(true)} className="w-full text-primary text-sm">Escanear outro</button>
+
+                   <div className="flex items-center gap-3 py-4 border-t border-border mt-4">
+                      <div className="h-px flex-1 bg-border"></div>
+                      <span className="text-xs text-muted-foreground">OU</span>
+                      <div className="h-px flex-1 bg-border"></div>
+                   </div>
+
+                   {/* VOLTAR PARA SCANNER */}
+                   <button onClick={() => setShowScanner(true)} className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-xl font-bold">
+                        <ScanBarcode /> Abrir Câmera
+                   </button>
+                   
+                   {/* Feedback se já identificou */}
+                   {data.product_name && (
+                       <div className="mt-4 p-3 bg-green-50 text-green-800 rounded-lg text-center text-sm border border-green-200">
+                           Produto selecionado: <b>{data.product_name}</b>
+                       </div>
+                   )}
                 </div>
               )}
             </motion.div>
           )}
 
-          {/* Step 1: Validade & OCR (INTEGRADO DO WIZARD) */}
+          {/* Step 1: Validade & OCR */}
           {step === 1 && (
             <motion.div key="expiry" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-6 rounded-xl border border-border bg-card p-5">
@@ -226,6 +322,7 @@ export default function AddProduct() {
 
                     {photo && !ocrLoading && (
                         <button 
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                             className="absolute bottom-2 right-2 bg-background p-2 rounded-full shadow-md border border-border"
                         >
@@ -234,7 +331,6 @@ export default function AddProduct() {
                     )}
                 </div>
 
-                {/* INPUT OCULTO */}
                 <input 
                     ref={fileInputRef} 
                     type="file" 
@@ -244,7 +340,6 @@ export default function AddProduct() {
                     onChange={handleNativeCamera} 
                 />
 
-                {/* CAMPOS MANUAIS */}
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-medium text-muted-foreground">Validade</label>
@@ -269,20 +364,29 @@ export default function AddProduct() {
             </motion.div>
           )}
 
-          {/* Step 2: Quantidade & Preço (Mantido do original) */}
+          {/* Step 2: Quantidade & Preço */}
           {step === 2 && (
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
-                 {/* ... Inputs de Quantidade e Preço do seu código original ... */}
-                 {/* Vou simplificar aqui, mas você mantém os botões +/- e inputs */}
-                 <div>
-                    <label className="text-sm font-medium">Nome</label>
-                    <input value={data.product_name} onChange={e=>setData({...data, product_name: e.target.value})} className="w-full border rounded-lg p-2 mt-1"/>
+                 
+                 {/* Exibe o Produto Selecionado */}
+                 <div className="bg-secondary/20 p-3 rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground font-bold uppercase">Produto</p>
+                    <p className="font-medium text-sm">{data.product_name}</p>
+                    {data.natura_sku && <p className="text-xs text-muted-foreground">SKU: {data.natura_sku}</p>}
                  </div>
+
+                 {/* Quantidade */}
                  <div>
                     <label className="text-sm font-medium">Quantidade</label>
-                    <input type="number" value={data.quantity} onChange={e=>setData({...data, quantity: parseInt(e.target.value)})} className="w-full border rounded-lg p-2 mt-1"/>
+                    <input 
+                        type="number" 
+                        value={data.quantity} 
+                        onChange={e=>setData({...data, quantity: parseInt(e.target.value)})} 
+                        className="w-full border rounded-lg p-2 mt-1 text-center text-lg font-bold"
+                    />
                  </div>
+                 
                  <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-sm font-medium">Custo</label>
@@ -300,10 +404,22 @@ export default function AddProduct() {
           {/* Step 3: Confirmar */}
           {step === 3 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-               {/* ... Resumo do seu código original ... */}
-               <div className="rounded-xl border border-border bg-card p-5 text-center">
-                  <p className="font-bold">{data.product_name}</p>
-                  <p className="text-sm text-muted-foreground">{data.quantity} unidades - Val: {data.expiry_date}</p>
+               <div className="rounded-xl border border-border bg-card p-5 text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+                      <Check size={32} />
+                  </div>
+                  <div>
+                      <p className="font-bold text-lg text-green-700">Tudo Pronto!</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Você está adicionando <b>{data.quantity}x {data.product_name}</b> ao estoque.
+                      </p>
+                  </div>
+                  <div className="p-3 bg-secondary/30 rounded-lg text-xs text-left space-y-1">
+                      <p>📦 <b>Validade:</b> {data.expiry_date || "Não informada"}</p>
+                      <p>📦 <b>SKU:</b> {data.natura_sku || "Não informado"}</p>
+                      <p>🏷️ <b>Lote:</b> {data.batch_code || "N/A"}</p>
+                      <p>💰 <b>Valor Venda:</b> R$ {data.sale_price}</p>
+                  </div>
                </div>
             </motion.div>
           )}
@@ -320,7 +436,11 @@ export default function AddProduct() {
             )}
             
             {step < 3 ? (
-              <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
+              <button 
+                onClick={() => setStep(s => s + 1)} 
+                disabled={!canAdvance()} 
+                className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+              >
                 Próximo
               </button>
             ) : (
