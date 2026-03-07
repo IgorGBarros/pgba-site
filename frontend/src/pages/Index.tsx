@@ -119,7 +119,7 @@ export default function Index() {
         {/* --- MENU DE AÇÕES RÁPIDAS (Atualizado) --- */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <ActionBtn 
-            onClick={() => navigate("/stock/entry")} 
+            onClick={() => navigate("/add")} 
             icon={ScanBarcode} 
             label="Entrada" 
             desc="Escanear e cadastrar" 
