@@ -14,6 +14,7 @@ import Storefront from "./pages/Storefront";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import StockWizard from "./pages/StockWizard";
+import StockHistory from "./pages/StockHistory";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/vitrine" element={<Storefront />} />
+          <Route path="/stock/history" element={<StockHistory />} />
        
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
