@@ -19,6 +19,8 @@ from .serializers import InventoryItemSerializer, ProductSerializer, StockEntryS
 from .scraper import search_google_shopping
 import re
 
+from backend.core.inventory import models
+
 # Pega o usuário padrão (seja ele Custom ou Default)
 User = get_user_model()
 
@@ -79,10 +81,10 @@ class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
             return InventoryItem.objects.none()
             
         return InventoryItem.objects.filter(store=store).select_related('product')
-
 class StockEntryView(APIView):
     """
-    RECEBIMENTO DE MERCADORIA (CRIA PRODUTO SE NÃO EXISTIR)
+    RECEBIMENTO DE MERCADORIA (CRIA OU ATUALIZA PRODUTO)
+    Lógica: Tenta achar por SKU -> Tenta achar por Barcode -> Cria Novo
     """
     def post(self, request):
         serializer = StockEntrySerializer(data=request.data)
@@ -93,19 +95,53 @@ class StockEntryView(APIView):
         store = get_current_store(request.user)
         
         with transaction.atomic():
-            # 1. Busca ou Cria o Produto Global
-            product, created = Product.objects.get_or_create(
-                bar_code=data['bar_code'],
-                defaults={
-                    'name': data.get('name', 'Produto Novo'),
-                    'category': data.get('category', 'Geral'),
-                    # Se tiver preço de venda no form, usa como oficial inicial
-                    'official_price': data.get('sale_price', 0) 
-                }
-            )
+            product = None
+            sku_input = data.get('natura_sku')
+            barcode_input = data.get('bar_code')
+
+            # 1. Tenta achar pelo SKU (Chave mais forte e imutável)
+            if sku_input:
+                product = Product.objects.filter(natura_sku=sku_input).first()
+
+            # 2. Se não achou, tenta pelo Código de Barras
+            if not product and barcode_input:
+                product = Product.objects.filter(bar_code=barcode_input).first()
+
+            if product:
+                # Produto EXISTE: Vamos atualizar dados faltantes?
+                # Ex: Se achou pelo SKU mas o produto no banco não tinha barcode, salva agora.
+                updated = False
+                if barcode_input and not product.bar_code:
+                    product.bar_code = barcode_input
+                    updated = True
+                if sku_input and not product.natura_sku:
+                    product.natura_sku = sku_input
+                    updated = True
+                
+                # Se o produto era um "placeholder" sem nome, atualiza o nome
+                if data.get('name') and "Produto Novo" in product.name:
+                    product.name = data['name']
+                    updated = True
+
+                if updated:
+                    product.save()
+            else:
+                # Produto NÃO EXISTE: Cria do zero
+                # Define preço oficial baseado no preço de venda informado (se não tiver histórico)
+                official_price = data.get('sale_price', 0)
+                
+                product = Product.objects.create(
+                    bar_code=barcode_input,
+                    natura_sku=sku_input, # Agora salva o SKU corretamente!
+                    name=data.get('name', 'Produto Novo'),
+                    category=data.get('category', 'Geral'),
+                    official_price=official_price,
+                    image_url=data.get('image_url', ''), # Se tiver imagem vindo do front
+                    last_checked_at=timezone.now()
+                )
             
-            # 2. Achar ou Criar Item no Estoque da Loja
-            item, _ = InventoryItem.objects.get_or_create(
+            # 3. Gerenciar Estoque da Loja (InventoryItem)
+            item, created = InventoryItem.objects.get_or_create(
                 store=store,
                 product=product,
                 defaults={
@@ -115,11 +151,12 @@ class StockEntryView(APIView):
                 }
             )
             
-            # Atualiza preços da loja se vierem no request
+            # Atualiza preços da consultora se fornecidos (e se mudaram)
             if data.get('cost_price'): item.cost_price = data['cost_price']
             if data.get('sale_price'): item.sale_price = data['sale_price']
+            item.save() # Garante que preços atualizem mesmo se o item já existia
             
-            # 3. Criar Lote (Batch)
+            # 4. Criar Lote (Batch)
             InventoryBatch.objects.create(
                 item=item,
                 quantity=data['quantity'],
@@ -127,12 +164,25 @@ class StockEntryView(APIView):
                 expiration_date=data.get('expiration_date')
             )
             
-            # 4. Atualizar Total
-            item.total_quantity += data['quantity']
+            # 5. Atualizar Total consolidado
+            # Recalcula do zero para garantir integridade (soma de todos os lotes)
+            total_real = item.batches.aggregate(total=models.Sum('quantity'))['total'] or 0
+            item.total_quantity = total_real
             item.save()
             
+            # 6. Registrar Transação (Log)
+            StockTransaction.objects.create(
+                store=store,
+                product=product,
+                transaction_type='ENTRADA',
+                quantity=data['quantity'],
+                unit_cost=data.get('cost_price'),
+                unit_price=data.get('sale_price'),
+                description=f"Entrada via App - Lote {data.get('batch_code', 'N/A')}"
+            )
+            
         return Response({
-            "message": "Estoque atualizado!", 
+            "message": "Estoque atualizado com sucesso!", 
             "product": product.name,
             "new_total": item.total_quantity
         })

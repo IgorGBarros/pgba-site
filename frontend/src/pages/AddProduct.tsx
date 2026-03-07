@@ -10,6 +10,7 @@ import { api } from "../services/api";
 import { useToast } from "../hooks/use-toast";
 import { productService } from "../lib/productService";
 import { processImageForData } from "../lib/ocrService";
+import ProductSearchModal from "../components/ProductSearchModal";
 
 const STEPS = [
   { id: "scan", label: "Código", icon: ScanBarcode },
@@ -44,6 +45,7 @@ export default function AddProduct() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [data, setData] = useState<ProductData>({
     barcode: "",
@@ -252,24 +254,21 @@ export default function AddProduct() {
                         {showSuggestions && (
                             <div className="absolute z-50 w-full bg-white border rounded-xl shadow-xl mt-1 max-h-60 overflow-y-auto">
                                 {suggestions.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => selectSuggestion(item)}
-                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b flex items-center gap-3 transition-colors"
-                                    >
-                                        {/* Thumb */}
-                                        <div className="w-10 h-10 bg-gray-100 rounded shrink-0 overflow-hidden">
-                                            {item.image_url && <img src={item.image_url} className="w-full h-full object-cover"/>}
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-sm text-gray-800 line-clamp-1">{item.name}</p>
-                                            <div className="flex justify-between text-xs text-gray-500">
-                                                <span>SKU: {item.natura_sku}</span>
-                                                <span>R$ {item.official_price}</span>
-                                            </div>
-                                        </div>
-                                        <ChevronRight size={16} className="text-gray-400" />
-                                    </button>
+                                  <button 
+                                      onClick={() => setIsSearchOpen(true)}
+                                      className="w-full flex items-center justify-between p-4 border rounded-xl hover:bg-gray-50 text-left group transition-all"
+                                  >
+                                      <div className="flex items-center gap-3">
+                                          <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                                              <Search size={20} />
+                                          </div>
+                                          <div>
+                                              <p className="font-bold text-sm text-gray-700">Buscar Manualmente</p>
+                                              <p className="text-xs text-gray-500">Digite o nome ou código da revista</p>
+                                          </div>
+                                      </div>
+                                      <ChevronRight className="text-gray-300 group-hover:text-primary transition-colors" />
+                                  </button>
                                 ))}
                             </div>
                         )}
@@ -431,6 +430,11 @@ export default function AddProduct() {
           )}
 
         </AnimatePresence>
+        <ProductSearchModal 
+              isOpen={isSearchOpen} 
+              onClose={() => setIsSearchOpen(false)} 
+              onSelect={selectSuggestion} // Reusa sua função existente!
+          />
 
         {/* NAVEGAÇÃO */}
         {(!showScanner || step > 0) && (
