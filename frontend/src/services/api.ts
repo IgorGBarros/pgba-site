@@ -2,7 +2,7 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "http://localhost:8000/api", // Ajuste para o IP/Porta do seu Django
+  baseURL: "https://gestao-estoque-k5vy.onrender.com", // Ajuste para o IP/Porta do seu Django
 });
 
 // Opcional: Interceptor para lidar com Token Expirado (Refresh)

@@ -13,7 +13,7 @@ from urllib.parse import quote_plus
 import os
 from dotenv import load_dotenv
 from pathlib import Path
-
+import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")  # Garanta o caminho correto do .env
 
@@ -38,15 +38,14 @@ safe_host = quote_plus(DB_HOST)
 DATABASE_URL = f"postgresql+psycopg2://{safe_ai_user}:{safe_ai_pass}@{safe_host}:{DB_PORT}/{safe_db_name}"
 
 # Configuração padrão do Django (não afeta o LangChain, mas bom manter igual)
+print(f"DEBUG: DATABASE_URL environment var is: {os.environ.get('DATABASE_URL')}") # Verifique se imprime algo nos logs
+
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": DB_NAME,
-        "USER": DB_USER,
-        "PASSWORD": DB_PASSWORD,
-        "HOST": DB_HOST,
-        "PORT": DB_PORT,
-    }
+    'default': dj_database_url.config(
+        default=f"postgres://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 
@@ -118,6 +117,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173", # Vite padrão
     "http://192.168.1.15:3000", # <--- Adicione seu IP aqui
     "http://192.168.1.15:8000",
+    "https://gestao-estoque-one.vercel.app"
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

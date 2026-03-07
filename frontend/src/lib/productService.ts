@@ -45,7 +45,7 @@ export interface ProductLookupResponse {
 
 // Usa a variável de ambiente ou localhost por padrão
 // @ts-ignore (para evitar erro de tipagem se o arquivo d.ts não estiver ok)
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
 
 async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
