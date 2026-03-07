@@ -81,6 +81,7 @@ export default function ProductForm() {
     toast({ title: "Produto Vinculado!", description: `SKU ${suggestion.natura_sku} carregado.` });
   };
 
+  // --- BUSCA POR CÓDIGO (EAN) ---
   const handleLookup = async (ean: string) => {
     if (!ean) return;
     setSearching(true);
@@ -88,48 +89,36 @@ export default function ProductForm() {
       const result = await productService.lookupByEan(ean);
       
       if (result.found) {
-        // ... (tipagem) ...
         const data = result.data as any; 
-        const { local, remote, source, candidates, google_name } = { ...data, source: result.source };
+        const { local, remote, price_diff, msg, source, candidates, google_name } = { ...data, source: result.source };
 
-        // 1. ACHOU LOCAL
         if (source === 'local' && local) {
+           if (price_diff) {
+              toast({ title: "Preço Mudou!", description: msg, className: "bg-yellow-100 text-yellow-800" });
+           }
            if (!isEditing && local.id) navigate(`/products/${local.id}/edit`);
-        
-        // 2. SUGERIR CANDIDATOS (Match Fuzzy)
+           
         } else if (source === 'suggestion' && candidates) {
+           // IMPLEMENTAÇÃO DO MODO SUGESTÃO (LISTA)
            setSuggestions(candidates);
            setShowSuggestions(true);
-           setForm(prev => ({ 
-               ...prev, 
-               name: google_name || prev.name, // Preenche o nome achado no Cosmos!
-               bar_code: ean 
-           }));
-           toast({ title: "Nome Encontrado!", description: `Possível match: ${google_name}` });
+           setForm(prev => ({ ...prev, name: google_name || prev.name, bar_code: ean }));
+           toast({ 
+             title: "Nome Encontrado!", 
+             description: `Parece ser '${google_name}'. Selecione abaixo.` 
+           });
 
-        // 3. ACHOU COMPLETO (SKU + Preço)
-        } else if (source === 'remote' || source === 'remote_learned') {
+        } else if (source === 'remote' || source === 'remote_learned' || source === 'remote_partial') {
            setForm(prev => ({
              ...prev,
              name: remote?.name || data.name,
              price: remote?.sale_price || data.sale_price || 0,
-             natura_sku: remote?.natura_sku || data.natura_sku,
+             natura_sku: remote?.natura_sku || data.natura_sku, // Preenche SKU se vier
              description: remote?.description || data.description,
              bar_code: ean
            }));
-           toast({ title: "Dados Carregados!", description: "Preço e Nome encontrados." });
-
-        // 4. ACHOU SÓ O NOME (Cosmos/Google Snippet) - CORREÇÃO AQUI
-        } else if (source === 'remote_partial') {
-           setForm(prev => ({
-             ...prev,
-             name: data.name || prev.name, // Preenche o nome!
-             bar_code: ean,
-             description: data.description
-           }));
-           toast({ title: "Nome Encontrado!", description: "Complete o preço e estoque." });
+           toast({ title: "Encontrado!", description: "Dados carregados." });
         }
-
       } else {
         toast({ title: "Novo Código", description: "Preencha os dados manualmente." });
       }
@@ -150,25 +139,13 @@ export default function ProductForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (isEditing) {
-        // Se for edição, continua usando o update normal (alterar preço/nome)
-        await productService.update(Number(id), form);
-        toast({ title: "Sucesso!", description: "Produto atualizado" });
-      } else {
-        // SE FOR NOVO CADASTRO, USA A ROTA DE ESTOQUE
-        // Primeiro garantimos que o produto existe no banco global (via lookup se ainda não tiver ID)
-        if (!form.id) {
-            // Se o produto veio do Google/Natura mas não tem ID ainda,
-            // o backend vai criar na hora que bater no stock/entry se o bar_code bater
-        }
-        
-        await productService.addStock(form);
-        toast({ title: "Sucesso!", description: "Estoque adicionado!" });
-      }
+      if (isEditing) await productService.update(Number(id), form);
+      else await productService.create(form);
+      
+      toast({ title: "Sucesso!", description: "Salvo com sucesso." });
       navigate("/products");
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Erro", description: "Falha ao salvar. Verifique se o produto já existe.", variant: "destructive" });
+    } catch {
+      toast({ title: "Erro", description: "Falha ao salvar." });
     } finally {
       setLoading(false);
     }
