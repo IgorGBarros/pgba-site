@@ -30,7 +30,7 @@ export default function Settings() {
     const fetchStoreSettings = async () => {
       try {
         // GET /store/settings/ -> Retorna os dados da Store vinculada ao User
-        const { data } = await api.get("/store/settings/");
+        const { data } = await api.get("/settings/");
         
         setForm({
           display_name: data.name || "",        // Mapeia 'name' do Django para 'display_name'
@@ -58,7 +58,7 @@ export default function Settings() {
     setSaving(true);
     try {
       // PATCH /store/settings/ -> Atualiza os dados
-      await api.patch("/store/settings/", {
+      await api.patch("/settings/", {
         name: form.display_name,
         whatsapp: form.whatsapp_number,
         // storefront_enabled: form.storefront_enabled // Enviar se o backend suportar
