@@ -110,7 +110,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
             ],
         },
-    },
+    }, 
 ]
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
