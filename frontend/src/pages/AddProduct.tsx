@@ -204,7 +204,7 @@ export default function AddProduct() {
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner ? (
                 <div className="space-y-4">
-                    <BarcodeScanner onScan={handleBarcodeScan} onClose={() => navigate("/")} />
+                    <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowScanner(false)}/>
                     
                     {/* Botão para mudar para busca manual */}
                     <button 
