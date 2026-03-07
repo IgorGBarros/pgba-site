@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ScanBarcode, Save, Loader2, Package, Calendar, ImageIcon } from "lucide-react";
+import { ArrowLeft, ScanBarcode, Save, Loader2, Search, Calendar, Package, ImageIcon } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
-import { Product, productService } from "../lib/productService";
+import { Product, productService, LookupData } from "../lib/productService";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { useToast } from "../hooks/use-toast";
 import { api } from "../services/api";
@@ -12,7 +12,7 @@ const CATEGORIES = ["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Inf
 const emptyProduct: Product = {
   name: "",
   bar_code: "",
-  natura_sku: "",
+  natura_sku: "", // Campo SKU
   category: "Perfumaria",
   price: 0,
   sale_price: 0,
