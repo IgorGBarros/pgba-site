@@ -196,3 +196,33 @@ class CustomUserManager(BaseUserManager):
 
         except Exception as e:
             raise ValueError(f"Erro ao criar usuário com Firebase: {str(e)}")
+        
+# ... (outros models: Product, Store, InventoryItem, etc)
+
+class StockTransaction(models.Model):
+    TRANSACTION_TYPES = [
+        ('ENTRADA', 'Entrada de Estoque'),
+        ('VENDA', 'Saída por Venda'),
+        ('PRESENTE', 'Saída para Presente'),
+        ('BRINDE', 'Saída para Brinde'),
+        ('USO_PROPRIO', 'Uso Próprio'),
+        ('PERDA', 'Perda / Avaria'),
+        ('AJUSTE', 'Ajuste Manual'),
+    ]
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="transactions")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    batch = models.ForeignKey(InventoryBatch, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    quantity = models.IntegerField() # Positivo = Entrada, Negativo = Saída
+    
+    # Snapshot dos valores no momento da operação
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    description = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.get_transaction_type_display()} - {self.product.name} ({self.quantity})"

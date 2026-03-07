@@ -132,9 +132,6 @@ class StockEntryView(APIView):
         return Response({"message": "Estoque atualizado!", "new_total": item.total_quantity})
 
 class SaleCheckoutView(APIView):
-    """
-    CAIXA / PDV (SCAN DE SAÍDA)
-    """
     def post(self, request):
         serializer = SaleSerializer(data=request.data)
         if not serializer.is_valid():
@@ -143,13 +140,11 @@ class SaleCheckoutView(APIView):
         data = serializer.validated_data
         store = get_current_store(request.user)
         
-        if not store:
-            return Response({"error": "Loja não encontrada."}, status=400)
-        
         total_sale = 0
         
         try:
             with transaction.atomic():
+                # 1. Cria a Venda
                 sale = Sale.objects.create(
                     store=store,
                     client_name=data.get('client_name', ''),
@@ -167,13 +162,15 @@ class SaleCheckoutView(APIView):
                     if inventory_item.total_quantity < qtd:
                         raise Exception(f"Estoque insuficiente para {product.name}")
                     
-                    # Baixa de Estoque (Lote ou FIFO)
-                    batch = None
+                    # 2. Lógica de Baixa (Lote Específico ou FIFO)
+                    batch_used = None
+                    
                     if 'batch_id' in item_data:
-                        batch = InventoryBatch.objects.get(id=item_data['batch_id'])
-                        if batch.quantity < qtd: raise Exception("Lote insuficiente")
-                        batch.quantity -= qtd
-                        batch.save()
+                        batch_used = InventoryBatch.objects.get(id=item_data['batch_id'])
+                        if batch_used.quantity < qtd:
+                             raise Exception("Lote insuficiente")
+                        batch_used.quantity -= qtd
+                        batch_used.save()
                     else:
                         # FIFO Automático
                         batches = inventory_item.batches.filter(quantity__gt=0).order_by('expiration_date')
@@ -184,16 +181,31 @@ class SaleCheckoutView(APIView):
                             b.quantity -= take
                             b.save()
                             remaining -= take
-                            batch = b
+                            batch_used = b # Registra o último lote usado para referência
                     
+                    # 3. Atualiza Saldo Geral
                     inventory_item.total_quantity -= qtd
                     inventory_item.save()
                     
+                    # 4. Cria Item da Venda
                     SaleItem.objects.create(
-                        sale=sale, product=product, batch=batch,
+                        sale=sale, product=product, batch=batch_used,
                         quantity=qtd, unit_price_sold=price
                     )
                     
+                    # 5. REGISTRA NO HISTÓRICO (StockTransaction)
+                    # Quantidade negativa para indicar saída [1]
+                    StockTransaction.objects.create(
+                        store=store,
+                        product=product,
+                        batch=batch_used,
+                        transaction_type=sale.transaction_type, # 'VENDA', 'PRESENTE', etc.
+                        quantity=-qtd, 
+                        unit_cost=inventory_item.cost_price,
+                        unit_price=price,
+                        description=f"Saída Ref. Venda #{sale.id} ({sale.get_transaction_type_display()})"
+                    )
+
                     if sale.transaction_type == 'VENDA':
                         total_sale += price * qtd
                 
@@ -203,8 +215,7 @@ class SaleCheckoutView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
             
-        return Response({"message": "Operação realizada!", "total": total_sale})
-
+        return Response({"message": "Operação realizada com sucesso!", "total": total_sale})
 # --- LOOKUP INTELIGENTE ---
 
 @api_view(['GET'])
@@ -351,3 +362,89 @@ def public_storefront(request, seller_id):
         "whatsapp": store.whatsapp,
         "items": items_data
     })
+
+# ... imports ...
+from .models import StockTransaction # <--- Não esqueça de importar
+
+class StockEntryView(APIView):
+    def post(self, request):
+        serializer = StockEntrySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+            
+        data = serializer.validated_data
+        store = get_current_store(request.user)
+        
+        try:
+            product = Product.objects.get(bar_code=data['bar_code'])
+        except Product.DoesNotExist:
+            return Response({"error": "Produto não cadastrado."}, status=404)
+            
+        with transaction.atomic():
+            # 1. Atualiza/Cria Item no Estoque
+            item, created = InventoryItem.objects.get_or_create(
+                store=store,
+                product=product,
+                defaults={
+                    'cost_price': data.get('cost_price', 0),
+                    'sale_price': data.get('sale_price', 0),
+                    'total_quantity': 0
+                }
+            )
+            
+            if not created:
+                if data.get('cost_price'): item.cost_price = data['cost_price']
+                if data.get('sale_price'): item.sale_price = data['sale_price']
+            
+            # 2. Cria Lote (Captura o objeto criado para vincular no histórico)
+            new_batch = InventoryBatch.objects.create(
+                item=item,
+                quantity=data['quantity'],
+                batch_code=data.get('batch_code', ''),
+                expiration_date=data.get('expiration_date')
+            )
+            
+            # 3. Atualiza Total
+            item.total_quantity += data['quantity']
+            item.save()
+
+            # 4. REGISTRA NO HISTÓRICO (StockTransaction)
+            StockTransaction.objects.create(
+                store=store,
+                product=product,
+                batch=new_batch,
+                transaction_type='ENTRADA',
+                quantity=data['quantity'], # Positivo
+                unit_cost=item.cost_price,
+                unit_price=item.sale_price,
+                description=f"Entrada Lote {new_batch.batch_code}"
+            )
+            
+        return Response({"message": "Estoque atualizado e registrado!", "new_total": item.total_quantity})
+    
+    # Em backend/core/inventory/views.py
+
+from rest_framework import viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import StockTransaction
+from .serializers import StockTransactionSerializer
+
+# Se você estiver usando a função helper para pegar a loja atual
+# from .utils import get_current_store (ou onde ela estiver definida)
+
+class StockTransactionViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = StockTransactionSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['transaction_type']
+
+    def get_queryset(self):
+        # Filtra transações apenas da loja do usuário logado
+        # Ajuste a lógica de get_current_store conforme sua implementação
+        # store = get_current_store(self.request.user) 
+        # return StockTransaction.objects.filter(store=store).order_by('-created_at')
+        
+        # Exemplo genérico se o user tiver relação direta com a store
+        user = self.request.user
+        if hasattr(user, 'store'):
+             return StockTransaction.objects.filter(store=user.store).order_by('-created_at')
+        return StockTransaction.objects.none()

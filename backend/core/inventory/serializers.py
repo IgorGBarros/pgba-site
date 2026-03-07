@@ -105,3 +105,26 @@ class SaleSerializer(serializers.Serializer):
     payment_method = serializers.CharField(default="DINHEIRO")
     transaction_type = serializers.CharField(default="VENDA") # VENDA, PRESENTE, ETC
     notes = serializers.CharField(required=False, allow_blank=True)
+
+    # Em backend/core/inventory/serializers.py
+
+from rest_framework import serializers
+from .models import StockTransaction  # Certifique-se de importar o modelo
+
+class StockTransactionSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    batch_code = serializers.CharField(source='batch.batch_code', read_only=True)
+
+    class Meta:
+        model = StockTransaction
+        fields = [
+            'id', 
+            'transaction_type', 
+            'quantity', 
+            'unit_price', 
+            'unit_cost', 
+            'description', 
+            'created_at', 
+            'product_name', 
+            'batch_code'
+        ]

@@ -6,7 +6,8 @@ from .views import (
     lookup_product, 
     StockEntryView, 
     SaleCheckoutView,
-    CustomTokenObtainPairView
+    CustomTokenObtainPairView,
+    StockTransactionViewSet,
     # FirebaseLoginView e CustomUserCreateView foram removidos daqui pois estão comentados na view
 )
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -24,8 +25,7 @@ urlpatterns = [
     # --- Rotas de Autenticação (JWT) ---
     path('auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
-    # Rota removida até a implementação do Firebase no Model
+    router.register(r'transactions', StockTransactionViewSet, basename='stock-transaction'),
     # path('auth/firebase/', FirebaseLoginView.as_view(), name='firebase-login'),
 
     # --- Rotas Automáticas (Router) ---
