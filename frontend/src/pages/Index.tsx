@@ -9,28 +9,22 @@ import {
   ScanBarcode, 
   List, 
   Settings as SettingsIcon,
-  ArrowDownCircle, // Novo ícone
-  PieChart,         // Novo ícone
-  Settings
+  ArrowDownCircle, 
+  PieChart,         
+  History // <--- Ícone novo
 } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { api } from "../services/api";
 
-
-// Tipagem dos itens vindos da API
+// Interfaces... (Mantive igual)
 interface InventoryItem {
   id: number;
-  product: {
-    id: number;
-    name: string;
-    official_price: number;
-  };
+  product: { id: number; name: string; official_price: number; };
   total_quantity: number;
   min_quantity: number;
   cost_price: string | number;
   sale_price: string | number;
 }
-
 interface StatCard {
   label: string;
   value: string | number;
@@ -43,7 +37,6 @@ export default function Index() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   
-  // Estados para os dados do Dashboard
   const [stats, setStats] = useState<StatCard[]>([
     { label: "Total Produtos", value: "-", icon: Package, change: "..." },
     { label: "Unidades em Estoque", value: "-", icon: BarChart3, change: "..." },
@@ -53,130 +46,82 @@ export default function Index() {
   
   const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([]);
 
-  // Carregar dados da API
   useEffect(() => {
     async function fetchDashboardData() {
       try {
         const { data } = await api.get<InventoryItem[]>("/inventory/");
         
-        // 1. Cálculos de Totais
+        if (!data) return;
+
         const totalProdutos = data.length;
         const unidadesTotal = data.reduce((acc, item) => acc + item.total_quantity, 0);
         const valorTotal = data.reduce((acc, item) => {
           const custo = Number(item.cost_price) || 0;
           return acc + (custo * item.total_quantity);
         }, 0);
-
-        // 2. Filtro de Estoque Baixo
         const criticalItems = data.filter(item => item.total_quantity <= item.min_quantity);
-
-        // 3. Formatação de Moeda
+        
         const valorFormatado = new Intl.NumberFormat('pt-BR', { 
-          style: 'currency', 
-          currency: 'BRL' 
+          style: 'currency', currency: 'BRL' 
         }).format(valorTotal);
 
-        // Atualiza os Cards
         setStats([
-          { 
-            label: "Total Produtos", 
-            value: totalProdutos, 
-            icon: Package, 
-            change: "SKUs ativos" 
-          },
-          { 
-            label: "Unidades em Estoque", 
-            value: unidadesTotal, 
-            icon: BarChart3, 
-            change: "Total de itens" 
-          },
-          { 
-            label: "Estoque Baixo", 
-            value: criticalItems.length, 
-            icon: TrendingDown, 
-            change: "Itens críticos",
-            color: criticalItems.length > 0 ? "text-destructive" : "text-primary"
-          },
-          { 
-            label: "Valor Investido", 
-            value: valorFormatado, 
-            icon: DollarSign, 
-            change: "Custo total" 
-          },
+          { label: "Total Produtos", value: totalProdutos, icon: Package, change: "SKUs ativos" },
+          { label: "Unidades em Estoque", value: unidadesTotal, icon: BarChart3, change: "Total de itens" },
+          { label: "Estoque Baixo", value: criticalItems.length, icon: TrendingDown, change: "Itens críticos", color: criticalItems.length > 0 ? "text-destructive" : "text-primary" },
+          { label: "Valor Investido", value: valorFormatado, icon: DollarSign, change: "Custo total" },
         ]);
-
-        setLowStockItems(criticalItems.slice(0, 5)); // Pega apenas os 5 primeiros
+        setLowStockItems(criticalItems.slice(0, 5));
       } catch (error) {
-        console.error("Erro ao carregar dashboard", error);
+        console.error("Erro dashboard", error);
       } finally {
         setLoading(false);
       }
     }
-
     fetchDashboardData();
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
+    <div className="min-h-screen bg-background pb-20">
+      <header className="border-b border-border bg-card sticky top-0 z-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
               <Package className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-bold text-foreground">
-                Estoque Natura
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Gestão inteligente de inventário
-              </p>
+              <h1 className="font-display text-lg font-bold text-foreground">Estoque Natura</h1>
+              <p className="text-xs text-muted-foreground">Gestão inteligente</p>
             </div>
           </div>
-              <button onClick={() => navigate("/settings")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
-                <Settings className="h-5 w-5" />
+          <button onClick={() => navigate("/settings")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <SettingsIcon className="h-5 w-5" />
           </button>
         </div>
       </header>
 
-      {/* Content */}
       <main className="mx-auto max-w-6xl px-6 py-8">
         
-        {/* Loading State Simples */}
-        {loading && (
-          <div className="mb-6 text-sm text-muted-foreground animate-pulse">
-            Carregando indicadores...
-          </div>
-        )}
-
-        {/* Stats Grid */}
+        {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
-            >
+            <div key={stat.label} className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">{stat.label}</span>
                 <stat.icon className={`h-4 w-4 ${stat.color || "text-muted-foreground"}`} />
               </div>
-              <p className="mt-2 font-display text-2xl font-bold text-foreground">
-                {stat.value}
-              </p>
-              <span className={`text-xs font-medium ${stat.color || "text-primary"}`}>
-                {stat.change}
-              </span>
+              <p className="mt-2 font-display text-2xl font-bold text-foreground">{stat.value}</p>
+              <span className={`text-xs font-medium ${stat.color || "text-primary"}`}>{stat.change}</span>
             </div>
           ))}
         </div>
 
-        {/* --- NOVO MENU DE AÇÕES RÁPIDAS --- */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {/* --- MENU DE AÇÕES RÁPIDAS (Atualizado) --- */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <ActionBtn 
-            onClick={() => navigate("/add")} // Ajustado para rota existente de Scan/Novo
+            onClick={() => navigate("/stock/entry")} 
             icon={ScanBarcode} 
-            label="Cadastrar" 
+            label="Entrada" 
             desc="Escanear e cadastrar" 
             primary 
           />
@@ -192,61 +137,49 @@ export default function Index() {
             label="Estoque" 
             desc="Lista completa" 
           />
+          {/* NOVO BOTÃO DE HISTÓRICO */}
+          <ActionBtn 
+            onClick={() => navigate("/stock/history")} 
+            icon={History} 
+            label="Extrato" 
+            desc="Histórico de mov." 
+          />
           <ActionBtn 
             onClick={() => navigate("/dashboard")} 
             icon={PieChart} 
-            label="Dashboard" 
-            desc="Gráficos e análises" 
+            label="Relatórios" 
+            desc="Gráficos avançados" 
           />
           <ActionBtn 
             onClick={() => navigate("/products/new")} 
             icon={Plus} 
             label="Manual" 
-            desc="Cadastro sem scanner" 
+            desc="Sem código de barras" 
           />
         </div>
         
-        {/* Low Stock Alert Dinâmico */}
+        {/* Low Stock */}
         {lowStockItems.length > 0 ? (
-          <div className="mt-8 rounded-xl border border-border bg-card p-6">
-            <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-destructive" />
-              Produtos com Estoque Baixo
+          <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6">
+            <h2 className="font-display text-base font-semibold text-red-900 flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-red-600" />
+              Atenção: Estoque Baixo
             </h2>
             <div className="mt-4 space-y-3">
               {lowStockItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between rounded-lg bg-destructive/5 px-4 py-3"
-                >
-                  <span className="text-sm font-medium text-foreground">
-                    {item.product.name}
+                <div key={item.id} className="flex items-center justify-between rounded-lg bg-white/60 px-4 py-3 border border-red-100">
+                  <span className="text-sm font-medium text-red-900">{item.product.name}</span>
+                  <span className="text-sm font-mono text-red-600 font-bold">
+                    {item.total_quantity}/{item.min_quantity}
                   </span>
-                  <div className="flex items-center gap-3">
-                    <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-destructive"
-                        style={{ width: `${(item.total_quantity / item.min_quantity) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-mono text-destructive font-semibold">
-                      {item.total_quantity}/{item.min_quantity}
-                    </span>
-                  </div>
                 </div>
               ))}
             </div>
           </div>
-        ) : (
-          !loading && (
-            <div className="mt-8 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              Nenhum produto com estoque baixo. Tudo sob controle! 🎉
-            </div>
-          )
-        )}
+        ) : null}
 
-        <p className="mt-8 text-center text-sm text-muted-foreground">
-          💬 Clique no botão no canto inferior direito para conversar com o assistente IA
+        <p className="mt-12 text-center text-sm text-muted-foreground/60">
+          💬 Dica: Use o assistente IA para perguntar "O que eu vendi hoje?"
         </p>
       </main>
       
@@ -255,7 +188,7 @@ export default function Index() {
   );
 }
 
-// --- Componente Auxiliar de Botão ---
+// Componente Botão
 interface ActionBtnProps {
   onClick: () => void;
   icon: any;
@@ -263,15 +196,14 @@ interface ActionBtnProps {
   desc: string;
   primary?: boolean;
 }
-
 function ActionBtn({ onClick, icon: Icon, label, desc, primary }: ActionBtnProps) {
   return (
     <button
       onClick={onClick}
       className={`flex flex-col items-start justify-center gap-2 rounded-xl border p-4 text-left transition-all hover:shadow-md hover:scale-[1.02] active:scale-95 ${
         primary
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card text-foreground hover:bg-secondary/50"
+          ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+          : "border-border bg-card text-foreground hover:border-primary/30 hover:bg-secondary/50"
       }`}
     >
       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${primary ? "bg-white/20" : "bg-primary/10"}`}>
