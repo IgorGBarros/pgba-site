@@ -298,17 +298,34 @@ export default function AddProduct() {
           )}
 
           {/* Step 3: Confirmar */}
-          {step === 3 && (
-            <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-               {/* ... Resumo do seu código original ... */}
-               <div className="rounded-xl border border-border bg-card p-5 text-center">
-                  <p className="font-bold">{data.product_name}</p>
-                  <p className="text-sm text-muted-foreground">{data.quantity} unidades - Val: {data.expiry_date}</p>
+           {step === 3 && (
+             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+                 <div className="flex items-center gap-3">
+                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                     <Package className="h-5 w-5 text-primary" />
+                   </div>
+                   <p className="text-sm font-semibold text-foreground">Resumo do Cadastro</p>
+                 </div>
+                 
+                 <div className="space-y-2 rounded-lg bg-secondary/50 p-4 border border-border">
+                   <Row label="Produto" value={data.product_name || "—"} />
+                   <Row label="Código" value={data.barcode} />
+                   <Row label="Quantidade" value={`${data.quantity} un.`} />
+                   <div className="border-t border-border/50 my-2" />
+                   <Row label="Validade" value={data.expiry_date ? new Date(data.expiry_date).toLocaleDateString('pt-BR') : "—"} />
+                   <Row label="Custo Total" value={`R$ ${(data.cost_price * data.quantity).toFixed(2)}`} />
+                 </div>
+                 
+                 <div className="text-center">
+                     <p className="text-xs text-muted-foreground">
+                         Ao confirmar, o estoque será atualizado imediatamente.
+                     </p>
+                 </div>
                </div>
-            </motion.div>
-          )}
-
-        </AnimatePresence>
+             </motion.div>
+           )}
+         </AnimatePresence>
 
         {/* NAVEGAÇÃO */}
         {(!showScanner || step > 0) && (
@@ -331,6 +348,14 @@ export default function AddProduct() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
     </div>
   );
 }
