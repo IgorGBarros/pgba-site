@@ -19,7 +19,7 @@ class Command(BaseCommand):
         products = Product.objects.filter(natura_sku__isnull=False).order_by('last_checked_at')
         
         # Limita para não rodar infinito (ex: 50 por vez)
-        products = products[:1800] 
+        products = products[:1893] 
 
         self.stdout.write(self.style.WARNING(f"🕷️ Atualizando {len(products)} produtos do banco..."))
 
