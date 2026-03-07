@@ -1,16 +1,17 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ScanBarcode, Camera, RefreshCw, DollarSign, ChevronRight, ChevronLeft,
-  Check, Loader2, X, Package, ImagePlus, Search
+  Check, Loader2, X, Package, Search, ImageIcon
 } from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { api } from "../services/api";
 import { useToast } from "../hooks/use-toast";
 import { productService } from "../lib/productService";
 import { processImageForData } from "../lib/ocrService";
-import ProductSearchModal from "../components/ProductSearchModal";
+// Certifique-se de que este componente existe em src/components/ProductSearchModal.tsx
+import ProductSearchModal from "../components/ProductSearchModal"; 
 
 const STEPS = [
   { id: "scan", label: "Código", icon: ScanBarcode },
@@ -37,15 +38,12 @@ export default function AddProduct() {
   const [showScanner, setShowScanner] = useState(true);
   const [loading, setLoading] = useState(false);
   
+  // Estados para Modal de Busca
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
   // OCR States
   const [ocrLoading, setOcrLoading] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
-
-  // Busca Manual (Nome/SKU)
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [data, setData] = useState<ProductData>({
     barcode: "",
@@ -62,7 +60,7 @@ export default function AddProduct() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // --- LÓGICA DE PREENCHIMENTO ---
+  // --- PREENCHIMENTO ---
   const fillProductData = (productData: any) => {
     setData(prev => ({
         ...prev,
@@ -72,6 +70,17 @@ export default function AddProduct() {
         natura_sku: productData.natura_sku,
         image_url: productData.image_url
     }));
+  };
+
+  // --- SELEÇÃO NO MODAL ---
+  const selectSuggestion = (item: any) => {
+      fillProductData(item);
+      setIsSearchOpen(false); // Fecha o modal
+      // Se a sugestão tiver barcode, usa. Se não, mantém o atual.
+      if (item.bar_code) setData(prev => ({ ...prev, barcode: item.bar_code }));
+      
+      toast({ title: "Selecionado!", description: item.name });
+      setStep(1); // Avança para Validade
   };
 
   // --- PASSO 1A: SCAN CÓDIGO DE BARRAS ---
@@ -94,35 +103,6 @@ export default function AddProduct() {
       console.error("Erro no lookup:", error);
     }
     setStep(1); 
-  };
-
-  // --- PASSO 1B: BUSCA MANUAL (NOME/SKU) ---
-  const handleManualSearch = async (term: string) => {
-      setSearchTerm(term);
-      if (term.length > 2) {
-          try {
-              const { data } = await api.get(`/products/lookup/?q=${term}`);
-              if (data.candidates && data.candidates.length > 0) {
-                  setSuggestions(data.candidates);
-                  setShowSuggestions(true);
-              } else {
-                  setShowSuggestions(false);
-              }
-          } catch { setShowSuggestions(false); }
-      } else {
-          setShowSuggestions(false);
-      }
-  };
-
-  const selectSuggestion = (item: any) => {
-      fillProductData(item);
-      setSearchTerm(""); 
-      setShowSuggestions(false);
-      // Se a sugestão tiver barcode, usa. Se não, mantém o atual.
-      if (item.bar_code) setData(prev => ({ ...prev, barcode: item.bar_code }));
-      
-      toast({ title: "Selecionado!", description: item.name });
-      setStep(1); // Avança para Validade
   };
 
   // --- PASSO 2: OCR ---
@@ -225,6 +205,8 @@ export default function AddProduct() {
               {showScanner ? (
                 <div className="space-y-4">
                     <BarcodeScanner onScan={handleBarcodeScan} onClose={() => navigate("/")} />
+                    
+                    {/* Botão para mudar para busca manual */}
                     <button 
                         onClick={() => setShowScanner(false)} 
                         className="w-full text-center text-sm text-muted-foreground underline mt-4"
@@ -236,43 +218,21 @@ export default function AddProduct() {
                 <div className="space-y-6 rounded-xl border border-border bg-card p-5">
                    
                    {/* CARD DE BUSCA MANUAL */}
-                   <div className="space-y-2 relative">
-                        <label className="text-sm font-medium">Buscar Produto (Nome ou SKU)</label>
-                        <div className="flex gap-2">
-                            <input 
-                                value={searchTerm}
-                                onChange={(e) => handleManualSearch(e.target.value)}
-                                placeholder="Ex: Kaiak ou 38854"
-                                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:border-primary outline-none"
-                            />
-                            <button className="bg-primary/10 text-primary p-2 rounded-lg">
+                   <button 
+                        onClick={() => setIsSearchOpen(true)}
+                        className="w-full flex items-center justify-between p-4 border rounded-xl hover:bg-gray-50 text-left group transition-all"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 text-primary rounded-lg">
                                 <Search size={20} />
-                            </button>
-                        </div>
-
-                        {/* LISTA DE SUGESTÕES (POPUP) */}
-                        {showSuggestions && (
-                            <div className="absolute z-50 w-full bg-white border rounded-xl shadow-xl mt-1 max-h-60 overflow-y-auto">
-                                {suggestions.map((item) => (
-                                  <button 
-                                      onClick={() => setIsSearchOpen(true)}
-                                      className="w-full flex items-center justify-between p-4 border rounded-xl hover:bg-gray-50 text-left group transition-all"
-                                  >
-                                      <div className="flex items-center gap-3">
-                                          <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                                              <Search size={20} />
-                                          </div>
-                                          <div>
-                                              <p className="font-bold text-sm text-gray-700">Buscar Manualmente</p>
-                                              <p className="text-xs text-gray-500">Digite o nome ou código da revista</p>
-                                          </div>
-                                      </div>
-                                      <ChevronRight className="text-gray-300 group-hover:text-primary transition-colors" />
-                                  </button>
-                                ))}
                             </div>
-                        )}
-                   </div>
+                            <div>
+                                <p className="font-bold text-sm text-gray-700">Buscar Manualmente</p>
+                                <p className="text-xs text-gray-500">Digite o nome ou código da revista</p>
+                            </div>
+                        </div>
+                        <ChevronRight className="text-gray-300 group-hover:text-primary transition-colors" />
+                   </button>
 
                    <div className="flex items-center gap-3 py-4 border-t border-border mt-4">
                       <div className="h-px flex-1 bg-border"></div>
@@ -280,6 +240,7 @@ export default function AddProduct() {
                       <div className="h-px flex-1 bg-border"></div>
                    </div>
 
+                   {/* VOLTAR PARA SCANNER */}
                    <button onClick={() => setShowScanner(true)} className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-xl font-bold">
                         <ScanBarcode /> Abrir Câmera
                    </button>
@@ -430,11 +391,13 @@ export default function AddProduct() {
           )}
 
         </AnimatePresence>
+
+        {/* --- MODAL DE BUSCA (AQUI ESTÁ ELE!) --- */}
         <ProductSearchModal 
-              isOpen={isSearchOpen} 
-              onClose={() => setIsSearchOpen(false)} 
-              onSelect={selectSuggestion} // Reusa sua função existente!
-          />
+            isOpen={isSearchOpen} 
+            onClose={() => setIsSearchOpen(false)} 
+            onSelect={selectSuggestion} 
+        />
 
         {/* NAVEGAÇÃO */}
         {(!showScanner || step > 0) && (
