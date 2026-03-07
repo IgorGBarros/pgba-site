@@ -59,8 +59,7 @@ SECRET_KEY = 'django-insecure-+rc4szhd0d(k@((%vp6og@k_p)y5x*$9_=214d4+p@e3^o4gj7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['gestao-estoque-k5vy.onrender.com', 'localhost', '127.0.0.1']
 
 # Application definition
 
