@@ -15,34 +15,32 @@ from dotenv import load_dotenv
 from pathlib import Path
 import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")  # Garanta o caminho correto do .env
+load_dotenv(BASE_DIR / ".env")  # Garanta o caminho correto do .env´
+from urllib.parse import quote_plus # <--- Importante para corrigir caracteres especiais
 
-# Carrega variáveis
-# Tenta carregar do .env, mas usa valores FIXOS corretos se falhar (Fallback)
-DB_NAME = os.getenv("DB_NAME", "natura_inventory")
-DB_USER = os.getenv("DB_USER", "natura_admin")       # <== Mude para seu usuário real
-DB_PASSWORD = os.getenv("DB_PASSWORD", "senha_segura_123") # <== Use a senha que definiu no psql
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-# Usuário de leitura da IA (se existir no .env)
-DB_AI_USER = os.getenv("DB_AI_USER", "natura_ai")
-DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", "leitura_segura")
+# Configuração de Banco de Dados
+# 1. Tenta pegar a DATABASE_URL pronta do ambiente (Render)
+database_url = os.getenv("DATABASE_URL")
 
-# Sanitização (quote_plus remove caracteres problemáticos como @, ç, espaços)
-safe_ai_user = quote_plus(DB_AI_USER)
-safe_ai_pass = quote_plus(DB_AI_PASSWORD)
-safe_db_name = quote_plus(DB_NAME)
-safe_host = quote_plus(DB_HOST)
+# 2. Se não tiver (Localhost), monta a string manualmente mas com SEGURANÇA (quote_plus)
+if not database_url:
+    DB_NAME = os.getenv("DB_NAME", "natura_inventory")
+    DB_USER = os.getenv("DB_USER", "natura_admin")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "senha_segura_123")
+    DB_HOST = os.getenv("DB_HOST", "localhost")
+    DB_PORT = os.getenv("DB_PORT", "5432")
 
-# Monta a URL sanitizada para o LangChain
-DATABASE_URL = f"postgresql+psycopg2://{safe_ai_user}:{safe_ai_pass}@{safe_host}:{DB_PORT}/{safe_db_name}"
+    # quote_plus transforma caracteres perigosos (ex: '@' vira '%40')
+    safe_user = quote_plus(DB_USER)
+    safe_pass = quote_plus(DB_PASSWORD)
+    
+    # Monta a URL de fallback segura
+    database_url = f"postgres://{safe_user}:{safe_pass}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Configuração padrão do Django (não afeta o LangChain, mas bom manter igual)
-print(f"DEBUG: DATABASE_URL environment var is: {os.environ.get('DATABASE_URL')}") # Verifique se imprime algo nos logs
-
+# 3. Configura o Django
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"postgres://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
+    'default': dj_database_url.parse(
+        database_url,
         conn_max_age=600,
         conn_health_checks=True,
     )
