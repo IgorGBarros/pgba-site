@@ -1,4 +1,5 @@
 from time import timezone
+from django.db import models
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import viewsets
@@ -19,7 +20,7 @@ from .serializers import InventoryItemSerializer, ProductSerializer, StockEntryS
 from .scraper import search_google_shopping
 import re
 
-from backend.core.inventory import models
+
 
 # Pega o usuário padrão (seja ele Custom ou Default)
 User = get_user_model()

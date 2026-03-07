@@ -18,6 +18,7 @@ jobs:
       - name: Run Tests
         env: 
           DATABASE_URL: sqlite:///db.sqlite3 # Usa banco local pra teste rápido
+          PYTHONPATH: backend/core
         run: |
           cd backend/core
           python manage.py test
