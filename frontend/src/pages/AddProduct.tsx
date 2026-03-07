@@ -6,10 +6,10 @@ import {
   Check, Loader2, X, Package, ImagePlus, Search
 } from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
+import { api } from "../services/api";
 import { useToast } from "../hooks/use-toast";
 import { productService } from "../lib/productService";
 import { processImageForData } from "../lib/ocrService";
-import { api } from "../services/api";
 
 const STEPS = [
   { id: "scan", label: "Código", icon: ScanBarcode },
@@ -35,9 +35,11 @@ export default function AddProduct() {
   const [step, setStep] = useState(0);
   const [showScanner, setShowScanner] = useState(true);
   const [loading, setLoading] = useState(false);
+  
+  // OCR States
   const [ocrLoading, setOcrLoading] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
-  
+
   // Busca Manual (Nome/SKU)
   const [searchTerm, setSearchTerm] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -97,7 +99,6 @@ export default function AddProduct() {
       setSearchTerm(term);
       if (term.length > 2) {
           try {
-              // Chama o endpoint inteligente que busca por Nome ou SKU
               const { data } = await api.get(`/products/lookup/?q=${term}`);
               if (data.candidates && data.candidates.length > 0) {
                   setSuggestions(data.candidates);
@@ -113,13 +114,13 @@ export default function AddProduct() {
 
   const selectSuggestion = (item: any) => {
       fillProductData(item);
-      setSearchTerm(""); // Limpa a busca
+      setSearchTerm(""); 
       setShowSuggestions(false);
-      // Se tiver barcode na sugestão, usa. Se não, mantém o atual ou gera um provisório.
+      // Se a sugestão tiver barcode, usa. Se não, mantém o atual.
       if (item.bar_code) setData(prev => ({ ...prev, barcode: item.bar_code }));
       
       toast({ title: "Selecionado!", description: item.name });
-      setStep(1); // Avança
+      setStep(1); // Avança para Validade
   };
 
   // --- PASSO 2: OCR ---
@@ -179,7 +180,7 @@ export default function AddProduct() {
   };
 
   const canAdvance = () => {
-    if (step === 0) return !!data.barcode || !!data.product_name; // Aceita se tiver nome (via busca manual)
+    if (step === 0) return !!data.barcode || !!data.product_name; 
     if (step === 1) return true; 
     if (step === 2) return data.quantity > 0 && !!data.product_name; 
     return true;
@@ -221,9 +222,7 @@ export default function AddProduct() {
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner ? (
                 <div className="space-y-4">
-                    <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowScanner(false)} />
-                    
-                    {/* Botão para mudar para busca manual */}
+                    <BarcodeScanner onScan={handleBarcodeScan} onClose={() => navigate("/")} />
                     <button 
                         onClick={() => setShowScanner(false)} 
                         className="w-full text-center text-sm text-muted-foreground underline mt-4"
@@ -233,6 +232,7 @@ export default function AddProduct() {
                 </div>
               ) : (
                 <div className="space-y-6 rounded-xl border border-border bg-card p-5">
+                   
                    {/* CARD DE BUSCA MANUAL */}
                    <div className="space-y-2 relative">
                         <label className="text-sm font-medium">Buscar Produto (Nome ou SKU)</label>
@@ -241,25 +241,32 @@ export default function AddProduct() {
                                 value={searchTerm}
                                 onChange={(e) => handleManualSearch(e.target.value)}
                                 placeholder="Ex: Kaiak ou 38854"
-                                className="flex-1 border rounded-lg px-3 py-2 text-sm"
+                                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:border-primary outline-none"
                             />
                             <button className="bg-primary/10 text-primary p-2 rounded-lg">
                                 <Search size={20} />
                             </button>
                         </div>
 
-                        {/* LISTA DE SUGESTÕES (MODAL) */}
+                        {/* LISTA DE SUGESTÕES (POPUP) */}
                         {showSuggestions && (
-                            <div className="absolute z-10 w-full bg-white border rounded-xl shadow-xl mt-1 max-h-60 overflow-y-auto">
+                            <div className="absolute z-50 w-full bg-white border rounded-xl shadow-xl mt-1 max-h-60 overflow-y-auto">
                                 {suggestions.map((item) => (
                                     <button
                                         key={item.id}
                                         onClick={() => selectSuggestion(item)}
-                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b flex justify-between items-center"
+                                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b flex items-center gap-3 transition-colors"
                                     >
-                                        <div>
-                                            <p className="font-bold text-sm text-gray-800">{item.name}</p>
-                                            <p className="text-xs text-gray-500">SKU: {item.natura_sku}</p>
+                                        {/* Thumb */}
+                                        <div className="w-10 h-10 bg-gray-100 rounded shrink-0 overflow-hidden">
+                                            {item.image_url && <img src={item.image_url} className="w-full h-full object-cover"/>}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-sm text-gray-800 line-clamp-1">{item.name}</p>
+                                            <div className="flex justify-between text-xs text-gray-500">
+                                                <span>SKU: {item.natura_sku}</span>
+                                                <span>R$ {item.official_price}</span>
+                                            </div>
                                         </div>
                                         <ChevronRight size={16} className="text-gray-400" />
                                     </button>
@@ -274,12 +281,10 @@ export default function AddProduct() {
                       <div className="h-px flex-1 bg-border"></div>
                    </div>
 
-                   {/* VOLTAR PARA SCANNER */}
                    <button onClick={() => setShowScanner(true)} className="w-full flex items-center justify-center gap-2 bg-primary text-white py-3 rounded-xl font-bold">
                         <ScanBarcode /> Abrir Câmera
                    </button>
                    
-                   {/* Feedback se já identificou */}
                    {data.product_name && (
                        <div className="mt-4 p-3 bg-green-50 text-green-800 rounded-lg text-center text-sm border border-green-200">
                            Produto selecionado: <b>{data.product_name}</b>
@@ -299,7 +304,6 @@ export default function AddProduct() {
                     <p className="text-xs text-muted-foreground">Tire uma foto para ler a data automaticamente.</p>
                 </div>
 
-                {/* BOTÃO CÂMERA */}
                 <div 
                     className="relative w-full aspect-video bg-secondary/30 rounded-xl overflow-hidden border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-secondary/50 transition active:scale-95"
                     onClick={() => !photo && fileInputRef.current?.click()}
@@ -369,14 +373,17 @@ export default function AddProduct() {
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
                  
-                 {/* Exibe o Produto Selecionado */}
-                 <div className="bg-secondary/20 p-3 rounded-lg border border-border">
-                    <p className="text-xs text-muted-foreground font-bold uppercase">Produto</p>
-                    <p className="font-medium text-sm">{data.product_name}</p>
-                    {data.natura_sku && <p className="text-xs text-muted-foreground">SKU: {data.natura_sku}</p>}
+                 <div className="bg-secondary/20 p-3 rounded-lg border border-border flex gap-3">
+                    <div className="w-12 h-12 bg-white rounded border overflow-hidden">
+                        {data.image_url ? <img src={data.image_url} className="w-full h-full object-cover"/> : <Package className="m-2 text-gray-400"/>}
+                    </div>
+                    <div>
+                        <p className="text-xs text-muted-foreground font-bold uppercase">Produto</p>
+                        <p className="font-medium text-sm line-clamp-1">{data.product_name}</p>
+                        {data.natura_sku && <p className="text-xs text-muted-foreground">SKU: {data.natura_sku}</p>}
+                    </div>
                  </div>
 
-                 {/* Quantidade */}
                  <div>
                     <label className="text-sm font-medium">Quantidade</label>
                     <input 
@@ -416,7 +423,6 @@ export default function AddProduct() {
                   </div>
                   <div className="p-3 bg-secondary/30 rounded-lg text-xs text-left space-y-1">
                       <p>📦 <b>Validade:</b> {data.expiry_date || "Não informada"}</p>
-                      <p>📦 <b>SKU:</b> {data.natura_sku || "Não informado"}</p>
                       <p>🏷️ <b>Lote:</b> {data.batch_code || "N/A"}</p>
                       <p>💰 <b>Valor Venda:</b> R$ {data.sale_price}</p>
                   </div>
@@ -436,11 +442,7 @@ export default function AddProduct() {
             )}
             
             {step < 3 ? (
-              <button 
-                onClick={() => setStep(s => s + 1)} 
-                disabled={!canAdvance()} 
-                className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
-              >
+              <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
                 Próximo
               </button>
             ) : (
