@@ -115,6 +115,7 @@ export default function AddProduct() {
   };
 
   // Passo Final: Salvar
+  // Passo Final: Salvar
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -125,13 +126,16 @@ export default function AddProduct() {
         sale_price: data.sale_price,
         expiration_date: data.expiry_date || null,
         batch_code: data.batch_code,
-        name: data.product_name // Manda nome caso precise criar
+        // CAMPOS ESSENCIAIS PARA CRIAR NOVO:
+        name: data.product_name, 
+        category: data.category || "Geral"
       });
       
       toast({ title: "Sucesso!", description: "Estoque atualizado." });
-      navigate("/");
+      navigate("/"); // Volta para Dashboard ou Lista
     } catch (err: any) {
-      const msg = err.response?.data?.error || "Erro ao salvar.";
+      console.error(err); // Ajuda no debug
+      const msg = err.response?.data?.error || "Erro ao salvar. Tente novamente.";
       toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);

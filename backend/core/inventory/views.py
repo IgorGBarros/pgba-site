@@ -82,7 +82,7 @@ class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 class StockEntryView(APIView):
     """
-    RECEBIMENTO DE MERCADORIA (SCAN DE ENTRADA)
+    RECEBIMENTO DE MERCADORIA (CRIA PRODUTO SE NÃO EXISTIR)
     """
     def post(self, request):
         serializer = StockEntrySerializer(data=request.data)
@@ -92,17 +92,20 @@ class StockEntryView(APIView):
         data = serializer.validated_data
         store = get_current_store(request.user)
         
-        if not store:
-            return Response({"error": "Usuário não possui loja vinculada."}, status=400)
-        
-        try:
-            product = Product.objects.get(bar_code=data['bar_code'])
-        except Product.DoesNotExist:
-            return Response({"error": "Produto não cadastrado."}, status=404)
-            
         with transaction.atomic():
-            # Achar ou Criar Item no Estoque da Loja
-            item, created = InventoryItem.objects.get_or_create(
+            # 1. Busca ou Cria o Produto Global
+            product, created = Product.objects.get_or_create(
+                bar_code=data['bar_code'],
+                defaults={
+                    'name': data.get('name', 'Produto Novo'),
+                    'category': data.get('category', 'Geral'),
+                    # Se tiver preço de venda no form, usa como oficial inicial
+                    'official_price': data.get('sale_price', 0) 
+                }
+            )
+            
+            # 2. Achar ou Criar Item no Estoque da Loja
+            item, _ = InventoryItem.objects.get_or_create(
                 store=store,
                 product=product,
                 defaults={
@@ -112,12 +115,11 @@ class StockEntryView(APIView):
                 }
             )
             
-            # Se já existia, atualiza preços se fornecidos
-            if not created:
-                if data.get('cost_price'): item.cost_price = data['cost_price']
-                if data.get('sale_price'): item.sale_price = data['sale_price']
+            # Atualiza preços da loja se vierem no request
+            if data.get('cost_price'): item.cost_price = data['cost_price']
+            if data.get('sale_price'): item.sale_price = data['sale_price']
             
-            # Criar Lote (Batch)
+            # 3. Criar Lote (Batch)
             InventoryBatch.objects.create(
                 item=item,
                 quantity=data['quantity'],
@@ -125,11 +127,15 @@ class StockEntryView(APIView):
                 expiration_date=data.get('expiration_date')
             )
             
-            # Atualizar Total
+            # 4. Atualizar Total
             item.total_quantity += data['quantity']
             item.save()
             
-        return Response({"message": "Estoque atualizado!", "new_total": item.total_quantity})
+        return Response({
+            "message": "Estoque atualizado!", 
+            "product": product.name,
+            "new_total": item.total_quantity
+        })
 
 class SaleCheckoutView(APIView):
     def post(self, request):

@@ -88,6 +88,10 @@ class StockEntrySerializer(serializers.Serializer):
     sale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     batch_code = serializers.CharField(required=False, allow_blank=True)
     expiration_date = serializers.DateField(required=False, allow_null=True)
+    
+    # NOVOS CAMPOS (Opcionais, para criar produto novo)
+    name = serializers.CharField(required=False, allow_blank=True)
+    category = serializers.CharField(required=False, allow_blank=True)
 
 # ==========================================
 # 4. SERIALIZERS DE VENDA (PDV)
