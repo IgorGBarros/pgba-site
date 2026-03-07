@@ -15,6 +15,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 router = DefaultRouter()
 router.register(r'products', ProductViewSet)
 router.register(r'inventory', InventoryViewSet, basename='inventory')
+router.register(r'transactions', StockTransactionViewSet, basename='stock-transaction')
 
 urlpatterns = [
     # --- Rotas de Negócio ---
@@ -25,7 +26,7 @@ urlpatterns = [
     # --- Rotas de Autenticação (JWT) ---
     path('auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    router.register(r'transactions', StockTransactionViewSet, basename='stock-transaction'),
+    
     # path('auth/firebase/', FirebaseLoginView.as_view(), name='firebase-login'),
 
     # --- Rotas Automáticas (Router) ---

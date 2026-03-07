@@ -1,21 +1,19 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ScanBarcode, DollarSign, Check, Loader2, X, Package,
-  ChevronRight, ChevronLeft, ShoppingBag, Gift, User as UserIcon,
-  Camera, RefreshCw // Importados do StockWizard
+  ChevronRight, ChevronLeft, ShoppingBag, Gift, User as UserIcon
 } from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
-import { api } from "../services/api";
+import { api } from "../services/api"; // ✅ Importa a API configurada
 import { useToast } from "../hooks/use-toast";
-import { processImageForData } from "../lib/ocrService"; // Importado do StockWizard
 
 type SaleType = "venda" | "uso_proprio" | "presente";
 
 interface WithdrawData {
   barcode: string;
-  product_id: number;
+  product_id: number; // Alterado para number (ID do Django)
   product_name: string;
   category: string;
   current_quantity: number;
@@ -23,9 +21,6 @@ interface WithdrawData {
   withdraw_qty: number;
   sale_price: number | null;
   sale_type: SaleType;
-  // Campos adicionados do StockWizard para OCR/Validade
-  expiration_date?: string;
-  batch_code?: string;
 }
 
 const SALE_TYPES: { value: SaleType; label: string; icon: any; desc: string }[] = [
@@ -40,11 +35,6 @@ export default function WithdrawProduct() {
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   
-  // Estados trazidos do StockWizard para OCR
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [data, setData] = useState<WithdrawData>({
     barcode: "",
     product_id: 0,
@@ -55,42 +45,39 @@ export default function WithdrawProduct() {
     withdraw_qty: 1,
     sale_price: null,
     sale_type: "venda",
-    expiration_date: "",
-    batch_code: ""
   });
 
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // 1. Lógica de Scan (Adaptada do WithdrawProduct original + StockWizard)
-  const handleBarcodeScan = async (barcode: string) => { // Equivalente ao handleScanEAN
+  // 1. Lógica de Scan (Buscar no Inventário)
+  const handleBarcodeScan = async (barcode: string) => {
     setShowScanner(false);
     setNotFound(false);
     setData((p) => ({ ...p, barcode }));
 
-    toast({ title: "Buscando...", description: "Identificando produto no estoque." });
-
     try {
+      // Busca todo o inventário (idealmente o backend teria um filtro ?barcode=X)
+      // Como fallback, buscamos a lista e filtramos no front
       const { data: inventory } = await api.get("/inventory/");
+      
       const item = inventory.find((i: any) => i.product.bar_code === barcode);
 
       if (item) {
         setData((p) => ({
           ...p,
-          product_id: item.id,
+          product_id: item.id, // ID do InventoryItem
           product_name: item.product.name,
           category: item.product.category || "Geral",
           current_quantity: item.total_quantity,
           cost_price: Number(item.cost_price),
+          // Sugere o preço de venda cadastrado ou o oficial
           sale_price: Number(item.sale_price > 0 ? item.sale_price : item.product.official_price),
         }));
-        setStep(1); // Avança para o próximo passo
+        setStep(1);
         toast({ title: "Produto encontrado!", description: `${item.product.name} — ${item.total_quantity} un.` });
       } else {
         setNotFound(true);
-        // Se não achar no estoque local, no fluxo de SAÍDA, geralmente é erro.
-        // O StockWizard buscaria externamente, mas aqui focamos em baixar o que já existe.
-        toast({ title: "Erro", description: "Produto não encontrado no estoque para baixa.", variant: "destructive" });
       }
     } catch (error) {
       console.error("Erro ao buscar produto", error);
@@ -98,48 +85,16 @@ export default function WithdrawProduct() {
     }
   };
 
-  // 2. Lógica de OCR (Trazida do StockWizard) - handleNativeCamera
-  const handleNativeCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // 1. Mostra a foto na tela
-    const objectUrl = URL.createObjectURL(file);
-    setPhoto(objectUrl);
-    
-    // 2. OCR em Background
-    setOcrLoading(true);
-    toast({ title: "Lendo...", description: "Analisando validade e lote." });
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-        const base64data = reader.result as string;
-        const result = await processImageForData(base64data);
-        setOcrLoading(false);
-
-        if (result.date || result.batch) {
-             setData(prev => ({
-                ...prev,
-                expiration_date: result.date || prev.expiration_date,
-                batch_code: result.batch || prev.batch_code
-             }));
-             toast({ title: "Sucesso!", description: `Validade: ${result.date}` });
-        } else {
-             toast({ title: "Aviso", description: "Não consegui ler. Digite abaixo.", variant: "default" });
-        }
-    };
-    reader.readAsDataURL(file);
-  };
-
   // Cálculo de Margem
   const margin = data.sale_price && data.cost_price
     ? (((data.sale_price - data.cost_price) / data.cost_price) * 100).toFixed(1)
     : null;
 
-  // 3. Lógica de Salvar (Adaptada do WithdrawProduct original para usar os dados) - handleSubmit
-  const handleSave = async () => { // Equivalente ao handleSubmit
+  // 2. Lógica de Salvar (Checkout no Backend)
+  const handleSave = async () => {
     setLoading(true);
     try {
+      // Mapeia os tipos do front para o enum do backend Django
       const transactionMap: Record<SaleType, string> = {
         "venda": "VENDA",
         "uso_proprio": "USO_PROPRIO",
@@ -148,14 +103,14 @@ export default function WithdrawProduct() {
 
       const payload = {
         transaction_type: transactionMap[data.sale_type],
-        payment_method: "DINHEIRO",
+        payment_method: "DINHEIRO", // Pode adicionar um select no futuro
         items: [
           {
             bar_code: data.barcode,
             quantity: data.withdraw_qty,
-            price_sold: data.sale_type === "venda" ? data.sale_price : 0,
-            // Opcional: Enviar lote/validade se o backend suportar baixa específica por lote
-            // batch_code: data.batch_code 
+            // Se não for venda, o preço vendido é 0 (ou custo, dependendo da regra)
+            // Aqui mandamos o preço definido se for venda, senão 0
+            price_sold: data.sale_type === "venda" ? data.sale_price : 0
           }
         ]
       };
@@ -177,7 +132,6 @@ export default function WithdrawProduct() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - Mantido do WithdrawProduct */}
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           <button onClick={() => navigate("/")} className="rounded-lg p-2 text-muted-foreground hover:text-foreground">
@@ -187,11 +141,25 @@ export default function WithdrawProduct() {
           <div className="w-9" />
         </div>
       </header>
+      
+      {/* Progress Steps */}
+      <div className="mx-auto max-w-lg px-4 pt-4">
+        <div className="flex items-center gap-1">
+          {["Escanear", "Tipo & Preço", "Confirmar"].map((label, i) => (
+            <div key={label} className="flex flex-1 flex-col items-center gap-1">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${i <= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                {i < step ? <Check className="h-4 w-4" /> : i + 1}
+              </div>
+              <span className={`text-[10px] ${i <= step ? "text-primary font-medium" : "text-muted-foreground"}`}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <main className="mx-auto max-w-lg px-4 py-6">
         <AnimatePresence mode="wait">
           
-          {/* Step 0: Scan (Mantido do WithdrawProduct) */}
+          {/* Step 0: Scan */}
           {step === 0 && (
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner ? (
@@ -220,94 +188,14 @@ export default function WithdrawProduct() {
             </motion.div>
           )}
 
-          {/* NOVO Step 1.5: Validade/Lote (Trazido do StockWizard Step 2) */}
-          {/* Inserido como passo intermediário ou opcional na baixa */}
+          {/* Step 1: Type & Price */}
           {step === 1 && (
-             <motion.div 
-               key="step2_ocr" // Chave única
-               initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-               className="space-y-6"
-             >
-                <div className="text-center">
-                   <h2 className="text-xl font-bold mb-2">Validar Lote (Opcional)</h2>
-                   <p className="text-muted-foreground text-sm">Confirme de qual lote o produto está saindo.</p>
-                </div>
-
-                {/* BOTÃO DE CÂMERA GIGANTE (Do StockWizard) */}
-                <div 
-                  className="relative w-full aspect-video bg-zinc-800 rounded-2xl overflow-hidden shadow-lg border-2 border-dashed border-zinc-600 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-700 transition active:scale-95"
-                  onClick={() => !photo && fileInputRef.current?.click()}
-                >
-                  {!photo ? (
-                      <>
-                          <Camera size={48} className="text-zinc-400 mb-2" />
-                          <p className="text-zinc-300 font-bold">Abrir Câmera</p>
-                      </>
-                  ) : (
-                      <img src={photo} alt="Validade" className="w-full h-full object-cover" />
-                  )}
-                  
-                  {ocrLoading && (
-                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white z-20 backdrop-blur-sm">
-                          <Loader2 className="w-12 h-12 animate-spin mb-3 text-green-500" />
-                          <p className="text-sm font-bold uppercase tracking-widest">Lendo...</p>
-                      </div>
-                  )}
-                  
-                  {/* BOTÃO RETAKE */}
-                  {photo && !ocrLoading && (
-                      <button 
-                          type="button" // Importante adicionar type="button" para não submeter forms
-                          onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                          className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-xl z-10"
-                      >
-                          <RefreshCw size={24} />
-                      </button>
-                  )}
-                </div>
-
-                {/* INPUT ESCONDIDO */}
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  accept="image/*" 
-                  capture="environment" // Abre câmera traseira nativa
-                  className="hidden"
-                  onChange={handleNativeCamera}
-                />
-
-                <div className="space-y-4 rounded-xl border border-border bg-card p-4">
-                   <div>
-                      <label className="text-xs text-muted-foreground uppercase font-bold">Validade</label>
-                      <input 
-                          type="date" 
-                          value={data.expiration_date || ''}
-                          className="w-full bg-transparent border-b border-input py-2 text-lg text-foreground font-mono focus:border-primary outline-none"
-                          onChange={e => setData(prev => ({...prev, expiration_date: e.target.value}))}
-                      />
-                   </div>
-                   <div>
-                      <label className="text-xs text-muted-foreground uppercase font-bold">Lote</label>
-                      <input 
-                          value={data.batch_code || ''}
-                          placeholder="Ex: L.A60073" 
-                          className="w-full bg-transparent border-b border-input py-2 text-lg text-foreground uppercase focus:border-primary outline-none"
-                          onChange={e => setData(prev => ({...prev, batch_code: e.target.value}))}
-                      />
-                   </div>
-                </div>
-             </motion.div>
-          )}
-
-          {/* Step 2 (Antigo Step 1): Type & Price */}
-          {step === 2 && (
             <motion.div key="type" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
                 <div className="rounded-lg bg-secondary/50 p-3">
                   <p className="text-xs text-muted-foreground">Produto Identificado</p>
                   <p className="text-sm font-semibold text-foreground">{data.product_name}</p>
                   <p className="text-xs text-muted-foreground mt-1">Estoque atual: <span className="font-mono font-semibold text-foreground">{data.current_quantity} un.</span></p>
-                  {data.batch_code && <p className="text-xs text-muted-foreground">Lote: {data.batch_code}</p>}
                 </div>
 
                 {/* Quantity */}
@@ -375,8 +263,8 @@ export default function WithdrawProduct() {
             </motion.div>
           )}
 
-          {/* Step 3 (Antigo Step 2): Confirm */}
-          {step === 3 && (
+          {/* Step 2: Confirm */}
+          {step === 2 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center gap-3">
@@ -388,7 +276,6 @@ export default function WithdrawProduct() {
                 <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
                   <Row label="Produto" value={data.product_name} />
                   <Row label="Saída" value={`${data.withdraw_qty} unidade(s)`} />
-                  {data.batch_code && <Row label="Lote" value={data.batch_code} />}
                   <Row label="Estoque Final" value={`${data.current_quantity - data.withdraw_qty} un.`} />
                   <div className="my-2 border-t border-border/50" />
                   <Row label="Tipo" value={SALE_TYPES.find((t) => t.value === data.sale_type)?.label || ""} />
@@ -401,7 +288,6 @@ export default function WithdrawProduct() {
               </div>
             </motion.div>
           )}
-
         </AnimatePresence>
 
         {/* Navigation Buttons */}
@@ -413,7 +299,7 @@ export default function WithdrawProduct() {
               </button>
             )}
             
-            {step < 3 ? (
+            {step < 2 ? (
               <button
                 onClick={() => setStep(step + 1)}
                 disabled={step === 0 && !data.product_id}
@@ -423,7 +309,7 @@ export default function WithdrawProduct() {
               </button>
             ) : (
               <button
-                onClick={handleSave} // Equivalente ao handleSubmit
+                onClick={handleSave}
                 disabled={loading}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 transition-transform active:scale-95"
               >
