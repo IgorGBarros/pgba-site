@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.auth.models import User
 from django.utils import timezone
 
 from django.db import models
@@ -8,6 +7,9 @@ from django.contrib.auth.models import (
 )
 from django.utils import timezone
 from django.conf import settings
+
+from firebase_admin import auth
+import firebase_admin
 
 # ==========================================
 # 1. CAMADA PÚBLICA (CATÁLOGO GLOBAL)
@@ -64,14 +66,23 @@ class Store(models.Model):
     """
     Representa o negócio da Consultora.
     """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="store")
+    user = models.OneToOneField(
+                settings.AUTH_USER_MODEL, 
+                on_delete=models.CASCADE, 
+                related_name="store",
+                null=True, 
+                blank=True
+            )
+        
     name = models.CharField(max_length=100, default="Minha Loja Natura")
-    slug = models.SlugField(unique=True, blank=True) # Para a Vitrine Digital (ex: app.com/maria)
+    slug = models.SlugField(unique=True, blank=True)
     whatsapp = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Loja de {self.user.username}"
+            # Se for usar CustomUser que não tem username nativo, proteja a chamada
+            username = getattr(self.user, 'name', getattr(self.user, 'email', 'Desconhecido')) if self.user else "Sem Usuário"
+            return f"Loja de {username}"
 
 class InventoryItem(models.Model):
     """
@@ -196,7 +207,21 @@ class CustomUserManager(BaseUserManager):
 
         except Exception as e:
             raise ValueError(f"Erro ao criar usuário com Firebase: {str(e)}")
-        
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    email = models.EmailField(unique=True)
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name']
+
+    def __str__(self):
+        return self.email
+          
 # ... (outros models: Product, Store, InventoryItem, etc)
 
 class StockTransaction(models.Model):

@@ -11,6 +11,8 @@ from .models import Product, InventoryItem, InventoryBatch, Store, Sale, SaleIte
 # 1. SERIALIZERS DE AUTENTICAÇÃO
 # ==========================================
 
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):

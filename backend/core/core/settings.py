@@ -128,8 +128,7 @@ REST_FRAMEWORK = {
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-
+AUTH_USER_MODEL = 'inventory.CustomUser'
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
