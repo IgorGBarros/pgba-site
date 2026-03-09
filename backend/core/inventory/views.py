@@ -49,20 +49,38 @@ User = get_user_model()
 
 
 class FirebaseLoginView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         firebase_token = request.data.get('token')
-
         if not firebase_token:
             return Response({'error': 'Token ausente'}, status=status.HTTP_400_BAD_REQUEST)
-
+        
         try:
-            user = CustomUser.objects.create_user_with_firebase(firebase_token)
-            login(request, user)  # Inicia sessão no Django
+            # 1. Verifica token via firebase_admin (Você precisa inicializar o firebase_admin no settings.py)
+            from firebase_admin import auth as firebase_auth
+            decoded_token = firebase_auth.verify_id_token(firebase_token)
+            email = decoded_token.get('email')
+            name = decoded_token.get('name')
+            
+            # 2. Cria ou pega usuário
+            user, created = CustomUser.objects.get_or_create(
+                email=email,
+                defaults={'name': name, 'username': email}
+            )
+            
+            # 3. Gera JWT do Django
+            from rest_framework_simplejwt.tokens import RefreshToken
+            refresh = RefreshToken.for_user(user)
+            
             return Response({
+                'access': str(refresh.access_token), # O FRONTEND PRECISA DESSE TOKEN
+                'refresh': str(refresh),
                 'email': user.email,
-                'name': user.name,
+                'name': getattr(user, 'name', user.username),
                 'is_authenticated': True
             }, status=status.HTTP_200_OK)
+            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
