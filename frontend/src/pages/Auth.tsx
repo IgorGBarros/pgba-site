@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
 import { useToast } from "../hooks/use-toast";
+import { api } from "../services/api";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -43,7 +44,12 @@ export default function Auth() {
         await signIn(email, password);
         navigate("/");
       } else {
-        await signUp(email, password, name);
+          await api.post("/auth/register/", {
+          username: email, 
+          email: email,
+          password: password,
+          first_name: name,
+        });
         toast({ title: "Conta criada!", description: "Bem-vindo ao sistema." });
         navigate("/");
       }
