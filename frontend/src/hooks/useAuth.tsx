@@ -1,119 +1,90 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { api } from "../services/api"; // Sua instância do Axios configurada
-import { jwtDecode } from "jwt-decode"; // Opcional: Para ler dados do token (instalar: npm install jwt-decode)
+import { authApi, AuthUser, setToken, clearToken } from "../lib/api";
+import { getFirebaseAuth, getGoogleProvider } from "../lib/firebase";
+import { signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
 
-// Interface do Usuário (Baseada no CustomUser/User do Django)
-export interface User {
-  id: number;
-  email: string;
-  name?: string;
-  first_name?: string;
-}
-
-interface AuthContextData {
-  user: User | null;
+interface AuthCtx {
+  user: AuthUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => void;
-  isAuthenticated: boolean;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInDemo: () => void;
+  signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+const AuthContext = createContext<AuthCtx>({
+  user: null,
+  loading: true,
+  signIn: async () => {},
+  signUp: async () => {},
+  signInWithGoogle: async () => {},
+  signInDemo: () => {},
+  signOut: async () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Ao iniciar, verifica se existe token salvo
-    const loadStorageData = async () => {
-      const storedToken = localStorage.getItem("@NaturaStock:token");
-      const storedUser = localStorage.getItem("@NaturaStock:user");
-
-      if (storedToken && storedUser) {
-        // Configura o token no cabeçalho padrão do Axios
-        api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
-        setUser(JSON.parse(storedUser));
-      }
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
       setLoading(false);
-    };
-
-    loadStorageData();
+      return;
+    }
+    authApi
+      .me()
+      .then(setUser)
+      .catch(() => clearToken())
+      .finally(() => setLoading(false));
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    try {
-      // 2. Faz o POST para o Django (Endpoint configurado no urls.py)
-      const response = await api.post("/auth/login/", {
-        username: email, // O Django espera 'username' (mesmo sendo email na lógica)
-        password: password,
-      });
-
-      const { access, refresh } = response.data;
-
-      // 3. Tenta extrair dados do usuário do token (se usar claims customizados)
-      // Ou usa os dados básicos se o backend não retornar o objeto user
-      let userData: User = { 
-        id: 0, 
-        email: email, 
-        name: "Usuário" 
-      };
-
-      try {
-        // Se instalou jwt-decode: const decoded: any = jwtDecode(access);
-        // userData = { id: decoded.user_id, email: decoded.email, name: decoded.name };
-        
-        // Se o seu serializer CustomTokenObtainPairSerializer retornar o user, use-o aqui
-        // Por enquanto, vamos simular com o email
-      } catch (e) {
-        console.log("Erro ao decodificar token");
-      }
-
-      // 4. Salva no localStorage
-      localStorage.setItem("@NaturaStock:token", access);
-      localStorage.setItem("@NaturaStock:refresh", refresh);
-      localStorage.setItem("@NaturaStock:user", JSON.stringify(userData));
-
-      // 5. Atualiza o Axios e o Estado
-      api.defaults.headers.common["Authorization"] = `Bearer ${access}`;
-      setUser(userData);
-
-    } catch (error) {
-      console.error("Erro no login:", error);
-      throw error; // Lança o erro para a tela de login tratar
-    }
+    const res = await authApi.login(email, password);
+    setToken(res.token);
+    setUser(res.user);
   };
 
-  const signOut = () => {
-    localStorage.removeItem("@NaturaStock:token");
-    localStorage.removeItem("@NaturaStock:refresh");
-    localStorage.removeItem("@NaturaStock:user");
-    
-    // Remove o header
-    delete api.defaults.headers.common["Authorization"];
-    
+  const signUp = async (email: string, password: string, name: string) => {
+    const res = await authApi.register(email, password, name);
+    setToken(res.token);
+    setUser(res.user);
+  };
+
+  const signInWithGoogle = async () => {
+    const firebaseAuth = getFirebaseAuth();
+    const googleProvider = getGoogleProvider();
+    const result = await signInWithPopup(firebaseAuth, googleProvider);
+    const idToken = await result.user.getIdToken();
+    const res = await authApi.firebaseLogin(idToken);
+    setToken(res.token);
+    setUser(res.user);
+  };
+
+  const signInDemo = () => {
+    const demoUser: AuthUser = { id: "demo", email: "teste@natura.com", name: "Usuário Teste" };
+    setToken("demo-token");
+    setUser(demoUser);
+  };
+
+  const signOut = async () => {
+    await authApi.logout().catch(() => {});
+    clearToken();
+    try {
+      const firebaseAuth = getFirebaseAuth();
+      await firebaseSignOut(firebaseAuth);
+    } catch {
+      // Firebase not initialized, ignore
+    }
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        loading, 
-        signIn, 
-        signOut,
-        isAuthenticated: !!user 
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithGoogle, signInDemo, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);

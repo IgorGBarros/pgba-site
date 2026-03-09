@@ -3,45 +3,66 @@ import { Toaster as Sonner } from "../src/components/ui/sonner";
 import { TooltipProvider } from "../src/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "../src/hooks/useAuth";
+import { PlanProvider } from "../src/hooks/usePlan";
+import { FeatureGatesProvider } from "../src/hooks/useFeatureGates";
+import { ThemeProvider } from "../src/hooks/useTheme";
+import ProtectedRoute from "../src/components/ProtectedRoute";
 import Index from "./pages/Index";
-
+import Auth from "./pages/Auth";
 import ProductList from "./pages/ProductList";
 import ProductForm from "./pages/ProductForm";
 import AddProduct from "./pages/AddProduct";
 import WithdrawProduct from "./pages/WithdrawProduct";
+import StockWizard from "./pages/StockWizard";
 import Dashboard from "./pages/Dashboard";
 import Storefront from "./pages/Storefront";
 import Settings from "./pages/Settings";
+import MovementHistory from "./pages/MovementHistory";
+import AdminPanel from "./pages/AdminPanel";
+import Profile from "./pages/Profile";
+import Plans from "./pages/Plans";
+import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
-import StockWizard from "./pages/StockWizard";
-import StockHistory from "./pages/StockHistory";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/products" element={<ProductList />} />
-          <Route path="/products/new" element={<ProductForm />} />
-          <Route path="/products/:id/edit" element={<ProductForm />} />
-          <Route path="/stock/entry" element={<StockWizard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/add" element={<AddProduct />} />
-          <Route path="/withdraw" element={<WithdrawProduct />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/vitrine" element={<Storefront />} />
-          <Route path="/stock/history" element={<StockHistory />} />
-       
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <PlanProvider>
+        <FeatureGatesProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/products" element={<ProtectedRoute><ProductList /></ProtectedRoute>} />
+            <Route path="/products/new" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
+            <Route path="/products/:id/edit" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
+            <Route path="/stock/entry" element={<ProtectedRoute><StockWizard /></ProtectedRoute>} />
+            <Route path="/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+            <Route path="/withdraw" element={<ProtectedRoute><WithdrawProduct /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><MovementHistory /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
+            <Route path="/vitrine/:slug" element={<Storefront />} />
+            <Route path="/vitrine" element={<Storefront />} />
+            <Route path="/admin-panel" element={<AdminPanel />} />
+            <Route path="/lp" element={<LandingPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        </FeatureGatesProvider>
+        </PlanProvider>
+      </AuthProvider>
     </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

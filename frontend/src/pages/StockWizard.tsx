@@ -1,272 +1,475 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { ScanBarcode, Camera, RefreshCw, X, Loader2, ImagePlus } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ScanBarcode, Camera, Hash, DollarSign, ChevronRight, ChevronLeft,
+  Check, Loader2, X, Package, Search as SearchIcon
+} from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
-import { productService } from "../lib/productService";
+import FuzzyMatchModal from "../components/FuzzyMatchModal";
+import {
+  inventoryApi, movementsApi, ocrApi, productLookupApi, batchApi,
+  GlobalProduct, formatMoney
+} from "../lib/api";
+import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/use-toast";
-import { processImageForData } from "../lib/ocrService";
 
-interface WizardData {
-  bar_code?: string;
-  name?: string;
-  price?: string | number;
-  cost_price?: string | number;
-  quantity?: number;
-  expiration_date?: string;
-  batch_code?: string;
-  product_id?: number;
+const STEPS = [
+  { id: "scan", label: "Escanear", icon: ScanBarcode },
+  { id: "expiry", label: "Validade", icon: Camera },
+  { id: "details", label: "Qtd & Preço", icon: DollarSign },
+  { id: "confirm", label: "Confirmar", icon: Check },
+];
+
+interface EntryData {
+  barcode: string;
+  product_name: string;
+  category: string;
+  sku: string | null;
+  image_url: string | null;
+  official_price: number | null;
+  expiry_date: string;
+  expiry_photo_url: string;
+  quantity: number;
+  cost_price: number;
+  existing_item_id: string | null;
+  lookup_source: string | null;
 }
 
 export default function StockWizard() {
-  const [step, setStep] = useState(1);
-  const [data, setData] = useState<WizardData>({ quantity: 1 });
+  const [step, setStep] = useState(0);
+  const [showScanner, setShowScanner] = useState(true);
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
-  
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [fuzzyModal, setFuzzyModal] = useState<{ barcode: string; suggestions: GlobalProduct[] } | null>(null);
+  const [data, setData] = useState<EntryData>({
+    barcode: "", product_name: "", category: "Outro", sku: null,
+    image_url: null, official_price: null, expiry_date: "", expiry_photo_url: "",
+    quantity: 1, cost_price: 0, existing_item_id: null, lookup_source: null,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { toast } = useToast();
 
-  // PASSO 1: EAN
-  const handleScanEAN = async (code: string) => {
-    setData((prev) => ({ ...prev, bar_code: code }));
-    toast({ title: "Buscando...", description: "Identificando produto." });
-    
+  // ── Hybrid lookup ──
+  const handleBarcodeScan = async (barcode: string) => {
+    setShowScanner(false);
+    setData((p) => ({ ...p, barcode }));
+    setLookupLoading(true);
+
     try {
-      const res = await productService.lookupByEan(code);
-      if (res.found) {
-        const foundData = res.source === 'local' ? res.data : (res.data as any).remote || res.data;
-        setData((prev) => ({ 
-            ...prev, 
-            name: foundData.name,
-            price: foundData.sale_price || foundData.price,
-            product_id: foundData.id
+      // Check user's own inventory first
+      const existing = await inventoryApi.getByBarcode(barcode);
+      if (existing) {
+        setData((p) => ({
+          ...p,
+          product_name: existing.product_name,
+          category: existing.category,
+          image_url: existing.image_url,
+          sku: existing.sku,
+          official_price: existing.official_price,
+          cost_price: existing.cost_price,
+          existing_item_id: existing.id,
+          lookup_source: "inventory",
         }));
-        toast({ title: "Encontrado!", description: foundData.name });
+        toast({ title: "Produto encontrado!", description: `${existing.product_name} — ${existing.quantity} un. em estoque` });
+        setLookupLoading(false);
+        setStep(1);
+        return;
       }
-    } catch {}
-    setStep(2); 
+    } catch { /* not in user inventory */ }
+
+    // Global lookup (local catalog → scraper → fuzzy)
+    try {
+      const result = await productLookupApi.lookup(barcode);
+
+      if (result.source === "fuzzy" && result.suggestions?.length) {
+        setLookupLoading(false);
+        setFuzzyModal({ barcode, suggestions: result.suggestions });
+        return;
+      }
+
+      if (result.product) {
+        applyGlobalProduct(result.product, result.source);
+        toast({ title: "Produto identificado!", description: `${result.product.name} (${result.source})` });
+      }
+    } catch {
+      // No match anywhere
+    }
+
+    setLookupLoading(false);
+    setStep(1);
   };
 
-  // CAPTURA DA FOTO DE VALIDADE (NATIVA)
-  const handleNativeCamera = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const applyGlobalProduct = (product: GlobalProduct, source: string) => {
+    setData((p) => ({
+      ...p,
+      product_name: product.name,
+      category: product.category || p.category,
+      sku: product.sku,
+      image_url: product.image_url,
+      official_price: product.official_price,
+      lookup_source: source,
+    }));
+  };
+
+  const handleFuzzyConfirm = async (product: GlobalProduct) => {
+    setFuzzyModal(null);
+    applyGlobalProduct(product, "fuzzy");
+
+    // Self-healing: link barcode to product
+    try {
+      await productLookupApi.confirmMatch(data.barcode, product.id);
+      toast({ title: "Vínculo salvo!", description: "Próximos scans serão instantâneos." });
+    } catch { /* non-critical */ }
+
+    setStep(1);
+  };
+
+  const handleFuzzySkip = () => {
+    setFuzzyModal(null);
+    setStep(1);
+  };
+
+  // ── OCR ──
+  const handleExpiryPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1. Mostra a foto na tela
-    const objectUrl = URL.createObjectURL(file);
-    setPhoto(objectUrl);
-    
-    // 2. OCR em Background
     setOcrLoading(true);
-    toast({ title: "Lendo...", description: "Analisando validade e lote." });
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-        const base64data = reader.result as string;
-        const result = await processImageForData(base64data);
-        setOcrLoading(false);
-
-        if (result.date || result.batch) {
-             setData(prev => ({
-                ...prev,
-                expiration_date: result.date || prev.expiration_date,
-                batch_code: result.batch || prev.batch_code
-             }));
-             toast({ title: "Sucesso!", description: `Validade: ${result.date}` });
-        } else {
-             toast({ title: "Aviso", description: "Não consegui ler. Digite abaixo.", variant: "default" });
-        }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const result = await ocrApi.uploadAndExtract(file);
+      if (result.photo_url) {
+        setData((p) => ({ ...p, expiry_photo_url: result.photo_url! }));
+      }
+      if (result.expiry_date) {
+        setData((p) => ({ ...p, expiry_date: result.expiry_date! }));
+        toast({ title: "Validade detectada!", description: result.expiry_date });
+      } else {
+        toast({ title: "OCR não detectou data", description: "Insira manualmente.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erro ao processar foto", variant: "destructive" });
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
-  // PASSO 3: FINALIZAR
-  const handleSubmit = async () => {
+  // ── Save (creates batch) ──
+  const handleSave = async () => {
+    if (!user) return;
     setLoading(true);
+
     try {
-       await productService.addStock({
-           bar_code: data.bar_code,
-           quantity: data.quantity || 1,
-           expiration_date: data.expiration_date,
-           batch_code: data.batch_code,
-           name: data.name || "Novo Produto", 
-           price: parseFloat(String(data.price)) || 0,
-           cost_price: 0,
-       });
-       toast({ title: "Sucesso!", description: "Entrada registrada." });
-       navigate("/products");
-    } catch {
-       toast({ title: "Erro", variant: "destructive" });
+      let itemId = data.existing_item_id;
+
+      if (!itemId) {
+        // Create new inventory item
+        const inserted = await inventoryApi.create({
+          barcode: data.barcode,
+          product_name: data.product_name || "Produto sem nome",
+          category: data.category,
+          expiry_date: data.expiry_date || null,
+          expiry_photo_url: data.expiry_photo_url || null,
+          quantity: data.quantity,
+          cost_price: data.cost_price,
+        });
+        itemId = inserted.id;
+      } else {
+        // Update existing item quantity
+        const existing = await inventoryApi.get(itemId);
+        await inventoryApi.update(itemId, {
+          quantity: existing.quantity + data.quantity,
+        });
+      }
+
+      // Create batch for this entry
+      await batchApi.create(itemId, {
+        quantity: data.quantity,
+        cost_price: data.cost_price,
+        expiry_date: data.expiry_date || null,
+        expiry_photo_url: data.expiry_photo_url || null,
+      });
+
+      // Record movement
+      await movementsApi.create({
+        product_id: itemId,
+        batch_id: null,
+        product_name: data.product_name || "Produto sem nome",
+        barcode: data.barcode,
+        movement_type: "entrada",
+        quantity: data.quantity,
+        unit_price: data.cost_price,
+        sale_type: null,
+        notes: data.lookup_source ? `Fonte: ${data.lookup_source}` : null,
+      });
+
+      toast({ title: "Entrada registrada!", description: `+${data.quantity} ${data.product_name}` });
+      navigate("/");
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const canAdvance = () => {
+    if (step === 0) return !!data.barcode && !lookupLoading;
+    if (step === 1) return true;
+    if (step === 2) return data.quantity > 0 && !!data.product_name;
+    return true;
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col safe-area-inset-bottom">
-      
-      {/* HEADER */}
-      <div className="p-4 pt-8 bg-zinc-900 flex justify-between items-center">
-        <button onClick={() => navigate(-1)}><X /></button>
-        <div className="flex gap-2">
-            {[1, 2, 3].map(i => (
-                <div key={i} className={`h-2 w-12 rounded-full ${step >= i ? 'bg-green-500' : 'bg-zinc-700'}`} />
-            ))}
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
+          <button onClick={() => navigate("/")} className="rounded-lg p-2 text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+          <h1 className="font-display text-base font-bold text-foreground">Entrada de Estoque</h1>
+          <div className="w-9" />
         </div>
-        <div className="w-6" />
+      </header>
+
+      {/* Progress */}
+      <div className="mx-auto max-w-lg px-4 pt-4">
+        <div className="flex items-center gap-1">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex flex-1 flex-col items-center gap-1">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${i <= step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                {i < step ? <Check className="h-4 w-4" /> : i + 1}
+              </div>
+              <span className={`text-[10px] ${i <= step ? "text-primary font-medium" : "text-muted-foreground"}`}>{s.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <main className="mx-auto max-w-lg px-4 py-6">
         <AnimatePresence mode="wait">
-          
-          {/* PASSO 1: SCAN */}
-          {step === 1 && (
-            <motion.div 
-              key="step1"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
-              className="flex-1 flex flex-col items-center justify-center p-6 space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold">O que chegou?</h2>
-                <p className="text-zinc-400">Separe os produtos por validade.</p>
-              </div>
-              <div className="w-full aspect-square bg-zinc-900 rounded-3xl overflow-hidden border-2 border-green-500/50 relative shadow-2xl shadow-green-900/20">
-                 <BarcodeScanner onScan={handleScanEAN} onClose={()=>{}} />
-              </div>
-              <p className="text-xs text-zinc-500">Aponte para o código de barras</p>
-            </motion.div>
-          )}
-
-          {/* PASSO 2: CÂMERA NATIVA */}
-          {step === 2 && (
-            <motion.div 
-              key="step2"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
-              className="flex-1 flex flex-col p-6 space-y-6"
-            >
-              <div className="text-center">
-                 <h2 className="text-2xl font-bold mb-2">Validade & Lote</h2>
-                 <p className="text-zinc-400 text-sm">Toque na câmera para abrir.</p>
-              </div>
-
-              {/* BOTÃO DE CÂMERA GIGANTE */}
-              <div 
-                className="relative w-full aspect-video bg-zinc-800 rounded-2xl overflow-hidden shadow-lg border-2 border-dashed border-zinc-600 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-700 transition active:scale-95"
-                onClick={() => !photo && fileInputRef.current?.click()}
-              >
-                {!photo ? (
-                    <>
-                        <Camera size={48} className="text-zinc-400 mb-2" />
-                        <p className="text-zinc-300 font-bold">Abrir Câmera</p>
-                    </>
-                ) : (
-                    <img src={photo} alt="Validade" className="w-full h-full object-cover" />
-                )}
-                
-                {ocrLoading && (
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white z-20 backdrop-blur-sm">
-                        <Loader2 className="w-12 h-12 animate-spin mb-3 text-green-500" />
-                        <p className="text-sm font-bold uppercase tracking-widest">Lendo...</p>
+          {/* Step 0: Scan & Lookup */}
+          {step === 0 && (
+            <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              {showScanner ? (
+                <BarcodeScanner onScan={handleBarcodeScan} onClose={() => navigate("/")} />
+              ) : (
+                <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <ScanBarcode className="h-5 w-5 text-primary" />
                     </div>
-                )}
-                
-                {/* BOTÃO RETAKE */}
-                {photo && !ocrLoading && (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                        className="absolute bottom-4 right-4 bg-white text-black p-3 rounded-full shadow-xl z-10"
-                    >
-                        <RefreshCw size={24} />
-                    </button>
-                )}
-              </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Código Lido</p>
+                      <p className="font-mono text-lg font-bold text-primary">{data.barcode}</p>
+                    </div>
+                  </div>
 
-              {/* INPUT ESCONDIDO */}
-              <input 
-                ref={fileInputRef}
-                type="file" 
-                accept="image/*" 
-                capture="environment" // Abre câmera traseira nativa
-                className="hidden"
-                onChange={handleNativeCamera}
-              />
+                  {lookupLoading && (
+                    <div className="flex items-center justify-center gap-2 rounded-lg bg-primary/5 py-4 text-sm text-primary">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Buscando produto...</span>
+                    </div>
+                  )}
 
-              <div className="space-y-4 bg-zinc-900 p-4 rounded-xl">
-                 <div>
-                    <label className="text-xs text-zinc-500 uppercase font-bold">Validade</label>
-                    <input 
-                        type="date" 
-                        value={data.expiration_date || ''}
-                        className="w-full bg-transparent border-b border-zinc-700 py-3 text-2xl text-white font-mono focus:border-green-500 outline-none"
-                        onChange={e => setData(prev => ({...prev, expiration_date: e.target.value}))}
-                    />
-                 </div>
-                 <div>
-                    <label className="text-xs text-zinc-500 uppercase font-bold">Lote</label>
-                    <input 
-                        value={data.batch_code || ''}
-                        placeholder="Ex: L.A60073" 
-                        className="w-full bg-transparent border-b border-zinc-700 py-2 text-lg text-white uppercase focus:border-green-500 outline-none"
-                        onChange={e => setData(prev => ({...prev, batch_code: e.target.value}))}
-                    />
-                 </div>
-              </div>
+                  {!lookupLoading && data.product_name && (
+                    <div className="flex items-center gap-3 rounded-lg bg-primary/5 p-3">
+                      {data.image_url ? (
+                        <img src={data.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border border-border" />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted"><Package className="h-5 w-5 text-muted-foreground" /></div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{data.product_name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {data.sku && <span>SKU: {data.sku}</span>}
+                          {data.official_price && <span>{formatMoney(data.official_price)}</span>}
+                          {data.lookup_source && (
+                            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">{data.lookup_source}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-              <button 
-                onClick={() => setStep(3)}
-                className="w-full bg-green-600 text-white font-bold py-4 rounded-xl mt-auto"
-              >
-                Confirmar Data
-              </button>
+                  {!lookupLoading && !data.product_name && (
+                    <div>
+                      <label className="text-sm text-muted-foreground">Nome do Produto *</label>
+                      <input type="text" value={data.product_name} onChange={(e) => setData((p) => ({ ...p, product_name: e.target.value }))} placeholder="Digite o nome do produto" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+                    </div>
+                  )}
+
+                  <button type="button" onClick={() => setShowScanner(true)} className="text-xs text-primary hover:underline">Escanear outro código</button>
+                </div>
+              )}
             </motion.div>
           )}
 
-          {/* PASSO 3: QUANTIDADE */}
+          {/* Step 1: Expiry Photo + OCR */}
+          {step === 1 && (
+            <motion.div key="expiry" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Camera className="h-5 w-5 text-primary" /></div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Foto da Validade</p>
+                    <p className="text-xs text-muted-foreground">Auditoria e rastreabilidade do lote</p>
+                  </div>
+                </div>
+
+                {data.expiry_photo_url ? (
+                  <div className="space-y-3">
+                    <img src={data.expiry_photo_url} alt="Foto da validade" className="w-full rounded-lg border border-border object-cover" style={{ maxHeight: 200 }} />
+                    {ocrLoading && (
+                      <div className="flex items-center justify-center gap-2 text-sm text-primary">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Analisando imagem...
+                      </div>
+                    )}
+                    <button type="button" onClick={() => { setData((p) => ({ ...p, expiry_photo_url: "", expiry_date: "" })); fileInputRef.current?.click(); }} className="text-xs text-primary hover:underline">Tirar outra foto</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-10 text-muted-foreground transition-colors hover:border-primary hover:text-primary">
+                    <Camera className="h-8 w-8" />
+                    <span className="text-sm font-medium">Tirar foto da validade</span>
+                    <span className="text-xs">Usa câmera traseira com zoom</span>
+                  </button>
+                )}
+
+                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleExpiryPhoto} className="hidden" />
+
+                <div>
+                  <label className="text-sm text-muted-foreground">Data de Validade</label>
+                  <input type="month" value={data.expiry_date} onChange={(e) => setData((p) => ({ ...p, expiry_date: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+                  <p className="mt-1 text-[10px] text-muted-foreground">{data.expiry_date ? "✅ Validade definida" : "Opcional — pode pular"}</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 2: Quantity & Price */}
+          {step === 2 && (
+            <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="space-y-5 rounded-xl border border-border bg-card p-5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Hash className="h-5 w-5 text-primary" /></div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Quantidade & Preço do Lote</p>
+                    <p className="text-xs text-muted-foreground">Cada entrada cria um lote separado</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-foreground">Quantidade *</label>
+                  <div className="mt-2 flex items-center gap-3">
+                    <button type="button" onClick={() => setData((p) => ({ ...p, quantity: Math.max(1, p.quantity - 1) }))} className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-lg font-bold">−</button>
+                    <input type="number" min={1} value={data.quantity} onChange={(e) => setData((p) => ({ ...p, quantity: Math.max(1, parseInt(e.target.value) || 1) }))} className="h-10 w-20 rounded-lg border border-input bg-background text-center font-mono text-lg font-bold outline-none focus:border-primary" />
+                    <button type="button" onClick={() => setData((p) => ({ ...p, quantity: p.quantity + 1 }))} className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-lg font-bold">+</button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-foreground">Preço de Custo (R$) *</label>
+                  <div className="relative mt-2">
+                    <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input type="number" step="0.01" min="0" value={data.cost_price || ""} onChange={(e) => setData((p) => ({ ...p, cost_price: parseFloat(e.target.value) || 0 }))} placeholder="0.00" className="w-full rounded-lg border border-input bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary" />
+                  </div>
+                  {data.official_price && (
+                    <p className="mt-1 text-[10px] text-muted-foreground">Preço oficial: {formatMoney(data.official_price)}</p>
+                  )}
+                </div>
+
+                {!data.product_name && (
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Nome do Produto *</label>
+                    <input type="text" value={data.product_name} onChange={(e) => setData((p) => ({ ...p, product_name: e.target.value }))} placeholder="Nome do produto" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-sm font-medium text-foreground">Categoria</label>
+                  <select value={data.category} onChange={(e) => setData((p) => ({ ...p, category: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary">
+                    {["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Infantil", "Casa", "Outro"].map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 3: Confirm */}
           {step === 3 && (
-            <motion.div 
-              key="step3"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
-              className="flex-1 flex flex-col p-6"
-            >
-              <div className="flex-1 space-y-6">
-                <h2 className="text-2xl font-bold text-center">Quantos chegaram?</h2>
-                <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 text-center">
-                    <h3 className="text-lg font-medium text-zinc-300 line-clamp-2">{data.name || "Produto Novo"}</h3>
+            <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+                <div className="flex items-center gap-3">
+                  {data.image_url ? (
+                    <img src={data.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border border-border" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Package className="h-6 w-6 text-primary" /></div>
+                  )}
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Confirmar Entrada</p>
+                    <p className="text-xs text-muted-foreground">{data.product_name || "Novo produto"}</p>
+                  </div>
                 </div>
-
-                <div className="flex items-center justify-center gap-6 py-8">
-                    <button onClick={() => setData(prev => ({...prev, quantity: Math.max(1, (prev.quantity||1)-1)}))} 
-                        className="w-16 h-16 rounded-full bg-zinc-800 border border-zinc-700 text-3xl font-bold">-</button>
-                    <span className="text-6xl font-bold w-24 text-center">{data.quantity}</span>
-                    <button onClick={() => setData(prev => ({...prev, quantity: (prev.quantity||1)+1}))} 
-                        className="w-16 h-16 rounded-full bg-green-500 text-black text-3xl font-bold">+</button>
+                <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
+                  <Row label="Código" value={data.barcode} />
+                  <Row label="Produto" value={data.product_name || "—"} />
+                  <Row label="Categoria" value={data.category} />
+                  {data.sku && <Row label="SKU" value={data.sku} />}
+                  <Row label="Validade" value={data.expiry_date || "Não informada"} />
+                  <Row label="Quantidade" value={`${data.quantity} un.`} />
+                  <Row label="Custo Unitário" value={formatMoney(data.cost_price)} />
+                  <Row label="Custo Total" value={formatMoney(data.cost_price * data.quantity)} />
                 </div>
-
-                <div className="bg-zinc-900 p-4 rounded-xl flex justify-between items-center">
-                    <span className="text-zinc-400">Preço Venda</span>
-                    <input 
-                        type="number" 
-                        className="bg-transparent text-right text-xl font-bold w-24 outline-none border-b border-zinc-700 focus:border-green-500"
-                        value={data.price || ''}
-                        onChange={e => setData(prev => ({...prev, price: e.target.value}))}
-                    />
-                </div>
+                {data.expiry_photo_url && (
+                  <img src={data.expiry_photo_url} alt="Validade" className="h-20 rounded-lg border border-border object-cover" />
+                )}
               </div>
-
-              <button 
-                onClick={handleSubmit}
-                disabled={loading}
-                className="w-full bg-white text-black font-bold py-4 rounded-xl text-lg shadow-xl"
-              >
-                {loading ? "Salvando..." : "Finalizar Entrada"}
-              </button>
             </motion.div>
           )}
-
         </AnimatePresence>
-      </div>
+
+        {/* Navigation */}
+        {(!showScanner || step > 0) && (
+          <div className="mt-6 flex gap-3">
+            {step > 0 && (
+              <button type="button" onClick={() => setStep((s) => s - 1)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground">
+                <ChevronLeft className="h-4 w-4" /> Voltar
+              </button>
+            )}
+            {step < 3 ? (
+              <button type="button" onClick={() => setStep((s) => s + 1)} disabled={!canAdvance()} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                Próximo <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <button type="button" onClick={handleSave} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Registrar Entrada
+              </button>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Fuzzy Match Modal */}
+      <AnimatePresence>
+        {fuzzyModal && (
+          <FuzzyMatchModal
+            barcode={fuzzyModal.barcode}
+            suggestions={fuzzyModal.suggestions}
+            onConfirm={handleFuzzyConfirm}
+            onSkip={handleFuzzySkip}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground">{value}</span>
     </div>
   );
 }
