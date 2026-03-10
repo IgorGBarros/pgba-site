@@ -76,12 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 2. Pega o ID Token gerado
       const idToken = await result.user.getIdToken();
 
-      // 3. Envia o token para o Django validar e retornar um JWT do seu sistema
-      const response = await api.post("/auth/firebase/", { token: idToken });
+        // 3. Envia o token para o Django validar
+      const response = await api.post("auth/firebase/", { token: idToken });
       
-      // 4. Salva a sessão no frontend (supondo que o Django retorne 'token' ou 'access')
-      const token = response.data.access || response.data.token;
-      const userData = { email: response.data.email, name: response.data.name };
+      // 4. Salva a sessão
+      const token = response.data.access; // O Django DRF SimpleJWT retorna 'access'
+      const userData = { 
+          email: response.data.email, 
+          name: response.data.name || "Usuário" 
+      };
 
       if (token) {
           localStorage.setItem("auth_token", token);

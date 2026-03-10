@@ -49,40 +49,57 @@ User = get_user_model()
 
 
 class FirebaseLoginView(APIView):
+    """View para Login/Cadastro via Google (Firebase)"""
     permission_classes = [AllowAny]
 
     def post(self, request):
         firebase_token = request.data.get('token')
+        
         if not firebase_token:
             return Response({'error': 'Token ausente'}, status=status.HTTP_400_BAD_REQUEST)
-        
+            
         try:
-            # 1. Verifica token via firebase_admin (Você precisa inicializar o firebase_admin no settings.py)
+            # 1. Verifica token via firebase_admin
             from firebase_admin import auth as firebase_auth
             decoded_token = firebase_auth.verify_id_token(firebase_token)
             email = decoded_token.get('email')
-            name = decoded_token.get('name')
+            name = decoded_token.get('name', 'Consultora')
             
-            # 2. Cria ou pega usuário
-            user, created = CustomUser.objects.get_or_create(
+            # 2. Cria ou pega usuário usando o modelo Padrão do Django
+            # CORREÇÃO AQUI: Usa first_name em vez de name
+            user, created = User.objects.get_or_create(
                 email=email,
-                defaults={'name': name, 'username': email}
+                defaults={
+                    'first_name': name[:30], # Limita tamanho caso venha nome muito longo
+                    'username': email
+                }
             )
             
-            # 3. Gera JWT do Django
+            # Se for criado agora, define uma senha inútil para ele não conseguir logar sem Google
+            if created:
+                user.set_unusable_password()
+                user.save()
+
+            # 3. Gera JWT do Django para a sessão
             from rest_framework_simplejwt.tokens import RefreshToken
             refresh = RefreshToken.for_user(user)
             
+            # 4. Adiciona Claims extras (Opcional, mas útil pro Front)
+            refresh['email'] = user.email
+            refresh['name'] = user.first_name
+            
             return Response({
-                'access': str(refresh.access_token), # O FRONTEND PRECISA DESSE TOKEN
+                'access': str(refresh.access_token), 
                 'refresh': str(refresh),
                 'email': user.email,
-                'name': getattr(user, 'name', user.username),
+                'name': user.first_name,
                 'is_authenticated': True
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # Trocado para imprimir no log do Render qual foi o erro exato
+            print(f"🔥 ERRO FIREBASE VIEW: {str(e)}") 
+            return Response({'error': f"Erro interno: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ============================================================================
