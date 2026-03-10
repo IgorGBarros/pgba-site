@@ -44,7 +44,7 @@ class CustomUserCreateView(generics.CreateAPIView):
     serializer_class = CustomUserSerializer
     permission_classes = [AllowAny]  # Permissão para qualquer usuário
 
-
+ 
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
