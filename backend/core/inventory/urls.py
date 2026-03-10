@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
+    CustomUserCreateView,
     FirebaseLoginView,
     ProductViewSet, 
     InventoryViewSet, 
@@ -27,8 +28,8 @@ urlpatterns = [
     # --- Rotas de Autenticação (JWT) ---
     path('auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
-      path('firebase-login/', FirebaseLoginView.as_view(), name='firebase-login'),
+    path('auth/register/', CustomUserCreateView.as_view(), name='register'), 
+    path('auth/firebase/', FirebaseLoginView.as_view(), name='firebase_login'),
 
     # --- Rotas Automáticas (Router) ---
     path('', include(router.urls)),
