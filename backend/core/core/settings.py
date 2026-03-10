@@ -170,3 +170,30 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+import os
+import json
+import firebase_admin
+from firebase_admin import credentials
+
+# Lê a string JSON da variável de ambiente do Render
+firebase_json_str = os.environ.get('FIREBASE_CREDENTIALS')
+
+if firebase_json_str:
+    try:
+        # Transforma a string de volta em dicionário
+        firebase_creds_dict = json.loads(firebase_json_str)
+        
+        # Cria a credencial
+        cred = credentials.Certificate(firebase_creds_dict)
+        
+        # Inicializa o Firebase APENAS SE ainda não estiver inicializado
+        # (Isso evita erros se o servidor recarregar partes do código)
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred)
+            print("✅ Firebase Admin inicializado com SUCESSO via Variável de Ambiente.")
+    except Exception as e:
+        print(f"❌ Erro Crítico: Falha ao inicializar o Firebase Admin. Erro: {e}")
+else:
+    print("⚠️ ATENÇÃO: Variável FIREBASE_CREDENTIALS não encontrada. Login do Google não vai funcionar.")
