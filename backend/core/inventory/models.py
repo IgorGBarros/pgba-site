@@ -158,7 +158,14 @@ class SaleItem(models.Model):
     unit_cost_at_time = models.DecimalField(max_digits=10, decimal_places=2, default=0) # Para relatório de lucro
 
 
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
+from firebase_admin import auth
 
+# ==========================================
+# 0. USUÁRIO CUSTOMIZADO (AUTH)
+# ==========================================
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -175,53 +182,41 @@ class CustomUserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-
-        if not extra_fields.get('is_staff'):
-            raise ValueError("Superuser deve ter is_staff=True.")
-        if not extra_fields.get('is_superuser'):
-            raise ValueError("Superuser deve ter is_superuser=True.")
-
         return self.create_user(email, password, **extra_fields)
-
+    
     def create_user_with_firebase(self, firebase_token, **extra_fields):
         try:
-            from firebase_admin import auth as firebase_auth
-            decoded_token = firebase_auth.verify_id_token(firebase_token)
+            decoded_token = auth.verify_id_token(firebase_token)
             email = decoded_token.get('email')
-            if not email:
-                raise ValueError("Token do Firebase não contém email.")
-
-            uid = decoded_token.get('uid')
-            name = extra_fields.get('name') or uid
-
+            name = decoded_token.get('name') or decoded_token.get('uid')
+            
             user, created = self.get_or_create(
-                email=email,
+                email=email, 
                 defaults={'name': name, **extra_fields}
             )
-
             if created:
                 user.set_unusable_password()
                 user.save(using=self._db)
-
             return user
-
         except Exception as e:
-            raise ValueError(f"Erro ao criar usuário com Firebase: {str(e)}")
+            raise ValueError(f"Erro ao verificar o token do Firebase: {e}")
+
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
-
+    
     objects = CustomUserManager()
-
+    
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['name']
-
+    
     def __str__(self):
         return self.email
-          
+
+# ... Resto do seu models.py (Product, Store, InventoryItem, etc)
 # ... (outros models: Product, Store, InventoryItem, etc)
 
 class StockTransaction(models.Model):

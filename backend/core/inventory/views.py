@@ -45,58 +45,37 @@ class CustomUserCreateView(generics.CreateAPIView):
     permission_classes = [AllowAny]  # Permissão para qualquer usuário
 
 
-User = get_user_model()
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import get_user_model
 
+User = get_user_model() # Vai pegar o CustomUser automaticamente
 
 class FirebaseLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         firebase_token = request.data.get('token')
-        
         if not firebase_token:
             return Response({'error': 'Token ausente'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            from firebase_admin import auth as firebase_auth
-            # Valida o token (se estiver expirado ou de outro projeto, vai quebrar aqui)
-            decoded_token = firebase_auth.verify_id_token(firebase_token)
+            # Chama o método elegante que você criou no Manager
+            user = User.objects.create_user_with_firebase(firebase_token)
             
-            email = decoded_token.get('email')
-            name = decoded_token.get('name', 'Consultora')
-            
-            # Se o projeto no Firebase estiver diferente das credenciais JSON do Render,
-            # o verify_id_token() falha.
-            
-            User = get_user_model()
-            # CRIAÇÃO SEGURA
-            user, created = User.objects.get_or_create(
-                email=email,
-                defaults={
-                    'first_name': name[:30], 
-                    'username': email
-                }
-            )
-            
-            if created:
-                user.set_unusable_password()
-                user.save()
-
-            from rest_framework_simplejwt.tokens import RefreshToken
+            # Gera o JWT
             refresh = RefreshToken.for_user(user)
             
             return Response({
-                'access': str(refresh.access_token), 
+                'access': str(refresh.access_token),
                 'refresh': str(refresh),
                 'email': user.email,
-                'name': user.first_name,
+                'name': user.name,
                 'is_authenticated': True
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            # 🚨 ESTE É O LOG QUE PRECISAMOS LER NO RENDER
-            print(f"\n🔥 ERRO FIREBASE VIEW: {str(e)}\n") 
-            return Response({'error': 'Erro ao validar login', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            print(f"🔥 ERRO FIREBASE: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 # ============================================================================
 # 2. CORE BUSINESS (ESTOQUE)
