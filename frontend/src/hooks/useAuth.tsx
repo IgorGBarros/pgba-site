@@ -1,153 +1,173 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { api } from "../services/api";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useToast } from '../hooks/use-toast';
+import { api } from '../services/api'; // A sua API Axios configurada
+import { auth, googleProvider, signInWithPopup } from '../firebaseConfig';
 
-// 1. IMPORTAÇÕES DO FIREBASE (Certifique-se que o caminho "../lib/firebaseConfig" está correto)
-import { auth, googleProvider, signInWithPopup } from "../firebaseConfig";
-
-// 2. INTERFACE DO USUÁRIO
+// --- TIPAGEM ---
 export interface User {
-  id: number;
+  id: string | number;
   email: string;
   name?: string;
   first_name?: string;
+  // Campos de assinatura (do seu projeto anterior)
+  subscriptionPlan?: string | null;
+  subscriptionStatus?: string;
 }
 
-// 3. INTERFACE DO CONTEXTO
-interface AuthContextData {
-  user: User | null;
+interface AuthContextType {
+  currentUser: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  loginWithFirebase: () => Promise<boolean>;
   signInDemo: () => void;
-  signOut: () => Promise<void>;
+  // Métodos de gerenciamento mantidos da sua estrutura
+  updateUser: (user: User) => boolean;
+  cancelSubscription: () => Promise<boolean>;
   isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Carrega usuário da sessão ao iniciar
+  // --- 1. CARREGAMENTO INICIAL ---
   useEffect(() => {
-    const loadStorageData = () => {
-      const storedToken = localStorage.getItem("auth_token");
-      const storedUser = localStorage.getItem("auth_user");
+    const initAuth = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const savedUser = localStorage.getItem('auth_user');
 
-      if (storedToken && storedUser) {
-        api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
-        setUser(JSON.parse(storedUser));
+        if (token && savedUser) {
+          api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+          setCurrentUser(JSON.parse(savedUser));
+        }
+      } catch (error) {
+        console.error("Erro ao restaurar sessão:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-
-    loadStorageData();
+    initAuth();
   }, []);
 
-  // --- LOGIN NORMAL (Email/Senha) ---
-  const signIn = async (email: string, password: string) => {
+  // --- 2. LOGIN NORMAL (DJANGO) ---
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await api.post("auth/login/", { username: email, password });
-      const { access, user: userData } = response.data;
+      
+      // O Django REST SimpleJWT retorna 'access'
+      const { access } = response.data;
+      const userData: User = { id: email, email, name: email.split('@')[0] };
 
       localStorage.setItem("auth_token", access);
-      localStorage.setItem("auth_user", JSON.stringify(userData || { email }));
-
+      localStorage.setItem("auth_user", JSON.stringify(userData));
       api.defaults.headers.common["Authorization"] = `Bearer ${access}`;
-      setUser(userData || { email, name: email.split('@')[0] });
+      
+      setCurrentUser(userData);
+      return true;
     } catch (error) {
-      console.error("Erro no login:", error);
-      throw error;
+      console.error("Falha no login local:", error);
+      return false;
     }
   };
 
-  // --- CADASTRO ---
-  const signUp = async (email: string, password: string, name: string) => {
-      await api.post("auth/register/", { username: email, email, password, first_name: name });
-  };
-
-  // --- LOGIN GOOGLE (Firebase -> Django) ---
-  const signInWithGoogle = async () => {
+  // --- 3. LOGIN GOOGLE (FIREBASE -> DJANGO) ---
+  const loginWithFirebase = async (): Promise<boolean> => {
     try {
       // Abre o popup do Google
       const result = await signInWithPopup(auth, googleProvider);
       
-      // Obtém o Token JWT do Firebase (Força renovação com 'true')
+      // Pega o token para enviar ao Django
       const idToken = await result.user.getIdToken(true);
 
-      if (!idToken) {
-          throw new Error("Falha ao gerar token do Google.");
-      }
+      if (!idToken) throw new Error("Token do Google vazio.");
 
-      // Envia o token para o Django validar
+      // Envia para nossa view FirebaseLoginView no Django
       const response = await api.post("auth/firebase/", { token: idToken });
       
-      // Salva a sessão retornada pelo seu Backend (Django)
       const token = response.data.access; 
       const userData: User = { 
-          id: response.data.id || 0,
+          id: response.data.email, 
           email: response.data.email, 
-          name: response.data.name || "Usuário" 
+          name: response.data.name 
       };
 
-      if (token) {
-          localStorage.setItem("auth_token", token);
-          localStorage.setItem("auth_user", JSON.stringify(userData));
-          api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-          setUser(userData);
-      } else {
-          throw new Error("Token de acesso não retornado pelo servidor.");
-      }
-
-    } catch (error) {
-      console.error("Erro no login com Google:", error);
-      throw error;
+      localStorage.setItem("auth_token", token);
+      localStorage.setItem("auth_user", JSON.stringify(userData));
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      
+      setCurrentUser(userData);
+      
+      toast({
+        title: "Login bem-sucedido",
+        description: `Bem-vindo(a), ${userData.name}`,
+      });
+      return true;
+      
+    } catch (error: any) {
+      console.error('Erro no login com Firebase:', error);
+      const msg = error.response?.data?.error || "Não foi possível fazer login com o Google.";
+      toast({ title: "Erro", description: msg, variant: "destructive" });
+      return false;
     }
   };
 
-  // --- LOGIN DEMO (Teste Rápido) ---
-  const signInDemo = () => {
-      const demoUser: User = { id: 999, email: "demo@natura.com", name: "Consultora Demo" };
-      setUser(demoUser);
-      localStorage.setItem("auth_user", JSON.stringify(demoUser));
-      localStorage.setItem("auth_token", "demo_token_123");
-      api.defaults.headers.common["Authorization"] = `Bearer demo_token_123`;
-  };
-
-  // --- LOGOUT ---
-  const signOut = async () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
+  // --- 4. LOGOUT ---
+  const logout = async (): Promise<void> => {
+    setCurrentUser(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
     delete api.defaults.headers.common["Authorization"];
-    setUser(null);
-    // Tenta deslogar do firebase também
     try { await auth.signOut(); } catch (e) {}
   };
 
+  // --- 5. DEMO ---
+  const signInDemo = () => {
+    const demoUser: User = { id: 'demo', email: "demo@natura.com", name: "Consultora Teste" };
+    setCurrentUser(demoUser);
+    localStorage.setItem("auth_user", JSON.stringify(demoUser));
+    localStorage.setItem("auth_token", "demo_token");
+    api.defaults.headers.common["Authorization"] = `Bearer demo_token`;
+  };
+
+  // --- 6. FUNÇÕES AUXILIARES (do seu outro projeto) ---
+  const updateUser = (user: User): boolean => {
+    setCurrentUser(user);
+    localStorage.setItem('auth_user', JSON.stringify(user));
+    return true;
+  };
+
+  const cancelSubscription = async (): Promise<boolean> => {
+    if (!currentUser) return false;
+    const updatedUser: User = { ...currentUser, subscriptionStatus: 'canceled', subscriptionPlan: null };
+    updateUser(updatedUser);
+    toast({ title: "Assinatura cancelada", description: "Sua assinatura foi cancelada com sucesso." });
+    return true;
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signUp,
-        signInWithGoogle,
-        signInDemo,
-        signOut,
-        isAuthenticated: !!user
-      }}
-    >
+    <AuthContext.Provider value={{ 
+      currentUser,
+      loading,
+      login, 
+      logout,
+      loginWithFirebase,
+      signInDemo,
+      updateUser,
+      cancelSubscription,
+      isAuthenticated: !!currentUser
+    }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
-  }
+  if (!context) throw new Error('useAuth deve estar dentro de AuthProvider');
   return context;
 };

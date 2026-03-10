@@ -27,56 +27,70 @@ from .scraper import search_google_shopping
 import re
 from django.contrib.auth import login
 
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import get_user_model
 
-# Pega o usuário padrão (seja ele Custom ou Default)
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth import login, get_user_model
+
+# Presumo que serializers.py contém essas classes
+from .serializers import CustomTokenObtainPairSerializer, CustomUserSerializer
+from .models import CustomUser
+
 User = get_user_model()
 
 # ============================================================================
-# 1. AUTHENTICATION (Simplificada para MVP)
+# 1. AUTHENTICATION VIEWS
 # ============================================================================
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-
 
 class CustomUserCreateView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
     permission_classes = [AllowAny]  # Permissão para qualquer usuário
 
- 
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import get_user_model
-
-User = get_user_model() # Vai pegar o CustomUser automaticamente
-
 class FirebaseLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         firebase_token = request.data.get('token')
+        
         if not firebase_token:
             return Response({'error': 'Token ausente'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            # Chama o método elegante que você criou no Manager
-            user = User.objects.create_user_with_firebase(firebase_token)
+            # 1. Usa o método Elegante do seu Manager
+            user = CustomUser.objects.create_user_with_firebase(firebase_token)
             
-            # Gera o JWT
+            # 2. Inicia sessão tradicional do Django (Opcional, mas estava no seu código)
+            login(request, user)  
+            
+            # 3. Gera os Tokens JWT para o Frontend moderno (React/Vite) usar no Bearer
             refresh = RefreshToken.for_user(user)
             
+            # Retorna o payload combinando a simplicidade do seu código antigo
+            # com a necessidade de JWT do projeto atual.
             return Response({
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
                 'email': user.email,
-                'name': user.name,
+                'name': getattr(user, 'name', user.email),
                 'is_authenticated': True
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"🔥 ERRO FIREBASE: {e}")
+            # Mantive a impressão para debug no Render, facilita muito a vida!
+            print(f"🔥 ERRO FIREBASE VIEW: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+# ... (Abaixo seguem as rotas do Estoque: ProductViewSet, StockEntryView, etc) ...
 # ============================================================================
 # 2. CORE BUSINESS (ESTOQUE)
 # ============================================================================
