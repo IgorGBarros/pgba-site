@@ -364,27 +364,53 @@ class SaleCheckoutView(APIView):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+
 def lookup_product(request):
     """
     Busca produto no banco local ou na internet via RPA.
+    Suporta busca por EAN exato, SKU exato ou Nome parcial (autocomplete).
     """
     query = request.query_params.get('ean') or request.query_params.get('q')
     force_remote = request.query_params.get('force_remote') == 'true'
     
-    print(f"\n🔍 [DEBUG] Nova busca: '{query}'")
+    print(f"\n🔍 [DEBUG] Nova busca API: '{query}'")
+
     if not query:
-        return Response({"error": "Query obrigatória"}, status=400)
+        return Response({"error": "Parâmetro de busca obrigatório"}, status=400)
     
-    # 1. Busca Local
+    # --- 1. SE FOR BUSCA POR NOME (NÃO É NÚMERO) ---
+    # Isso atende ao ProductSearchModal perfeitamente
+    if not query.isdigit():
+        print(f"   ↳ Busca Textual detectada. Procurando no Catálogo Global...")
+        
+        # Faz uma busca case-insensitive no catálogo global (Product)
+        candidates = Product.objects.filter(name__icontains=query).order_by('name')[:10]
+        
+        if candidates.exists():
+            print(f"   ✅ Retornando {candidates.count()} candidatos.")
+            return Response({
+                "found": True,
+                "source": "suggestion",
+                "google_name": query,
+                "candidates": ProductSerializer(candidates, many=True).data,
+                "message": "Candidatos encontrados."
+            })
+        else:
+            # Se não achou no banco, pode tentar jogar no Google (opcional) ou só retornar falso
+            return Response({"found": False, "message": "Nenhum produto encontrado com este nome na base."})
+
+    # --- 2. SE FOR BUSCA POR EAN / SKU (NÚMERO) ---
+    print(f"   ↳ Busca Numérica detectada. Verificando base local...")
+    
     if not force_remote:
         local = Product.objects.filter(Q(bar_code=query) | Q(natura_sku=query)).first()
         if local:
-            print(f"   ✅ Encontrado no banco local: {local.name}")
+            print(f"   ✅ Encontrado no banco local (Match Exato): {local.name}")
             return Response({"found": True, "source": "local", "data": ProductSerializer(local).data})
             
-    # 2. Busca Remota
-    if query and query.isdigit() and len(query) > 6:
-        print(f"   ↳ Buscando ONLINE para aprender...")
+    # Se não achou local ou forçou remoto, vai pros Scrapers (Google/Natura/Cosmos)
+    if len(query) > 5:
+        print(f"   ↳ Não achou EAN localmente. Iniciando Scraper para {query}...")
         
         online_data = search_google_shopping(query)
         
@@ -392,69 +418,35 @@ def lookup_product(request):
             sku_found = online_data.get('natura_sku')
             name_found = online_data.get('name')
             
-            # Salvar resultados bônus (se houver)
+            # Salvar resultados adicionais (se a busca trouxe vários)
             all_results = online_data.get('all_results', [])
-            if all_results:
-                for p in all_results:
-                    Product.objects.update_or_create(
-                        natura_sku=p['natura_sku'],
-                        defaults={
-                            'name': p['name'],
-                            'official_price': p.get('sale_price', 0),
-                            'category': p.get('category', 'Geral'),
-                            'last_checked_at': timezone.now()
-                        }
-                    )
-            
-            # Match exato por SKU
-            if sku_found:
-                product, created = Product.objects.get_or_create(
-                    natura_sku=sku_found,
-                    defaults={
-                        'bar_code': query,
-                        'name': name_found,
-                        'official_price': online_data.get('sale_price', 0),
-                        'category': online_data.get('category', 'Geral'),
-                        'description': online_data.get('description', '')
-                    }
+            for p in all_results:
+                Product.objects.update_or_create(
+                    natura_sku=p['natura_sku'],
+                    defaults={'name': p['name'], 'official_price': p.get('sale_price', 0), 'category': p.get('category', 'Geral'), 'last_checked_at': timezone.now()}
                 )
-                if not created and not product.bar_code:
+            
+            # CASO 1: TEM SKU (Google ou Natura achou)
+            if sku_found:
+                try:
+                    product = Product.objects.get(natura_sku=sku_found)
                     product.bar_code = query
                     product.save()
-                    
-                return Response({
-                    "found": True, 
-                    "source": "remote_learned", 
-                    "data": ProductSerializer(product).data
-                })
+                    print(f"   🧠 APRENDIZADO: Vinculado EAN {query} ao SKU existente {sku_found}")
+                except Product.DoesNotExist:
+                    product = Product.objects.create(
+                        natura_sku=sku_found, bar_code=query, name=name_found,
+                        official_price=online_data.get('sale_price', 0), category=online_data.get('category', 'Geral'), description=online_data.get('description', '')
+                    )
+                    print(f"   🧠 APRENDIZADO: Novo produto criado (SKU {sku_found})")
                 
-            # Match Fuzzy (Nome)
+                return Response({"found": True, "source": "remote_learned", "data": ProductSerializer(product).data})
+                
+            # CASO 2: SÓ TEM NOME (Ex: Cosmos achou)
             elif name_found:
-                stopwords = ['ml', 'g', 'de', 'e', 'para', 'o', 'a', 'com', 'natura', '-', 'refil']
-                clean_name = re.sub(r'\b\d+\b', '', name_found.lower())
-                keywords = [w for w in clean_name.split() if w not in stopwords and len(w) > 2]
-                
-                query_filter = Q()
-                if keywords:
-                    query_filter &= Q(name__icontains=keywords[0])
-                    for word in keywords[1:3]: 
-                        query_filter &= Q(name__icontains=word)
-                    
-                    candidates = Product.objects.filter(query_filter)[:5]
-                    
-                    if candidates.exists():
-                         return Response({
-                            "found": True,
-                            "source": "suggestion",
-                            "google_name": name_found,
-                            "candidates": ProductSerializer(candidates, many=True).data,
-                            "message": "Qual destes é o correto?"
-                        })
-                        
                 return Response({
-                    "found": True,
-                    "source": "remote_partial",
-                    "data": online_data
+                    "found": True, "source": "remote_partial", "data": online_data,
+                    "message": "Produto achado, mas sem código Natura oficial."
                 })
                 
     return Response({"found": False, "source": None})
