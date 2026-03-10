@@ -1,173 +1,174 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useToast } from '../hooks/use-toast';
-import { api } from '../services/api'; // A sua API Axios configurada
-import { auth, googleProvider, signInWithPopup } from '../firebaseConfig';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { api } from "../services/api";
 
-// --- TIPAGEM ---
+// 1. IMPORTAÇÕES DO FIREBASE
+import { auth, googleProvider, signInWithPopup } from "../firebaseConfig";
+
+// 2. INTERFACE DO USUÁRIO
 export interface User {
-  id: string | number;
+  id: number;
   email: string;
   name?: string;
   first_name?: string;
-  // Campos de assinatura (do seu projeto anterior)
-  subscriptionPlan?: string | null;
-  subscriptionStatus?: string;
 }
 
-interface AuthContextType {
-  currentUser: User | null;
+interface AuthContextData {
+  user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  loginWithFirebase: () => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signInDemo: () => void;
-  // Métodos de gerenciamento mantidos da sua estrutura
-  updateUser: (user: User) => boolean;
-  cancelSubscription: () => Promise<boolean>;
+  signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
-  // --- 1. CARREGAMENTO INICIAL ---
+  // --- CARREGAR SESSÃO INICIAL ---
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const token = localStorage.getItem('auth_token');
-        const savedUser = localStorage.getItem('auth_user');
+    const loadStorageData = () => {
+      const storedToken = localStorage.getItem("auth_token");
+      const storedUser = localStorage.getItem("auth_user");
 
-        if (token && savedUser) {
-          api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-          setCurrentUser(JSON.parse(savedUser));
-        }
-      } catch (error) {
-        console.error("Erro ao restaurar sessão:", error);
-      } finally {
-        setLoading(false);
+      if (storedToken && storedUser) {
+        // Se tem token, configura o Axios para enviar em todas as requisições
+        api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+        setUser(JSON.parse(storedUser));
       }
+      setLoading(false);
     };
-    initAuth();
+
+    loadStorageData();
   }, []);
 
-  // --- 2. LOGIN NORMAL (DJANGO) ---
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // --- LOGIN NORMAL (Email/Senha) ---
+  const signIn = async (email: string, password: string) => {
     try {
+      // Chama o endpoint CustomTokenObtainPairView
       const response = await api.post("auth/login/", { username: email, password });
       
-      // O Django REST SimpleJWT retorna 'access'
       const { access } = response.data;
-      const userData: User = { id: email, email, name: email.split('@')[0] };
+      
+      // Cria um usuário básico para a sessão baseado no email
+      // (Se seu backend não retornar o objeto user completo no login normal)
+      const userData: User = { id: 0, email: email, name: email.split('@')[0] };
 
       localStorage.setItem("auth_token", access);
       localStorage.setItem("auth_user", JSON.stringify(userData));
+
       api.defaults.headers.common["Authorization"] = `Bearer ${access}`;
+      setUser(userData);
       
-      setCurrentUser(userData);
-      return true;
     } catch (error) {
-      console.error("Falha no login local:", error);
-      return false;
+      console.error("Erro no login padrão:", error);
+      throw error;
     }
   };
 
-  // --- 3. LOGIN GOOGLE (FIREBASE -> DJANGO) ---
-  const loginWithFirebase = async (): Promise<boolean> => {
+  // --- CADASTRO MANUAL ---
+  const signUp = async (email: string, password: string, name: string) => {
+      // Chama CustomUserCreateView
+      await api.post("auth/register/", { 
+          username: email, 
+          email: email, 
+          password: password, 
+          first_name: name 
+      });
+  };
+
+  // --- LOGIN GOOGLE (Firebase -> Django) ---
+  const signInWithGoogle = async () => {
     try {
-      // Abre o popup do Google
+      // 1. Abre o popup do Google via Firebase
       const result = await signInWithPopup(auth, googleProvider);
       
-      // Pega o token para enviar ao Django
+      // 2. Extrai o Token JWT seguro gerado pelo Google
       const idToken = await result.user.getIdToken(true);
 
-      if (!idToken) throw new Error("Token do Google vazio.");
+      if (!idToken) {
+          throw new Error("Falha ao gerar credencial do Google.");
+      }
 
-      // Envia para nossa view FirebaseLoginView no Django
+      // 3. Envia para o Django (FirebaseLoginView que acabamos de simplificar)
       const response = await api.post("auth/firebase/", { token: idToken });
       
+      // 4. Recebe a resposta do Django
       const token = response.data.access; 
+      
+      if (!token) {
+          throw new Error("Token de acesso não retornado pelo servidor Django.");
+      }
+
       const userData: User = { 
-          id: response.data.email, 
+          id: response.data.id || 0,
           email: response.data.email, 
-          name: response.data.name 
+          name: response.data.name || "Consultora" 
       };
 
+      // 5. Salva no navegador
       localStorage.setItem("auth_token", token);
       localStorage.setItem("auth_user", JSON.stringify(userData));
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       
-      setCurrentUser(userData);
-      
-      toast({
-        title: "Login bem-sucedido",
-        description: `Bem-vindo(a), ${userData.name}`,
-      });
-      return true;
-      
+      setUser(userData);
+
     } catch (error: any) {
-      console.error('Erro no login com Firebase:', error);
-      const msg = error.response?.data?.error || "Não foi possível fazer login com o Google.";
-      toast({ title: "Erro", description: msg, variant: "destructive" });
-      return false;
+      console.error("Erro completo Google Sign-In:", error);
+      // Se for erro da API, joga a mensagem que veio do Django para a tela
+      if (error.response?.data?.error) {
+          throw new Error(error.response.data.error);
+      }
+      throw error;
     }
   };
 
-  // --- 4. LOGOUT ---
-  const logout = async (): Promise<void> => {
-    setCurrentUser(null);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
+  // --- LOGIN DE DEMONSTRAÇÃO ---
+  const signInDemo = () => {
+      const demoUser: User = { id: 999, email: "demo@natura.com", name: "Consultora Teste" };
+      setUser(demoUser);
+      localStorage.setItem("auth_user", JSON.stringify(demoUser));
+      localStorage.setItem("auth_token", "demo_token_123");
+      api.defaults.headers.common["Authorization"] = `Bearer demo_token_123`;
+  };
+
+  // --- LOGOUT ---
+  const signOut = async () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     delete api.defaults.headers.common["Authorization"];
+    setUser(null);
+    
+    // Tenta deslogar do firebase localmente para forçar escolha de conta na próxima vez
     try { await auth.signOut(); } catch (e) {}
   };
 
-  // --- 5. DEMO ---
-  const signInDemo = () => {
-    const demoUser: User = { id: 'demo', email: "demo@natura.com", name: "Consultora Teste" };
-    setCurrentUser(demoUser);
-    localStorage.setItem("auth_user", JSON.stringify(demoUser));
-    localStorage.setItem("auth_token", "demo_token");
-    api.defaults.headers.common["Authorization"] = `Bearer demo_token`;
-  };
-
-  // --- 6. FUNÇÕES AUXILIARES (do seu outro projeto) ---
-  const updateUser = (user: User): boolean => {
-    setCurrentUser(user);
-    localStorage.setItem('auth_user', JSON.stringify(user));
-    return true;
-  };
-
-  const cancelSubscription = async (): Promise<boolean> => {
-    if (!currentUser) return false;
-    const updatedUser: User = { ...currentUser, subscriptionStatus: 'canceled', subscriptionPlan: null };
-    updateUser(updatedUser);
-    toast({ title: "Assinatura cancelada", description: "Sua assinatura foi cancelada com sucesso." });
-    return true;
-  };
-
   return (
-    <AuthContext.Provider value={{ 
-      currentUser,
-      loading,
-      login, 
-      logout,
-      loginWithFirebase,
-      signInDemo,
-      updateUser,
-      cancelSubscription,
-      isAuthenticated: !!currentUser
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signInDemo,
+        signOut,
+        isAuthenticated: !!user
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth deve estar dentro de AuthProvider');
+  if (!context) {
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
+  }
   return context;
 };
