@@ -49,7 +49,6 @@ User = get_user_model()
 
 
 class FirebaseLoginView(APIView):
-    """View para Login/Cadastro via Google (Firebase)"""
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -59,34 +58,32 @@ class FirebaseLoginView(APIView):
             return Response({'error': 'Token ausente'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            # 1. Verifica token via firebase_admin
             from firebase_admin import auth as firebase_auth
+            # Valida o token (se estiver expirado ou de outro projeto, vai quebrar aqui)
             decoded_token = firebase_auth.verify_id_token(firebase_token)
+            
             email = decoded_token.get('email')
             name = decoded_token.get('name', 'Consultora')
             
-            # 2. Cria ou pega usuário usando o modelo Padrão do Django
-            # CORREÇÃO AQUI: Usa first_name em vez de name
+            # Se o projeto no Firebase estiver diferente das credenciais JSON do Render,
+            # o verify_id_token() falha.
+            
+            User = get_user_model()
+            # CRIAÇÃO SEGURA
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
-                    'first_name': name[:30], # Limita tamanho caso venha nome muito longo
+                    'first_name': name[:30], 
                     'username': email
                 }
             )
             
-            # Se for criado agora, define uma senha inútil para ele não conseguir logar sem Google
             if created:
                 user.set_unusable_password()
                 user.save()
 
-            # 3. Gera JWT do Django para a sessão
             from rest_framework_simplejwt.tokens import RefreshToken
             refresh = RefreshToken.for_user(user)
-            
-            # 4. Adiciona Claims extras (Opcional, mas útil pro Front)
-            refresh['email'] = user.email
-            refresh['name'] = user.first_name
             
             return Response({
                 'access': str(refresh.access_token), 
@@ -97,10 +94,9 @@ class FirebaseLoginView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            # Trocado para imprimir no log do Render qual foi o erro exato
-            print(f"🔥 ERRO FIREBASE VIEW: {str(e)}") 
-            return Response({'error': f"Erro interno: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
+            # 🚨 ESTE É O LOG QUE PRECISAMOS LER NO RENDER
+            print(f"\n🔥 ERRO FIREBASE VIEW: {str(e)}\n") 
+            return Response({'error': 'Erro ao validar login', 'details': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 # ============================================================================
 # 2. CORE BUSINESS (ESTOQUE)
