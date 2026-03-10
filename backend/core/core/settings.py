@@ -117,7 +117,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.1.15:8000",
     "https://gestao-estoque-one.vercel.app"
 ]
-
+CORS_ALLOW_HEADERS = ['content-type', 'authorization']
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True 
 WSGI_APPLICATION = 'core.wsgi.application'
