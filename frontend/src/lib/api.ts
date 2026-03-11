@@ -1,36 +1,31 @@
-import { isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS, DEMO_PROFILE, DEMO_BATCHES } from "./demoData";
+import {
+  isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
+  DEMO_PROFILE, DEMO_BATCHES
+} from "./demoData";
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
+const API_BASE_URL =(import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
 
+// 🔑 token helpers
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
-
 export function setToken(token: string) {
   localStorage.setItem("auth_token", token);
 }
-
 export function clearToken() {
   localStorage.removeItem("auth_token");
 }
 
-async function apiRequest<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<T> {
+// 🔧 request helper
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...((options?.headers as Record<string, string>) || {}),
+    ...(options.headers as Record<string, string>),
   };
-  if (token) {
-    headers["Authorization"] = `Token ${token}`;
-  }
+  if (token) headers["Authorization"] = `Token ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
 
   if (response.status === 401) {
     clearToken();
@@ -53,33 +48,25 @@ export interface AuthUser {
   email: string;
   name?: string;
 }
-
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest<{ token: string; user: AuthUser }>("/api/auth/login/", {
+    apiRequest<{ access: string; refresh: string }>("/api/auth/login/", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
-
   register: (email: string, password: string, name: string) =>
     apiRequest<{ token: string; user: AuthUser }>("/api/auth/register/", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
-
-  /** Envia o Firebase ID Token para o Django, que valida e retorna um Token DRF */
   firebaseLogin: (firebaseIdToken: string) =>
-    apiRequest<{ token: string; user: AuthUser }>("/api/auth/firebase/", {
+    apiRequest<{ access: string; refresh: string }>("/api/auth/firebase/", {
       method: "POST",
-      body: JSON.stringify({ id_token: firebaseIdToken }),
+      body: JSON.stringify({ token: firebaseIdToken }),
     }),
-
   me: () => apiRequest<AuthUser>("/api/auth/me/"),
-
-  logout: () =>
-    apiRequest<void>("/api/auth/logout/", { method: "POST" }).catch(() => {}),
+  logout: () => apiRequest<void>("/api/auth/logout/", { method: "POST" }).catch(() => {}),
 };
-
 // ── Product (Global Catalog) ──
 export interface GlobalProduct {
   id: number;
@@ -94,19 +81,27 @@ export interface GlobalProduct {
 }
 
 export interface LookupResult {
-  source: "local" | "remote" | "fuzzy";
-  product: GlobalProduct | null;
-  suggestions?: GlobalProduct[];
+  found: boolean;
+  source:
+    | "local"
+    | "remote"
+    | "remote_learned"
+    | "remote_partial"
+    | "suggestion"
+    | "fuzzy"          // ✅ adiciona o valor que o front usa
+    | null;
+  product?: GlobalProduct | null; // ✅ adiciona o campo esperado
+  suggestions?: GlobalProduct[];  // ✅ adiciona o campo usado no fuzzy match
+  data?: any;                     // opcional, cobre payloads diferentes
+  message?: string;
 }
 
 export const productLookupApi = {
-  /** Hybrid lookup: local → scraper → fuzzy */
-  lookup: (barcode: string) =>
-    apiRequest<LookupResult>(`/api/products/lookup/${barcode}/`),
+  lookup: (barcodeOrName: string) =>
+    apiRequest<LookupResult>(`/api/products/lookup/?q=${encodeURIComponent(barcodeOrName)}`),
 
-  /** Confirm a fuzzy match — links barcode to global product (self-healing) */
   confirmMatch: (barcode: string, productId: number) =>
-    apiRequest<GlobalProduct>(`/api/products/confirm-match/`, {
+    apiRequest<GlobalProduct>("/api/products/confirm-match/", {
       method: "POST",
       body: JSON.stringify({ barcode, product_id: productId }),
     }),
@@ -135,38 +130,31 @@ export interface InventoryItem {
 }
 
 export const inventoryApi = {
-  list: () => {
-    if (isDemoMode()) return Promise.resolve(DEMO_INVENTORY);
-    return apiRequest<InventoryItem[]>("/api/inventory/");
-  },
+  list: () => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY)
+                            : apiRequest<InventoryItem[]>("/api/inventory/")),
 
-  get: (id: string) => {
-    if (isDemoMode()) return Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0]);
-    return apiRequest<InventoryItem>(`/api/inventory/${id}/`);
-  },
+  get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
+                                     : apiRequest<InventoryItem>(`/api/inventory/${id}/`)),
 
-  getByBarcode: (barcode: string) => {
-    if (isDemoMode()) return Promise.resolve(DEMO_INVENTORY.find(i => i.barcode === barcode) || null);
-    return apiRequest<InventoryItem | null>(`/api/inventory/barcode/${barcode}/`);
-  },
+  getByBarcode: (barcode: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.barcode === barcode) || null)
+                                                   : apiRequest<InventoryItem | null>(`/api/inventory/barcode/${barcode}/`)),
 
-  create: (data: Partial<InventoryItem>) => {
-    if (isDemoMode()) return Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem);
-    return apiRequest<InventoryItem>("/api/inventory/", { method: "POST", body: JSON.stringify(data) });
-  },
+  // ✅ criação corrigida para rota real
+  create: (data: Partial<InventoryItem>) =>
+    isDemoMode()
+      ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
+      : apiRequest<InventoryItem>("/api/stock/entry/", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
 
-  update: (id: string, data: Partial<InventoryItem>) => {
-    if (isDemoMode()) {
-      const item = DEMO_INVENTORY.find(i => i.id === id);
-      return Promise.resolve({ ...item, ...data } as InventoryItem);
-    }
-    return apiRequest<InventoryItem>(`/api/inventory/${id}/`, { method: "PATCH", body: JSON.stringify(data) });
-  },
+  update: (id: string, data: Partial<InventoryItem>) =>
+    apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 
-  delete: (id: string) => {
-    if (isDemoMode()) return Promise.resolve(null as unknown as void);
-    return apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" });
-  },
+  delete: (id: string) => apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" }),
 };
 
 // ── Inventory Batches ──

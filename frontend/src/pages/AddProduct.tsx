@@ -354,11 +354,11 @@ export default function AddProduct() {
                   </button>
 
                   {/* Search Modal */}
-                  <ProductSearchModal
-                    isOpen={isSearchOpen}
-                    onClose={() => setIsSearchOpen(false)}
-                    onSelect={selectSuggestion}
-                  />
+                    <ProductSearchModal
+                      isOpen={isSearchOpen}
+                      onClose={() => setIsSearchOpen(false)}
+                      onSelect={(p) => selectSuggestion(p as GlobalProduct)} // ✅ cast
+                    />
                 </div>
               )}
             </motion.div>
