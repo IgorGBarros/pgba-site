@@ -154,7 +154,7 @@ class TenantModelMixin:
 
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     """Catálogo Global - Apenas Leitura para as consultoras"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]    
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
 
@@ -363,7 +363,7 @@ class SaleCheckoutView(APIView):
 # ==========================================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])   
 
 def lookup_product(request):
     """
