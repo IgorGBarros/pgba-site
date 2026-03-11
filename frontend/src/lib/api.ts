@@ -23,7 +23,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) headers["Authorization"] = `Token ${token}`;
+if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
 
@@ -50,6 +50,7 @@ export interface AuthUser {
 }
 export const authApi = {
   login: (email: string, password: string) =>
+    
     apiRequest<{ access: string; refresh: string }>("/api/auth/login/", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -302,7 +303,7 @@ export const ocrApi = {
 
     const response = await fetch(`${API_BASE_URL}/api/ocr-expiry/`, {
       method: "POST",
-      headers: token ? { Authorization: `Token ${token}` } : {},
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
 
