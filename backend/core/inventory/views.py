@@ -1,13 +1,14 @@
-from time import timezone
 from django.db import models
 from django.db import transaction
-from django.db.models import Q
-from rest_framework import viewsets
+from rest_framework import viewsets,status, permissions, generics
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework import status, generics
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.db.models import Q, Sum, F
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+import re
 
 # Imports do Django Auth
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -38,9 +39,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import login, get_user_model
 
-# Presumo que serializers.py contém essas classes
-from .serializers import CustomTokenObtainPairSerializer, CustomUserSerializer
-from .models import CustomUser
 
 User = get_user_model()
 
@@ -94,16 +92,7 @@ class FirebaseLoginView(APIView):
 # ============================================================================
 # 2. CORE BUSINESS (ESTOQUE)
 # ============================================================================
-from rest_framework import viewsets, status, permissions
-from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from django.db import transaction
-from django.db.models import Q, Sum, F
-from django.utils import timezone
-from django_filters.rest_framework import DjangoFilterBackend
-import re
+
 
 # Imports Locais
 from .models import (
