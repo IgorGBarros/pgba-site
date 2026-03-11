@@ -44,29 +44,54 @@ export interface ProductLookupResponse {
 
 // --- CONFIGURAÇÃO API ---
 // @ts-ignore
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
+// Base da API definida pelo ambiente, com fallback
+const API_BASE_URL =(import.meta as env)?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
 
-async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
+/**
+ * Faz requisições REST para o backend Django.
+ * Adiciona automaticamente o token salvo em localStorage (se existir).
+ */
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = localStorage.getItem("auth_token");
+
+  // monta cabeçalhos
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Token ${token}`;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
       ...options,
+      headers,
     });
+
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
+      throw new Error(
+        `API Error ${response.status}: ${errorText || response.statusText}`
+      );
     }
-    if (response.status === 204) return null as T;
-    return response.json();
+
+    // sem conteúdo
+    if (response.status === 204) {
+      return null as T;
+    }
+
+    // resposta JSON normal
+    return (await response.json()) as T;
   } catch (error) {
     console.error(`Falha na requisição: ${endpoint}`, error);
     throw error;
   }
 }
-
 // --- SERVICE REAL ---
 export const productService = {
   

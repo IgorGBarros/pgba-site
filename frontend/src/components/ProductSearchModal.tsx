@@ -3,7 +3,7 @@ import { Search, X, Loader2, ChevronRight, Package, ImageOff } from "lucide-reac
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../services/api";
 import { formatMoney } from "../lib/api";
-
+import { productService } from "../lib/productService";
 interface Product {
   id: number;
   name: string;
@@ -56,11 +56,14 @@ export default function ProductSearchModal({ isOpen, onClose, onSelect }: Props)
   const searchProducts = async (q: string) => {
     setLoading(true);
     setError(null);
-    try {
-      const { data } = await api.get(`/products/lookup/?q=${q}`);
-      let list: Product[] = [];
-      if (data.candidates?.length) list = data.candidates;
-      else if (data.found && data.source === "local" && data.data) list = [data.data];
+const searchProducts = async () => {
+  try {
+    const response = await productService.lookupByName(query);
+    let list: Product[] = [];
+    if (response.data.candidates?.length) list = response.data.candidates;
+    else if (response.found && response.source === "local") {
+      list = [response.data as Product];
+    }
       // Fallback local se o remoto vier vazio
       if (!list.length && allProducts.length) {
         const qLower = q.toLowerCase();
