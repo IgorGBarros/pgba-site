@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 
 # Importa seus modelos de negócio
-from .models import Product, InventoryItem, InventoryBatch, Store, Sale, SaleItem
+from .models import CustomUser, Product, InventoryItem, InventoryBatch, Store, Sale, SaleItem
 
 # ==========================================
 # 1. SERIALIZERS DE AUTENTICAÇÃO
@@ -134,3 +134,30 @@ class StockTransactionSerializer(serializers.ModelSerializer):
             'product_name', 
             'batch_code'
         ]
+
+
+class UserNestedSerializer(serializers.ModelSerializer):
+    """Dados básicos do usuário (email, nome)"""
+    class Meta:
+        model = CustomUser
+        fields = ["id", "email", "name"]
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializador de Perfil — baseado na Store vinculada ao usuário.
+    Permite editar nome da loja, WhatsApp e slug.
+    """
+    user = UserNestedSerializer(read_only=True)
+
+    class Meta:
+        model = Store
+        fields = [
+            "id",
+            "user",
+            "name",
+            "slug",
+            "whatsapp",
+            "created_at",
+        ]
+        read_only_fields = ["id", "user", "created_at"]

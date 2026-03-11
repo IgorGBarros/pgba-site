@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 
 from rest_framework_simplejwt.views import TokenObtainPairView,TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import CustomTokenObtainPairSerializer, CustomUserSerializer
+from .serializers import CustomTokenObtainPairSerializer, CustomUserSerializer, ProfileSerializer
 from .models import CustomUser
 
 
@@ -549,3 +549,23 @@ def feature_gates_view(request):
         {"feature_key": "unlimited_products", "label": "Produtos Ilimitados", "description": None, "requires_pro": True},
     ]
     return Response(gates)
+
+@api_view(["GET", "PATCH"])
+@permission_classes([IsAuthenticated])
+def profile_view(request):
+    """
+    Retorna ou atualiza as informações da loja (perfil da consultora).
+    """
+    # Cada usuário tem uma Store vinculada; cria se não existir
+    store, _ = Store.objects.get_or_create(user=request.user)
+
+    if request.method == "GET":
+        serializer = ProfileSerializer(store)
+        return Response(serializer.data)
+
+    if request.method == "PATCH":
+        serializer = ProfileSerializer(store, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -11,6 +11,7 @@ from .views import (
     SaleCheckoutView,
     CustomTokenObtainPairView,
     StockTransactionViewSet,
+    profile_view,
     # FirebaseLoginView e CustomUserCreateView foram removidos daqui pois estão comentados na view
 )
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -24,6 +25,7 @@ router.register(r'transactions', StockTransactionViewSet, basename='stock-transa
 urlpatterns = [
     # --- Rotas de Negócio ---
     path('admin/feature-gates/', feature_gates_view),
+    path("profile/", profile_view, name="profile"),
     path('products/lookup/', lookup_product, name='product-lookup'),
     path('stock/entry/', StockEntryView.as_view(), name='stock-entry'),
     path('sales/checkout/', SaleCheckoutView.as_view(), name='sale-checkout'),

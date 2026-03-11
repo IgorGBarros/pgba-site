@@ -47,20 +47,23 @@ export default function Profile() {
     ([form.display_name, form.whatsapp_number, user?.email, form.store_slug].filter(Boolean).length / 4) * 100
   );
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await profileApi.update({
-        display_name: form.display_name,
-        whatsapp_number: form.whatsapp_number,
-        store_slug: form.store_slug || null,
-      } as any);
-      toast({ title: "Perfil atualizado!" });
-    } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
-    }
+const handleSave = async () => {
+  setSaving(true);
+  try {
+    const updated = await profileApi.update({
+      display_name: form.display_name,
+      whatsapp_number: form.whatsapp_number,
+      store_slug: form.store_slug || null,
+    } as any);
+
+    setProfile(updated);
+    toast({ title: "Perfil atualizado!" });
+  } catch (err: any) {
+    toast({ title: "Erro", description: err.message, variant: "destructive" });
+  } finally {
     setSaving(false);
-  };
+  }
+};
 
   if (loading) {
     return (
