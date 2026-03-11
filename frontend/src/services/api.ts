@@ -1,61 +1,74 @@
 // src/services/api.ts
 import axios, { AxiosError } from "axios";
 
+// 🔧 lê a variável de ambiente e garante formato correto
 const rawBaseUrl =(import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
 
-// garante que termine em /api/
-const finalBaseUrl = rawBaseUrl.endsWith("/api")
-  ? `${rawBaseUrl}/`
-  : rawBaseUrl.endsWith("/api/")
-  ? rawBaseUrl
-  : `${rawBaseUrl}/api/`;
+// garante que o baseURL termine com `/api/`
+let finalBaseUrl: string;
+if (rawBaseUrl.endsWith("/api/")) {
+  finalBaseUrl = rawBaseUrl;
+} else if (rawBaseUrl.endsWith("/api")) {
+  finalBaseUrl = rawBaseUrl + "/";
+} else if (rawBaseUrl.endsWith("/")) {
+  finalBaseUrl = rawBaseUrl + "api/";
+} else {
+  finalBaseUrl = rawBaseUrl + "/api/";
+}
 
-// 🔐 pega e manipula token
-function getToken() {
+// 🔐 token helpers
+export function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
-
-function setToken(token: string) {
+export function setToken(token: string) {
   localStorage.setItem("auth_token", token);
 }
-
-function clearToken() {
+export function clearToken() {
   localStorage.removeItem("auth_token");
 }
 
-// 🚀 instância principal
+// 🚀 cria instância principal do Axios
 export const api = axios.create({
   baseURL: finalBaseUrl,
   headers: { "Content-Type": "application/json" },
 });
 
-// 🔁 Interceptador de REQUEST – adiciona Token
+// 🔁 Interceptador REQUEST — adiciona Token automaticamente
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) {
-    config.headers.Authorization = `Token ${token}`;
+    // AxiosHeaders tem o método set, use-o
+    if (config.headers?.set) {
+      config.headers.set("Authorization", `Token ${token}`);
+    } else {
+      // fallback para versões antigas ou se set não existir
+      (config.headers as any)["Authorization"] = `Token ${token}`;
+    }
   }
   return config;
 });
 
-// 🚨 Interceptador de RESPONSE – trata erros comuns
+// 🚨 Interceptador RESPONSE — trata erros comuns
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
       clearToken();
-      window.location.href = "/auth"; // redireciona login
-      console.error("Sessão expirada");
-    } else if (error.response) {
-      console.error(
-        `API Error ${error.response.status}:`,
-        (error.response.data as any)?.detail || error.message
-      );
-    } else {
-      console.error("Erro de rede:", error.message);
+      console.warn("Sessão expirada, redirecionando para login.");
+      window.location.href = "/auth";
+      return Promise.reject(error);
     }
+
+    if (error.response) {
+      const detail =
+        (error.response.data as any)?.detail ||
+        (error.response.data as any)?.error ||
+        error.message;
+      console.error(`API Error ${error.response.status}:`, detail);
+    } else {
+      console.error("Erro de rede ou CORS:", error.message);
+    }
+
     return Promise.reject(error);
   }
 );
-
-export { getToken, setToken, clearToken };
