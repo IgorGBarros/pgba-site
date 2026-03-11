@@ -31,7 +31,7 @@ export interface LookupData {
   };
   price_diff?: boolean;
   msg?: string;
-  candidates?: any[]; // Adicionado para suportar lista de sugestões
+  candidates?: Product[]; // Adicionado para suportar lista de sugestões
   google_name?: string;
 }
 
@@ -39,6 +39,8 @@ export interface ProductLookupResponse {
   found: boolean;
   source: 'local' | 'remote' | 'remote_learned' | 'remote_partial' | 'suggestion' | null;
   data: LookupData | Partial<Product>;
+  candidates?: Product[];
+  google_name?: string;
   message?: string;
 }
 

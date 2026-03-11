@@ -48,38 +48,45 @@ export default function ProductSearchModal({ isOpen, onClose, onSelect }: Props)
 
   // busca remota + fallback local
   const searchProducts = async (q: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await productService.lookupByName(q);
-      let list: Product[] = [];
+  setLoading(true);
+  setError(null);
 
-      if ((response.data as any).candidates?.length) {
-        list = (response.data as any).candidates;
-      } else if (response.found && response.source === "local") {
-        list = [response.data as Product];
-      }
+  try {
+    // a função lookupByName faz GET e retorna o corpo JSON, não o envelope Axios
+    const response = await productService.lookupByName(q);
 
-      // fallback local se remoto vier vazio
-      if (!list.length && allProducts.length) {
-        const qLower = q.toLowerCase();
-        list = allProducts.filter(
-          (p) =>
-            p.name.toLowerCase().includes(qLower) ||
-            (p.natura_sku && p.natura_sku.toLowerCase().includes(qLower)) ||
-            (p.bar_code && p.bar_code.includes(qLower))
-        );
-      }
+    let list: Product[] = [];
 
-      setResults(list.slice(0, 20));
-    } catch (err) {
-      console.error("Erro na busca remota:", err);
-      setError("Falha ao buscar produtos.");
-      setResults([]);
-    } finally {
-      setLoading(false);
+    // verifica se há candidatos (busca textual)
+    if (response.candidates && response.candidates.length > 0) {
+      list = response.candidates;
     }
-  };
+    // verifica match exato de SKU/EAN
+    else if (response.found && response.source === "local" && response.data) {
+      const data = response.data as Product;
+      list = [data];
+    }
+
+    // fallback local se remoto vier vazio
+    if (!list.length && allProducts.length) {
+      const qLower = q.toLowerCase();
+      list = allProducts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(qLower) ||
+          (p.natura_sku && p.natura_sku.toLowerCase().includes(qLower)) ||
+          (p.bar_code && p.bar_code.includes(qLower))
+      );
+    }
+
+    setResults(list.slice(0, 20));
+  } catch (err) {
+    console.error("Erro na busca remota:", err);
+    setError("Falha ao buscar produtos.");
+    setResults([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // debounce
   useEffect(() => {
