@@ -11,7 +11,7 @@ interface Product {
   name: string;
   natura_sku?: string;
   bar_code?: string;
-  category?: string;
+  category?: string; 
   official_price?: number;
   image_url?: string | null;
 }
