@@ -5,16 +5,14 @@ import axios, { AxiosError } from "axios";
 const rawBaseUrl =(import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
 
 // garante que o baseURL termine com `/api/`
-let finalBaseUrl: string;
-if (rawBaseUrl.endsWith("/api/")) {
-  finalBaseUrl = rawBaseUrl;
-} else if (rawBaseUrl.endsWith("/api")) {
-  finalBaseUrl = rawBaseUrl + "/";
-} else if (rawBaseUrl.endsWith("/")) {
-  finalBaseUrl = rawBaseUrl + "api/";
-} else {
-  finalBaseUrl = rawBaseUrl + "/api/";
-}
+// garante que termina com /api/
+const finalBaseUrl = rawBaseUrl.endsWith("/api/")
+  ? rawBaseUrl
+  : rawBaseUrl.endsWith("/api")
+  ? rawBaseUrl + "/"
+  : rawBaseUrl.endsWith("/")
+  ? rawBaseUrl + "api/"
+  : rawBaseUrl + "/api/";
 
 // 🔐 token helpers
 export function getToken(): string | null {
