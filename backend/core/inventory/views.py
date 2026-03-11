@@ -54,7 +54,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class CustomUserCreateView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
-    permission_classes = [AllowAny]  # Permissão para qualquer usuário
+    permission_classes = [AllowAny]  # ✅ Permite GET sem login
 
 class FirebaseLoginView(APIView):
     permission_classes = [AllowAny]
