@@ -529,3 +529,23 @@ class DashboardStatsView(APIView):
                 "by_category": category_stats
             }
         })
+    
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def feature_gates_view(request):
+    """
+    Fornece lista de feature gates para o frontend.
+    Pode ser substituída futuramente por regras dinâmicas.
+    """
+    gates = [
+        {"feature_key": "barcode_scanner", "label": "Scanner de Código", "description": None, "requires_pro": True},
+        {"feature_key": "ocr_expiry", "label": "Leitor de Validade (IA)", "description": None, "requires_pro": True},
+        {"feature_key": "dashboard_charts", "label": "Gráficos Avançados", "description": None, "requires_pro": True},
+        {"feature_key": "dashboard_kpi_advanced", "label": "Lucro e Rentabilidade", "description": None, "requires_pro": True},
+        {"feature_key": "ai_insights", "label": "Insights com Inteligência Artificial", "description": None, "requires_pro": True},
+        {"feature_key": "storefront", "label": "Vitrine Digital", "description": None, "requires_pro": True},
+        {"feature_key": "chat_assistant", "label": "Assistente de Estoque", "description": None, "requires_pro": True},
+        {"feature_key": "unlimited_products", "label": "Produtos Ilimitados", "description": None, "requires_pro": True},
+    ]
+    return Response(gates)

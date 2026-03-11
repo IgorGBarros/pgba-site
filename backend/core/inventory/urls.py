@@ -4,7 +4,8 @@ from .views import (
     CustomUserCreateView,
     FirebaseLoginView,
     ProductViewSet, 
-    InventoryViewSet, 
+    InventoryViewSet,
+    feature_gates_view, 
     lookup_product, 
     StockEntryView, 
     SaleCheckoutView,
@@ -19,8 +20,10 @@ router.register(r'products', ProductViewSet)
 router.register(r'inventory', InventoryViewSet, basename='inventory')
 router.register(r'transactions', StockTransactionViewSet, basename='stock-transaction')
 
+
 urlpatterns = [
     # --- Rotas de Negócio ---
+    path('admin/feature-gates/', feature_gates_view),
     path('products/lookup/', lookup_product, name='product-lookup'),
     path('stock/entry/', StockEntryView.as_view(), name='stock-entry'),
     path('sales/checkout/', SaleCheckoutView.as_view(), name='sale-checkout'),
