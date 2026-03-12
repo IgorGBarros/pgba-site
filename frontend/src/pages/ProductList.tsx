@@ -23,11 +23,12 @@ type StockFilter = "TODOS" | "COM_ESTOQUE" | "ESGOTADO";
 export default function ProductList() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  // Usamos any temporariamente ou você pode atualizar a tipagem na api.ts depois
+  const [inventory, setInventory] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [filterStock, setFilterStock] = useState<StockFilter>("COM_ESTOQUE");
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
+  const [adjustItem, setAdjustItem] = useState<any | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
 
   const loadInventory = async () => {
@@ -42,20 +43,27 @@ export default function ProductList() {
   useEffect(() => { loadInventory(); }, []);
 
   const filtered = inventory.filter((item) => {
+    // 🚀 Mapeamento seguro para o novo formato aninhado do backend
+    const qty = item.total_quantity ?? item.quantity ?? 0;
+    const prodName = item.product?.name || item.product_name || "";
+    const prodBarcode = item.product?.bar_code || item.barcode || "";
+    const prodSku = item.product?.natura_sku || item.sku || "";
+    const prodCat = item.product?.category || item.category || "";
+
     // Filtro de Texto
     const textMatch = 
-      (item.product_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      prodName.toLowerCase().includes(search.toLowerCase()) ||
       (item.custom_name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (item.barcode || "").includes(search) ||
-      (item.sku || "").toLowerCase().includes(search.toLowerCase()) ||
-      (item.category || "").toLowerCase().includes(search.toLowerCase());
+      prodBarcode.includes(search) ||
+      prodSku.toLowerCase().includes(search.toLowerCase()) ||
+      prodCat.toLowerCase().includes(search.toLowerCase());
     
     // Filtro de Estoque
     const stockMatch = 
       filterStock === "TODOS" ? true :
-      filterStock === "COM_ESTOQUE" ? item.quantity > 0 :
-      item.quantity <= 0; // ESGOTADO
-
+      filterStock === "COM_ESTOQUE" ? qty > 0 :
+      qty <= 0; // ESGOTADO
+      
     return textMatch && stockMatch;
   });
 
@@ -70,7 +78,6 @@ export default function ProductList() {
     }
     setDeleteId(null);
   };
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,22 +105,20 @@ export default function ProductList() {
           </div>
         </div>
       </header>
-
       <main className="mx-auto max-w-4xl px-6 py-6">
+        
         {/* Search */}
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input type="text" placeholder="Buscar por nome, código, SKU ou categoria..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
         </div>
-
+        
         {/* Stock Filters */}
         <div className="mb-4 flex gap-2">
           <button 
             onClick={() => setFilterStock("COM_ESTOQUE")}
             className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors ${
-              filterStock === "COM_ESTOQUE" 
-                ? "bg-primary text-primary-foreground" 
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              filterStock === "COM_ESTOQUE" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
             Em Estoque
@@ -121,9 +126,7 @@ export default function ProductList() {
           <button 
             onClick={() => setFilterStock("ESGOTADO")}
             className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors ${
-              filterStock === "ESGOTADO" 
-                ? "bg-destructive text-destructive-foreground" 
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              filterStock === "ESGOTADO" ? "bg-destructive text-destructive-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
             Esgotados
@@ -131,9 +134,7 @@ export default function ProductList() {
           <button 
             onClick={() => setFilterStock("TODOS")}
             className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors ${
-              filterStock === "TODOS" 
-                ? "bg-foreground text-background" 
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              filterStock === "TODOS" ? "bg-foreground text-background" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
             }`}
           >
             Todos
@@ -149,8 +150,20 @@ export default function ProductList() {
             </div>
           ) : (
             filtered.map((item, i) => {
-              const status = getStockStatus(item.quantity, item.min_quantity);
-              const displayName = item.custom_name || item.product_name;
+              // 🚀 Extração Segura dos Dados Aninhados do Backend
+              const qty = item.total_quantity ?? item.quantity ?? 0;
+              const minQty = item.min_quantity ?? 5;
+              const status = getStockStatus(qty, minQty);
+              
+              const prodName = item.product?.name || item.product_name || "Sem Nome";
+              const displayName = item.custom_name || prodName;
+              const imageUrl = item.product?.image_url || item.image_url;
+              const barcode = item.product?.bar_code || item.barcode;
+              const category = item.product?.category || item.category;
+              const officialPrice = item.product?.official_price || item.official_price;
+              
+              // 🚀 O pulo do gato: ID correto para o botão Editar (ID do Produto Global)
+              const productIdToEdit = item.product?.id || item.id;
 
               return (
                 <motion.div
@@ -161,8 +174,8 @@ export default function ProductList() {
                   className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm"
                 >
                   {/* Image / Icon */}
-                  {item.image_url ? (
-                    <img src={item.image_url} alt={displayName} className="h-12 w-12 shrink-0 rounded-lg object-cover border border-border" />
+                  {imageUrl ? (
+                    <img src={imageUrl} alt={displayName} className="h-12 w-12 shrink-0 rounded-lg object-cover border border-border" />
                   ) : (
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <Package className="h-5 w-5 text-primary" />
@@ -178,9 +191,10 @@ export default function ProductList() {
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                      <span>{item.category}</span>
+                      <span>{category}</span>
                       <span>·</span>
-                      <span className="font-mono">{item.barcode}</span>
+                      <span className="font-mono">{barcode}</span>
+                      
                       {item.expiry_date && (() => {
                         const now = new Date(); now.setHours(0,0,0,0);
                         const exp = new Date(item.expiry_date); exp.setHours(0,0,0,0);
@@ -204,21 +218,21 @@ export default function ProductList() {
 
                   {/* Prices & Quantity */}
                   <div className="text-right shrink-0 space-y-0.5">
-                    {item.official_price && (
+                    {officialPrice > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Oficial: <span className="font-mono font-medium text-foreground">{formatMoney(item.official_price)}</span>
+                        Oficial: <span className="font-mono font-medium text-foreground">{formatMoney(officialPrice)}</span>
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       Custo: <span className="font-mono font-medium text-primary">{formatMoney(item.cost_price)}</span>
                     </p>
-                    {item.sale_price && (
+                    {item.sale_price > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Venda: <span className="font-mono font-medium text-accent-foreground">{formatMoney(item.sale_price)}</span>
                       </p>
                     )}
-                    <p className={`text-xs font-mono ${item.quantity <= item.min_quantity ? (item.quantity <= 0 ? "text-destructive font-bold" : "text-yellow-600 dark:text-yellow-400 font-semibold") : "text-muted-foreground"}`}>
-                      {item.quantity} un.
+                    <p className={`text-xs font-mono ${qty <= minQty ? (qty <= 0 ? "text-destructive font-bold" : "text-yellow-600 dark:text-yellow-400 font-semibold") : "text-muted-foreground"}`}>
+                      {qty} un.
                     </p>
                   </div>
 
@@ -231,7 +245,8 @@ export default function ProductList() {
                     >
                       <Scale className="h-4 w-4" />
                     </button>
-                    <button onClick={() => navigate(`/products/${item.id}/edit`)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                    {/* 🚀 Abre o produto certo no formulário! */}
+                    <button onClick={() => navigate(`/products/${productIdToEdit}/edit`)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button onClick={() => setDeleteId(item.id)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
@@ -250,7 +265,7 @@ export default function ProductList() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
-            <AlertDialogDescription>Esta ação não pode ser desfeita. O produto será removido permanentemente.</AlertDialogDescription>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. O produto será removido do seu estoque.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -259,14 +274,12 @@ export default function ProductList() {
         </AlertDialogContent>
       </AlertDialog>
 
-
       <StockAdjustmentModal
         isOpen={adjustItem !== null}
         onClose={() => setAdjustItem(null)}
         item={adjustItem}
         onAdjusted={loadInventory}
       />
-
       <ProductSearchModal
         isOpen={showCatalog}
         onClose={() => setShowCatalog(false)}
