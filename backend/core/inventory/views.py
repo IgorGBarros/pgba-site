@@ -163,36 +163,35 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ReadOnlyModelViewSet):
 # ==========================================
 
 class StockEntryView(APIView):
-    """
-    RECEBIMENTO DE MERCADORIA
-    Lógica: Tenta achar por SKU -> Tenta achar por Barcode -> Cria Novo
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = StockEntrySerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-            
+        serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         store = get_current_store(request.user)
         if not store:
             return Response({"error": "Usuário não possui loja vinculada."}, status=403)
-        
+
         with transaction.atomic():
-            product = None
             sku_input = data.get('natura_sku')
             barcode_input = data.get('bar_code')
+            name_input = data.get('name') or 'Produto Novo'
+            category_input = data.get('category', 'Geral')
 
-            # 1. Tenta achar o produto no catálogo global
+            # 1. Buscar produto no catálogo protegido
+            product = None
             if sku_input:
                 product = Product.objects.filter(natura_sku=sku_input).first()
-
             if not product and barcode_input:
                 product = Product.objects.filter(bar_code=barcode_input).first()
 
-            # 2. Cria ou Atualiza o Produto Global
-            if product:
+            # 2. Caso produto exista, verificar se é protegido
+            if product and getattr(product, 'is_protected', False):
+                # Apenas vincular — não modificar
+                pass
+            elif product:
+                # Pode atualizar se não for protegido
                 updated = False
                 if barcode_input and not product.bar_code:
                     product.bar_code = barcode_input
@@ -206,17 +205,19 @@ class StockEntryView(APIView):
                 if updated:
                     product.save()
             else:
+                # Criar produto local (não global)
                 product = Product.objects.create(
                     bar_code=barcode_input,
                     natura_sku=sku_input,
-                    name=data.get('name', 'Produto Novo'),
-                    category=data.get('category', 'Geral'),
+                    name=name_input,
+                    category=category_input,
                     official_price=data.get('sale_price', 0),
                     image_url=data.get('image_url', ''),
-                    last_checked_at=timezone.now()
+                    last_checked_at=timezone.now(),
+                    is_protected=False  # padrão
                 )
-            
-            # 3. Gerenciar Estoque da Loja
+
+            # 3. Gerenciar estoque da loja
             item, _ = InventoryItem.objects.get_or_create(
                 store=store,
                 product=product,
@@ -226,25 +227,26 @@ class StockEntryView(APIView):
                     'total_quantity': 0
                 }
             )
-            
-            if data.get('cost_price'): item.cost_price = data['cost_price']
-            if data.get('sale_price'): item.sale_price = data['sale_price']
+
+            if data.get('cost_price'):
+                item.cost_price = data['cost_price']
+            if data.get('sale_price'):
+                item.sale_price = data['sale_price']
             item.save() 
-            
-            # 4. Criar Lote
+
+            # 4. Criar lote
             new_batch = InventoryBatch.objects.create(
                 item=item,
                 quantity=data['quantity'],
                 batch_code=data.get('batch_code', ''),
                 expiration_date=data.get('expiration_date')
             )
-            
-            # 5. Atualizar Total Consolidado
-            total_real = item.batches.aggregate(total=Sum('quantity'))['total'] or 0
-            item.total_quantity = total_real
+
+            # 5. Atualizar total consolidado
+            item.total_quantity = item.batches.aggregate(total=Sum('quantity'))['total'] or 0
             item.save()
-            
-            # 6. Registrar Transação (Log/Extrato)
+
+            # 6. Registrar transação
             StockTransaction.objects.create(
                 store=store,
                 product=product,
@@ -255,9 +257,9 @@ class StockEntryView(APIView):
                 unit_price=data.get('sale_price'),
                 description=f"Entrada Lote {new_batch.batch_code or 'S/N'}"
             )
-            
+
         return Response({
-            "message": "Estoque atualizado com sucesso!", 
+            "message": "Estoque atualizado com sucesso!",
             "product": product.name,
             "new_total": item.total_quantity
         })
