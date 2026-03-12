@@ -7,12 +7,15 @@ import BarcodeScanner from "../components/BarcodeScanner";
 import { useToast } from "../hooks/use-toast";
 import { api } from "../services/api";
 
+// 🚀 IMPORTAÇÃO DO NOVO HOOK CENTRALIZADO
+import { useStockEntry } from "../hooks/useStockEntry";
+
 const CATEGORIES = ["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Infantil", "Casa", "Outro"];
 
 const emptyProduct: Product = {
   name: "",
   bar_code: "",
-  natura_sku: "", // Campo SKU
+  natura_sku: "",
   category: "Perfumaria",
   price: 0,
   sale_price: 0,
@@ -22,7 +25,7 @@ const emptyProduct: Product = {
   description: "",
   batch_code: "",
   expiration_date: "",
-  image_url: "" // Inicializa vazio
+  image_url: "" 
 };
 
 export default function ProductForm() {
@@ -30,6 +33,9 @@ export default function ProductForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isEditing = Boolean(id);
+  
+  // 🚀 INICIALIZAÇÃO DO HOOK
+  const { saveEntry } = useStockEntry();
 
   const [form, setForm] = useState<Product>(emptyProduct);
   const [showScanner, setShowScanner] = useState(false);
@@ -77,7 +83,7 @@ export default function ProductForm() {
       price: suggestion.official_price || prev.price, 
       natura_sku: suggestion.natura_sku,
       description: suggestion.description,
-      image_url: suggestion.image_url // Preenche a imagem
+      image_url: suggestion.image_url
     }));
     setShowSuggestions(false);
     toast({ title: "Produto Vinculado!", description: `SKU ${suggestion.natura_sku} carregado.` });
@@ -93,7 +99,6 @@ export default function ProductForm() {
       if (result.found) {
         const data = result.data as any; 
         const { local, remote, source, candidates, google_name } = { ...data, source: result.source };
-
         if (source === 'local' && local) {
            if (!isEditing && local.id) navigate(`/products/${local.id}/edit`);
         } 
@@ -110,7 +115,7 @@ export default function ProductForm() {
              price: remote?.sale_price || data.sale_price || 0,
              natura_sku: remote?.natura_sku || data.natura_sku,
              description: remote?.description || data.description,
-             image_url: remote?.image_url || data.image_url, // Preenche a imagem
+             image_url: remote?.image_url || data.image_url,
              bar_code: ean
            }));
            toast({ title: "Encontrado!", description: "Dados carregados." });
@@ -131,17 +136,39 @@ export default function ProductForm() {
     handleLookup(code);
   };
 
+  // 🚀 LÓGICA DE SUBMISSÃO ATUALIZADA
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
-      if (isEditing) await productService.update(Number(id), form);
-      else await productService.addStock(form); // Adiciona ao estoque com quantidade
+      if (isEditing) {
+        // Se for edição, continua usando o update padrão (altera apenas dados base)
+        await productService.update(Number(id), form);
+        toast({ title: "Sucesso!", description: "Produto atualizado com sucesso." });
+      } else {
+        // 🚀 SE FOR NOVO: Chama o super hook passando os dados mapeados
+        await saveEntry({
+          bar_code: form.bar_code,
+          name: form.name,
+          category: form.category,
+          natura_sku: form.natura_sku,
+          quantity: form.quantity,
+          cost_price: form.cost_price,
+          sale_price: form.price, // Mapeado do campo Preço Venda
+          batch_code: form.batch_code,
+          expiration_date: form.expiration_date,
+          
+        });
+        // O toast de sucesso já é gerado dentro do hook saveEntry
+      }
       
-      toast({ title: "Sucesso!", description: "Salvo com sucesso." });
       navigate("/products");
-    } catch {
-      toast({ title: "Erro", description: "Falha ao salvar." });
+    } catch (err: any) {
+      // O hook já gera um toast de erro, mas garantimos um fallback aqui caso isEditing falhe
+      if (isEditing) {
+        toast({ title: "Erro", description: "Falha ao salvar as alterações.", variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
@@ -153,13 +180,11 @@ export default function ProductForm() {
         <button onClick={() => navigate("/products")}><ArrowLeft /></button>
         <h1 className="font-bold text-lg">{isEditing ? "Editar" : "Novo"} Produto</h1>
       </header>
-
       <main className="max-w-2xl mx-auto p-6 space-y-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           
           {/* BLOCO 1: IDENTIFICAÇÃO */}
           <div className="bg-card p-4 rounded-xl border space-y-4">
-            {/* EAN */}
             <div>
                 <label className="text-sm font-medium">Código de Barras (EAN)</label>
                 <div className="flex gap-2 relative mt-1">
@@ -176,8 +201,6 @@ export default function ProductForm() {
                   {searching && <Loader2 className="absolute right-24 top-3 animate-spin text-muted-foreground" size={18} />}
                 </div>
             </div>
-
-            {/* SKU e Link */}
             <div className="flex gap-4">
                 <div className="flex-1">
                     <label className="text-sm text-muted-foreground">SKU Natura</label>
@@ -196,8 +219,6 @@ export default function ProductForm() {
           <div className="bg-card p-4 rounded-xl border space-y-4">
              <div className="flex justify-between items-start">
                 <h2 className="font-bold text-sm flex gap-2 items-center"><Package size={16}/> Detalhes</h2>
-                
-                {/* IMAGEM PREVIEW */}
                 <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden border flex items-center justify-center">
                     {form.image_url ? (
                         <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
@@ -207,8 +228,7 @@ export default function ProductForm() {
                 </div>
              </div>
              
-             {/* NOME + AUTOCOMPLETE */}
-             <div className="relative -mt-16 mr-24"> {/* Ajuste para não cobrir a imagem */}
+             <div className="relative -mt-16 mr-24">
                 <label className="text-sm text-muted-foreground">Nome</label>
                 <input 
                   required 
@@ -228,7 +248,6 @@ export default function ProductForm() {
                         className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-0 transition-colors group"
                       >
                         <div className="flex gap-3">
-                            {/* Thumb na sugestão */}
                             <div className="w-8 h-8 bg-gray-100 rounded shrink-0 overflow-hidden">
                                 {s.image_url && <img src={s.image_url} className="w-full h-full object-cover"/>}
                             </div>
@@ -242,7 +261,6 @@ export default function ProductForm() {
                   </div>
                 )}
              </div>
-
              <div className="grid grid-cols-2 gap-4 mt-4">
                 <div>
                   <label className="text-sm text-muted-foreground">Preço Venda</label>
@@ -261,7 +279,6 @@ export default function ProductForm() {
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
-                {/* Input de URL de Imagem Manual (Opcional) */}
                 <div>
                     <label className="text-sm text-muted-foreground">URL Imagem</label>
                     <input value={form.image_url || ''} onChange={e => handleChange("image_url", e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1 text-xs" placeholder="https://..." />
@@ -296,13 +313,11 @@ export default function ProductForm() {
                </div>
             </div>
           )}
-
           <button disabled={loading} type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform">
              {loading ? "Salvando..." : "Salvar Produto"}
           </button>
         </form>
       </main>
-
       <AnimatePresence>
         {showScanner && <BarcodeScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
       </AnimatePresence>
