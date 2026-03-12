@@ -12,24 +12,25 @@ from .models import CustomUser, Product, InventoryItem, InventoryBatch, Store, S
 # ==========================================
 
 
-
-
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Autenticação via email + senha para JWT."""
+    """Permite login com email e senha."""
+    username_field = CustomUser.USERNAME_FIELD  # "email"
+
     def validate(self, attrs):
-        email_field = CustomUser.USERNAME_FIELD  # "email"
         credentials = {
-            email_field: attrs.get("email"),
+            "email": attrs.get("email"),
             "password": attrs.get("password"),
         }
-        user = CustomUser.objects.filter(email=credentials[email_field]).first()
 
-        if user and user.check_password(credentials["password"]) and user.is_active:
-            data = super().validate(attrs)
-            data["email"] = user.email
-            data["name"] = user.name
-            return data
-        raise serializers.ValidationError("Invalid credentials.")
+        user = authenticate(email=credentials["email"], password=credentials["password"])
+        if not user:
+            raise serializers.ValidationError("Invalid credentials.")
+
+        # retoma validação padrão do JWT
+        data = super().validate(attrs)
+        data["email"] = user.email
+        data["name"] = user.name
+        return data
 
     @classmethod
     def get_token(cls, user):
