@@ -167,15 +167,16 @@ class StockEntryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+ 
+        serializer = StockEntrySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        store = get_current_store(request.user)
         print("\n=== [DEBUG] StockEntryView recebeu requisição ===")
         print("URL chamada:", request.path)
         print("Método:", request.method)
         print("Usuário autenticado?:", request.user.is_authenticated)
         print("Body recebido:", request.data, "\n")
-        serializer = StockEntrySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        store = get_current_store(request.user)
         if not store:
             return Response({"error": "Usuário não possui loja vinculada."}, status=403)
 
