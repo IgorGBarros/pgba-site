@@ -197,10 +197,14 @@ class StockEntryView(APIView):
 
                 # 1. Buscar produto no catálogo protegido
                 product = None
-                if sku_input:
-                    product = Product.objects.filter(natura_sku=sku_input).first()
-                if not product and barcode_input:
+                
+                # PRIORIDADE 1: Código de Barras (EAN é global e único)
+                if barcode_input:
                     product = Product.objects.filter(bar_code=barcode_input).first()
+                    
+                # PRIORIDADE 2: SKU Natura (Apenas se não achar pelo EAN e o SKU for válido)
+                if not product and sku_input and str(sku_input).strip() != "":
+                    product = Product.objects.filter(natura_sku=sku_input).first()
 
                 print(f"Produto encontrado: {product}")
 
