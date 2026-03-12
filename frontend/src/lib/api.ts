@@ -147,7 +147,7 @@ export const inventoryApi = {
   create: (data: Partial<InventoryItem>) =>
     isDemoMode()
       ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
-      : apiRequest<InventoryItem>("/api/stock/entry/", {
+      : apiRequest<InventoryItem>("/stock/entry/", {
           method: "POST",
           body: JSON.stringify(data),
         }),
