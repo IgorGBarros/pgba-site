@@ -180,24 +180,26 @@ export default function AddProduct() {
     }
   };
 
-const handleSave = async () => {
-  try {
-    await saveEntry({
-      bar_code: data.barcode,
-      product_name: data.product_name || "Produto sem nome",
-      category: data.category,
-      sku: data.sku,
-      expiry_date: data.expiry_date,
-      expiry_photo_url: data.expiry_photo_url,
-      quantity: data.quantity,
-      cost_price: data.cost_price,
-      lookup_source: data.lookup_source,
-    });
-    navigate("/");
-  } catch {
-    // erro tratado pelo hook (toast)
-  }
-};
+  const handleSave = async () => {
+    try {
+      await saveEntry({
+        bar_code: data.barcode,
+        name: data.product_name || "Produto sem nome",
+        category: data.category,
+        natura_sku: data.sku,
+        expiration_date: data.expiry_date,
+        expiry_photo_url: data.expiry_photo_url,
+        quantity: data.quantity,
+        cost_price: data.cost_price,
+        lookup_source: data.lookup_source,
+      });
+      toast({ title: "Entrada registrada!", description: `${data.product_name}` });
+      navigate("/");
+    } catch {
+      // erro tratado pelo hook (toast)
+    }
+  };
+
 
   const canAdvance = () => {
     if (step === 0) return !!data.barcode && !lookupLoading;
