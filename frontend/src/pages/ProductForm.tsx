@@ -36,7 +36,7 @@ export default function ProductForm() {
   
   // 🚀 INICIALIZAÇÃO DO HOOK
   const { saveEntry } = useStockEntry();
-
+  
   const [form, setForm] = useState<Product>(emptyProduct);
   const [showScanner, setShowScanner] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -109,13 +109,14 @@ export default function ProductForm() {
            toast({ title: "Nome Encontrado!", description: `Possível match: ${google_name}` });
         } 
         else if (source?.includes('remote')) {
+           // 🚀 CORREÇÃO AQUI: Se o remoto não trouxer a info, preservamos o que já estava digitado (prev.name)
            setForm(prev => ({
              ...prev,
-             name: remote?.name || data.name,
-             price: remote?.sale_price || data.sale_price || 0,
-             natura_sku: remote?.natura_sku || data.natura_sku,
-             description: remote?.description || data.description,
-             image_url: remote?.image_url || data.image_url,
+             name: remote?.name || data?.name || prev.name,
+             price: remote?.sale_price || data?.sale_price || prev.price,
+             natura_sku: remote?.natura_sku || data?.natura_sku || prev.natura_sku,
+             description: remote?.description || data?.description || prev.description,
+             image_url: remote?.image_url || data?.image_url || prev.image_url,
              bar_code: ean
            }));
            toast({ title: "Encontrado!", description: "Dados carregados." });
@@ -139,15 +140,26 @@ export default function ProductForm() {
   // 🚀 LÓGICA DE SUBMISSÃO ATUALIZADA
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 🚀 NOVA VALIDAÇÃO: Impede envio sem código de barras (evita Erro 400 no backend)
+    if (!isEditing && (!form.bar_code || form.bar_code.trim() === "")) {
+      toast({ 
+        title: "Código Obrigatório", 
+        description: "O código de barras não pode ficar vazio.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
       if (isEditing) {
-        // Se for edição, continua usando o update padrão (altera apenas dados base)
+        // Se for edição, continua usando o update padrão
         await productService.update(Number(id), form);
         toast({ title: "Sucesso!", description: "Produto atualizado com sucesso." });
       } else {
-        // 🚀 SE FOR NOVO: Chama o super hook passando os dados mapeados
+        // SE FOR NOVO: Chama o super hook passando os dados mapeados
         await saveEntry({
           bar_code: form.bar_code,
           name: form.name,
@@ -158,14 +170,11 @@ export default function ProductForm() {
           sale_price: form.price, // Mapeado do campo Preço Venda
           batch_code: form.batch_code,
           expiration_date: form.expiration_date,
-          
         });
-        // O toast de sucesso já é gerado dentro do hook saveEntry
       }
       
       navigate("/products");
     } catch (err: any) {
-      // O hook já gera um toast de erro, mas garantimos um fallback aqui caso isEditing falhe
       if (isEditing) {
         toast({ title: "Erro", description: "Falha ao salvar as alterações.", variant: "destructive" });
       }
@@ -177,7 +186,7 @@ export default function ProductForm() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 border-b bg-card px-6 py-4 flex items-center gap-3">
-        <button onClick={() => navigate("/products")}><ArrowLeft /></button>
+        <button type="button" onClick={() => navigate("/products")}><ArrowLeft /></button>
         <h1 className="font-bold text-lg">{isEditing ? "Editar" : "Novo"} Produto</h1>
       </header>
       <main className="max-w-2xl mx-auto p-6 space-y-6">
@@ -186,9 +195,10 @@ export default function ProductForm() {
           {/* BLOCO 1: IDENTIFICAÇÃO */}
           <div className="bg-card p-4 rounded-xl border space-y-4">
             <div>
-                <label className="text-sm font-medium">Código de Barras (EAN)</label>
+                <label className="text-sm font-medium">Código de Barras (EAN) *</label>
                 <div className="flex gap-2 relative mt-1">
                   <input 
+                    required={!isEditing}
                     value={form.bar_code}
                     onChange={e => handleChange("bar_code", e.target.value)}
                     onBlur={() => handleLookup(form.bar_code)}
@@ -229,7 +239,7 @@ export default function ProductForm() {
              </div>
              
              <div className="relative -mt-16 mr-24">
-                <label className="text-sm text-muted-foreground">Nome</label>
+                <label className="text-sm text-muted-foreground">Nome *</label>
                 <input 
                   required 
                   value={form.name} 
@@ -313,6 +323,7 @@ export default function ProductForm() {
                </div>
             </div>
           )}
+          
           <button disabled={loading} type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform">
              {loading ? "Salvando..." : "Salvar Produto"}
           </button>

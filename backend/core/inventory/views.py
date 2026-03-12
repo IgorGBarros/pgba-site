@@ -190,8 +190,12 @@ class StockEntryView(APIView):
             with transaction.atomic():
                 sku_input = data.get('natura_sku')
                 barcode_input = data.get('bar_code')
-                name_input = data.get('name') or 'Produto Novo'
+                name_input = data.get('name', '').strip()
                 category_input = data.get('category', 'Geral')
+
+                # 🚀 PROTEÇÃO 1: Impede que o frontend suje o banco com nomes de fallback
+                if name_input in ["Produto sem nome", "Produto Novo", ""]:
+                    name_input = "Produto Novo"
 
                 print(f"Buscando produto: SKU={sku_input}, Barcode={barcode_input}")
 
@@ -209,26 +213,41 @@ class StockEntryView(APIView):
                 print(f"Produto encontrado: {product}")
 
                 # 2. Caso produto exista, verificar se é protegido
-                if product and getattr(product, 'is_protected', False):
-                    print("Produto protegido - apenas vincular")
-                    pass
-                elif product:
-                    print("Produto não protegido - pode atualizar")
-                    updated = False
-                    if barcode_input and not product.bar_code:
-                        product.bar_code = barcode_input
-                        updated = True
-                    #if sku_input and not product.natura_sku:
-                       # product.natura_sku = sku_input
-                        #updated = True
-                    if data.get('name') and "Produto Novo" in product.name:
-                        product.name = data['name']
-                        updated = True
-                    if updated:
-                        product.save()
-                        print("Produto atualizado")
+                if product:
+                    is_protected = getattr(product, 'is_protected', False)
+                    if is_protected:
+                        print("Produto oficial protegido - apenas vincular [1]")
+                    else:
+                        print("Produto local não protegido - validando atualizações [1]")
+                        updated = False
+                        
+                        if barcode_input and not product.bar_code:
+                            product.bar_code = barcode_input
+                            updated = True
+                            
+                        # 🚀 ATUALIZAÇÃO SEGURA DO SKU (Evita erro 500 de UNIQUE constraint)
+                        if sku_input and not product.natura_sku:
+                            if not Product.objects.exclude(id=product.id).filter(natura_sku=sku_input).exists():
+                                product.natura_sku = sku_input
+                                updated = True
+                        
+                        # 🚀 PROTEÇÃO 2 (CURA AUTOMÁTICA): 
+                        # Atualiza o nome sempre que for diferente (limpando sujeira de testes antigos), 
+                        # desde que o nome enviado NÃO seja um fallback ("Produto Novo")
+                        if name_input != "Produto Novo" and product.name != name_input:
+                            product.name = name_input
+                            updated = True
+                            
+                        # Aproveita para preencher a imagem se estiver faltando no catálogo
+                        if data.get('image_url') and not getattr(product, 'image_url', ''):
+                            product.image_url = data['image_url']
+                            updated = True
+
+                        if updated:
+                            product.save()
+                            print("Produto atualizado com os novos dados")
                 else:
-                    print("Criando novo produto")
+                    print("Criando novo produto local")
                     product = Product.objects.create(
                         bar_code=barcode_input,
                         natura_sku=sku_input,
@@ -303,7 +322,6 @@ class StockEntryView(APIView):
             "product": product.name,
             "new_total": item.total_quantity
         })
-
 class SaleCheckoutView(APIView):
     """
     CAIXA / PDV (SCAN DE SAÍDA)
