@@ -94,7 +94,7 @@ useEffect(() => {
       }
 
       // 3. Envia para o Django (FirebaseLoginView que acabamos de simplificar)
-      const response = await api.post("/api/auth/firebase/", { token: idToken });
+      const response = await api.post("/auth/firebase/", { token: idToken });
       
       // 4. Recebe a resposta do Django
       const token = response.data.access; 
