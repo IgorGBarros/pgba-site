@@ -248,7 +248,7 @@ const handleSave = async () => {
 
           {!isPro && (
             <button
-              onClick={() => navigate("/plans")}
+              onClick={() => navigate("/admin-panel")}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
             >
               <Crown className="h-4 w-4" /> Fazer Upgrade para PRO

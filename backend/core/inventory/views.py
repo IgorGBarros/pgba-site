@@ -167,102 +167,135 @@ class StockEntryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
- 
+        print(f"\n=== [DEBUG] StockEntryView ===")
+        print(f"Usuário: {request.user}")
+        print(f"Dados recebidos: {request.data}")
+        
         serializer = StockEntrySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            print(f"❌ Serializer inválido: {serializer.errors}")
+            return Response(serializer.errors, status=400)
+            
         data = serializer.validated_data
+        print(f"✅ Dados validados: {data}")
+        
         store = get_current_store(request.user)
-
+        print(f"Store encontrada: {store}")
+        
         if not store:
+            print("❌ Usuário sem loja vinculada")
             return Response({"error": "Usuário não possui loja vinculada."}, status=403)
 
-        with transaction.atomic():
-            sku_input = data.get('natura_sku')
-            barcode_input = data.get('bar_code')
-            name_input = data.get('name') or 'Produto Novo'
-            category_input = data.get('category', 'Geral')
+        try:
+            with transaction.atomic():
+                sku_input = data.get('natura_sku')
+                barcode_input = data.get('bar_code')
+                name_input = data.get('name') or 'Produto Novo'
+                category_input = data.get('category', 'Geral')
 
-            # 1. Buscar produto no catálogo protegido
-            product = None
-            if sku_input:
-                product = Product.objects.filter(natura_sku=sku_input).first()
-            if not product and barcode_input:
-                product = Product.objects.filter(bar_code=barcode_input).first()
+                print(f"Buscando produto: SKU={sku_input}, Barcode={barcode_input}")
 
-            # 2. Caso produto exista, verificar se é protegido
-            if product and getattr(product, 'is_protected', False):
-                # Apenas vincular — não modificar
-                pass
-            elif product:
-                # Pode atualizar se não for protegido
-                updated = False
-                if barcode_input and not product.bar_code:
-                    product.bar_code = barcode_input
-                    updated = True
-                if sku_input and not product.natura_sku:
-                    product.natura_sku = sku_input
-                    updated = True
-                if data.get('name') and "Produto Novo" in product.name:
-                    product.name = data['name']
-                    updated = True
-                if updated:
-                    product.save()
-            else:
-                # Criar produto local (não global)
-                product = Product.objects.create(
-                    bar_code=barcode_input,
-                    natura_sku=sku_input,
-                    name=name_input,
-                    category=category_input,
-                    official_price=data.get('sale_price', 0),
-                    image_url=data.get('image_url', ''),
-                    last_checked_at=timezone.now(),
-                    is_protected=False  # padrão
+                # 1. Buscar produto no catálogo protegido
+                product = None
+                if sku_input:
+                    product = Product.objects.filter(natura_sku=sku_input).first()
+                if not product and barcode_input:
+                    product = Product.objects.filter(bar_code=barcode_input).first()
+
+                print(f"Produto encontrado: {product}")
+
+                # 2. Caso produto exista, verificar se é protegido
+                if product and getattr(product, 'is_protected', False):
+                    print("Produto protegido - apenas vincular")
+                    pass
+                elif product:
+                    print("Produto não protegido - pode atualizar")
+                    updated = False
+                    if barcode_input and not product.bar_code:
+                        product.bar_code = barcode_input
+                        updated = True
+                    if sku_input and not product.natura_sku:
+                        product.natura_sku = sku_input
+                        updated = True
+                    if data.get('name') and "Produto Novo" in product.name:
+                        product.name = data['name']
+                        updated = True
+                    if updated:
+                        product.save()
+                        print("Produto atualizado")
+                else:
+                    print("Criando novo produto")
+                    product = Product.objects.create(
+                        bar_code=barcode_input,
+                        natura_sku=sku_input,
+                        name=name_input,
+                        category=category_input,
+                        official_price=data.get('sale_price', 0),
+                        image_url=data.get('image_url', ''),
+                        last_checked_at=timezone.now()
+                    )
+                    print(f"Produto criado: {product}")
+
+                # 3. Gerenciar estoque da loja
+                print(f"Criando/atualizando InventoryItem para store={store}, product={product}")
+                item, created = InventoryItem.objects.get_or_create(
+                    store=store,
+                    product=product,
+                    defaults={
+                        'cost_price': data.get('cost_price', 0),
+                        'sale_price': data.get('sale_price', 0),
+                        'total_quantity': 0
+                    }
                 )
+                print(f"InventoryItem: {item} (criado: {created})")
 
-            # 3. Gerenciar estoque da loja
-            item, _ = InventoryItem.objects.get_or_create(
-                store=store,
-                product=product,
-                defaults={
-                    'cost_price': data.get('cost_price', 0),
-                    'sale_price': data.get('sale_price', 0),
-                    'total_quantity': 0
-                }
-            )
+                if data.get('cost_price'): 
+                    item.cost_price = data['cost_price']
+                if data.get('sale_price'): 
+                    item.sale_price = data['sale_price']
+                item.save()
+                print("InventoryItem salvo")
 
-            if data.get('cost_price'):
-                item.cost_price = data['cost_price']
-            if data.get('sale_price'):
-                item.sale_price = data['sale_price']
-            item.save() 
+                # 4. Criar Lote
+                print("Criando InventoryBatch")
+                new_batch = InventoryBatch.objects.create(
+                    item=item,
+                    quantity=data['quantity'],
+                    batch_code=data.get('batch_code', ''),
+                    expiration_date=data.get('expiration_date')
+                )
+                print(f"Batch criado: {new_batch}")
 
-            # 4. Criar lote
-            new_batch = InventoryBatch.objects.create(
-                item=item,
-                quantity=data['quantity'],
-                batch_code=data.get('batch_code', ''),
-                expiration_date=data.get('expiration_date')
-            )
+                # 5. Atualizar Total Consolidado
+                total_real = item.batches.aggregate(total=Sum('quantity'))['total'] or 0
+                item.total_quantity = total_real
+                item.save()
+                print(f"Total atualizado: {total_real}")
 
-            # 5. Atualizar total consolidado
-            item.total_quantity = item.batches.aggregate(total=Sum('quantity'))['total'] or 0
-            item.save()
+                # 6. Registrar Transação
+                print("Criando StockTransaction")
+                StockTransaction.objects.create(
+                    store=store,
+                    product=product,
+                    batch=new_batch,
+                    transaction_type='ENTRADA',
+                    quantity=data['quantity'],
+                    unit_cost=data.get('cost_price'),
+                    unit_price=data.get('sale_price'),
+                    description=f"Entrada Lote {new_batch.batch_code or 'S/N'}"
+                )
+                print("Transação criada")
 
-            # 6. Registrar transação
-            StockTransaction.objects.create(
-                store=store,
-                product=product,
-                batch=new_batch,
-                transaction_type='ENTRADA',
-                quantity=data['quantity'],
-                unit_cost=data.get('cost_price'),
-                unit_price=data.get('sale_price'),
-                description=f"Entrada Lote {new_batch.batch_code or 'S/N'}"
-            )
+        except Exception as e:
+            print(f"❌ ERRO na transação: {str(e)}")
+            print(f"Tipo do erro: {type(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({"error": f"Erro interno: {str(e)}"}, status=500)
 
+        print("✅ Sucesso!")
         return Response({
-            "message": "Estoque atualizado com sucesso!",
+            "message": "Estoque atualizado com sucesso!", 
             "product": product.name,
             "new_total": item.total_quantity
         })
