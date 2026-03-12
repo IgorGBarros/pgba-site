@@ -44,7 +44,7 @@ interface ProductData {
 
 export default function AddProduct() {
   const [step, setStep] = useState(0);
-  const [showScanner, setShowScanner] = useState(true);
+  const [showScanner, setShowScanner] = useState(false); // Inicia com false para mostrar input manual
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState({ feature: "", description: "" });
@@ -71,17 +71,19 @@ export default function AddProduct() {
 
   const handleScannerClick = () => {
     if (isLocked("barcode_scanner")) {
-      triggerProGate("Scanner de Código de Barras", "Cansada de digitar? O Scanner é exclusivo PRO.");
+      triggerProGate("Scanner de Código de Barras", "Mais rápido e preciso! O Scanner é exclusivo PRO.");
       return;
     }
     setShowScanner(true);
   };
 
-  const handleBarcodeScan = async (barcode: string) => {
-    setShowScanner(false);
-    setData((prev) => ({ ...prev, barcode }));
+  // Função para processar código (manual ou escaneado)
+  const handleBarcodeInput = async (barcode: string) => {
+    if (!barcode.trim()) return;
+    
+    setData((prev) => ({ ...prev, barcode: barcode.trim() }));
     setLookupLoading(true);
-
+    
     // Try user inventory
     try {
       const existing = await inventoryApi.getByBarcode(barcode);
@@ -123,9 +125,13 @@ export default function AddProduct() {
         toast({ title: "Produto identificado!", description: result.product.name });
       }
     } catch { /* no match */ }
-
     setLookupLoading(false);
     setStep(1);
+  };
+
+  const handleBarcodeScan = async (barcode: string) => {
+    setShowScanner(false);
+    await handleBarcodeInput(barcode);
   };
 
   const handleFuzzyConfirm = async (product: GlobalProduct) => {
@@ -181,9 +187,19 @@ export default function AddProduct() {
   };
 
   const handleSave = async () => {
+    // Validação obrigatória do código de barras
+    if (!data.barcode?.trim()) {
+      toast({ 
+        title: "Código obrigatório", 
+        description: "Digite ou escaneie um código de barras válido.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     try {
       await saveEntry({
-        bar_code: data.barcode,
+        bar_code: data.barcode.trim(),
         name: data.product_name || "Produto sem nome",
         category: data.category,
         natura_sku: data.sku,
@@ -193,16 +209,15 @@ export default function AddProduct() {
         cost_price: data.cost_price,
         lookup_source: data.lookup_source,
       });
-      toast({ title: "Entrada registrada!", description: `${data.product_name}` });
+      toast({ title: "Produto cadastrado!", description: `${data.product_name} adicionado ao estoque.` });
       navigate("/");
     } catch {
       // erro tratado pelo hook (toast)
     }
   };
 
-
   const canAdvance = () => {
-    if (step === 0) return !!data.barcode && !lookupLoading;
+    if (step === 0) return !!data.barcode?.trim() && !lookupLoading;
     if (step === 1) return true;
     if (step === 2) return data.quantity > 0;
     return true;
@@ -212,7 +227,9 @@ export default function AddProduct() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-          <button onClick={() => navigate("/")} className="rounded-lg p-2 text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+          <button onClick={() => navigate("/")} className="rounded-lg p-2 text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
           <h1 className="font-display text-base font-bold text-foreground">Cadastrar Produto</h1>
           <div className="w-9" />
         </div>
@@ -235,22 +252,24 @@ export default function AddProduct() {
         <AnimatePresence mode="wait">
           {step === 0 && (
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-             {showScanner && !isLocked("barcode_scanner") ? (
+              {showScanner && !isLocked("barcode_scanner") ? (
                 <div className="space-y-4">
                   <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowScanner(false)} />
                   <button
                     onClick={() => setShowScanner(false)}
                     className="w-full text-center text-sm text-muted-foreground underline mt-2"
                   >
-                    Não tem código? Buscar por nome/SKU
+                    Digitar código manualmente
                   </button>
                 </div>
               ) : data.barcode ? (
                 <div className="space-y-4 rounded-xl border border-border bg-card p-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><ScanBarcode className="h-5 w-5 text-primary" /></div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <ScanBarcode className="h-5 w-5 text-primary" />
+                    </div>
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Código Lido</p>
+                      <p className="text-sm font-semibold text-foreground">Código Informado</p>
                       <p className="font-mono text-lg font-bold text-primary">{data.barcode}</p>
                     </div>
                   </div>
@@ -266,7 +285,9 @@ export default function AddProduct() {
                       {data.image_url ? (
                         <img src={data.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border border-border" />
                       ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted"><Package className="h-5 w-5 text-muted-foreground" /></div>
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-foreground truncate">{data.product_name}</p>
@@ -281,26 +302,65 @@ export default function AddProduct() {
                   {!lookupLoading && !data.product_name && (
                     <div>
                       <label className="text-sm text-muted-foreground">Nome do Produto *</label>
-                      <input type="text" value={data.product_name} onChange={(e) => setData((p) => ({ ...p, product_name: e.target.value }))} placeholder="Digite o nome do produto" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+                      <input 
+                        type="text" 
+                        value={data.product_name} 
+                        onChange={(e) => setData((p) => ({ ...p, product_name: e.target.value }))} 
+                        placeholder="Digite o nome do produto" 
+                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" 
+                      />
                     </div>
                   )}
 
-                  <button type="button" onClick={() => setShowScanner(true)} className="text-xs text-primary hover:underline">Escanear outro código</button>
+                  <button 
+                    type="button" 
+                    onClick={() => setData((p) => ({ ...p, barcode: "", product_name: "", sku: null, image_url: null, official_price: null, lookup_source: null }))} 
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Informar outro código
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-6 rounded-xl border border-border bg-card p-5">
-                  {/* Manual Search Button */}
+                  {/* Campo manual SEMPRE disponível */}
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Código de Barras *</label>
+                    <input
+                      type="text"
+                      value={data.barcode}
+                      onChange={(e) => setData((p) => ({ ...p, barcode: e.target.value }))}
+                      onBlur={(e) => e.target.value.trim() && handleBarcodeInput(e.target.value)}
+                      placeholder="Digite o código de barras"
+                      className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:border-primary"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Digite e pressione Enter ou clique fora do campo
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">OU</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+
+                  {/* Scanner como diferencial PRO */}
                   <button
-                    onClick={() => setIsSearchOpen(true)}
-                    className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all"
+                    onClick={handleScannerClick}
+                    className={`w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all ${isLocked("barcode_scanner") ? "opacity-80" : ""}`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                        <Search size={20} />
+                      <div className={`p-2 rounded-lg ${!isLocked("barcode_scanner") ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {!isLocked("barcode_scanner") ? <ScanBarcode size={20} /> : <Lock size={20} />}
                       </div>
                       <div>
-                        <p className="font-bold text-sm text-foreground">Buscar Manualmente</p>
-                        <p className="text-xs text-muted-foreground">Digite o nome ou código do produto</p>
+                        <p className="font-bold text-sm text-foreground flex items-center gap-2">
+                          Escanear com Câmera
+                          {isLocked("barcode_scanner") && <ProBadge />}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {!isLocked("barcode_scanner") ? "Mais rápido e preciso" : "Exclusivo PRO - Mais velocidade"}
+                        </p>
                       </div>
                     </div>
                     <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
@@ -312,44 +372,41 @@ export default function AddProduct() {
                     <div className="h-px flex-1 bg-border" />
                   </div>
 
-                  {/* Scan Button */}
+                  {/* Busca manual por nome */}
                   <button
-                    onClick={handleScannerClick}
-                    className={`w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all ${isLocked("barcode_scanner") ? "opacity-80" : ""}`}
+                    onClick={() => setIsSearchOpen(true)}
+                    className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${!isLocked("barcode_scanner") ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                        {!isLocked("barcode_scanner") ? <ScanBarcode size={20} /> : <Lock size={20} />}
+                      <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                        <Search size={20} />
                       </div>
                       <div>
-                        <p className="font-bold text-sm text-foreground flex items-center gap-2">
-                          Escanear Código de Barras
-                          {isLocked("barcode_scanner") && <ProBadge />}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {!isLocked("barcode_scanner") ? "Use a câmera para ler o código" : "Exclusivo para assinantes PRO"}
-                        </p>
+                        <p className="font-bold text-sm text-foreground">Buscar por Nome</p>
+                        <p className="text-xs text-muted-foreground">Encontre produtos pelo nome ou SKU</p>
                       </div>
                     </div>
                     <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
                   </button>
 
-                  {/* Search Modal */}
-                    <ProductSearchModal
-                      isOpen={isSearchOpen}
-                      onClose={() => setIsSearchOpen(false)}
-                      onSelect={(p) => selectSuggestion(p as GlobalProduct)} // ✅ cast
-                    />
+                  <ProductSearchModal
+                    isOpen={isSearchOpen}
+                    onClose={() => setIsSearchOpen(false)}
+                    onSelect={(p) => selectSuggestion(p as GlobalProduct)}
+                  />
                 </div>
               )}
             </motion.div>
           )}
 
+          {/* Resto dos steps permanecem iguais */}
           {step === 1 && (
             <motion.div key="expiry" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Camera className="h-5 w-5 text-primary" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Camera className="h-5 w-5 text-primary" />
+                  </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">Foto da Validade</p>
                     <p className="text-xs text-muted-foreground">Formato: L.AB0030 EXP.11/27</p>
@@ -360,9 +417,13 @@ export default function AddProduct() {
                   <div className="space-y-3">
                     <img src={data.expiry_photo_url} alt="Foto da validade" className="w-full rounded-lg border border-border object-cover" style={{ maxHeight: 200 }} />
                     {ocrLoading && (
-                      <div className="flex items-center justify-center gap-2 text-sm text-primary"><Loader2 className="h-4 w-4 animate-spin" /> Analisando imagem...</div>
+                      <div className="flex items-center justify-center gap-2 text-sm text-primary">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Analisando imagem...
+                      </div>
                     )}
-                    <button type="button" onClick={() => { setData((p) => ({ ...p, expiry_photo_url: "", expiry_date: "" })); fileInputRef.current?.click(); }} className="text-xs text-primary hover:underline">Tirar outra foto</button>
+                    <button type="button" onClick={() => { setData((p) => ({ ...p, expiry_photo_url: "", expiry_date: "" })); fileInputRef.current?.click(); }} className="text-xs text-primary hover:underline">
+                      Tirar outra foto
+                    </button>
                   </div>
                 ) : isLocked("ocr_expiry") ? (
                   <div className="relative">
@@ -381,7 +442,7 @@ export default function AddProduct() {
                 )}
 
                 <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleExpiryPhoto} className="hidden" />
-
+                
                 <div>
                   <label className="text-sm text-muted-foreground">Data de Validade</label>
                   <input type="month" value={data.expiry_date} onChange={(e) => setData((p) => ({ ...p, expiry_date: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
@@ -395,7 +456,9 @@ export default function AddProduct() {
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Hash className="h-5 w-5 text-primary" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Hash className="h-5 w-5 text-primary" />
+                  </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">Quantidade & Preço do Lote</p>
                     <p className="text-xs text-muted-foreground">Cada entrada gera um lote independente</p>
@@ -436,7 +499,9 @@ export default function AddProduct() {
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Package className="h-5 w-5 text-primary" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Package className="h-5 w-5 text-primary" />
+                  </div>
                   <p className="text-sm font-semibold text-foreground">Confirmar Cadastro</p>
                 </div>
                 <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
