@@ -17,17 +17,16 @@ export interface StockEntryData {
   bar_code: string;                  // código de barras
   product_name: string;
   category: string;
-  sku?: string | null;
-  image_url?: string | null;
-  official_price?: number | null;
-  expiry_date?: string | null;
-  expiry_photo_url?: string | null;
-  quantity: number;
-  cost_price: number;
-  lookup_source?: string | null;
-  existing_item_id?: string | null;  // usado se já existe o produto no estoque
+  sku?: string | null;               // SKU opcional
+  image_url?: string | null;         // URL de imagem opcional
+  official_price?: number | null;    // preço oficial opcional
+  expiry_date?: string | null;       // data de validade (YYYY-MM ou YYYY-MM-DD)
+  expiry_photo_url?: string | null;  // link da foto de validade
+  quantity: number;                  // quantidade recebida
+  cost_price: number;                // preço de custo
+  lookup_source?: string | null;     // origem do lookup (inventory, fuzzy, etc.)
+  existing_item_id?: string | null;  // id do item existente no estoque
 }
-
 /**
  * Hook que centraliza criação de entrada de estoque.
  * Retorna estado de carregamento e a função saveEntry() que executa toda lógica.
