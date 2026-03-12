@@ -9,7 +9,8 @@ import BarcodeScanner from "../components/BarcodeScanner";
 import FuzzyMatchModal from "../components/FuzzyMatchModal";
 import {
   inventoryApi, movementsApi, ocrApi, productLookupApi, batchApi,
-  GlobalProduct, formatMoney
+  GlobalProduct, formatMoney,
+  stockApi
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/use-toast";
@@ -55,6 +56,7 @@ export default function StockWizard() {
 
   // ── Hybrid lookup ──
   const handleBarcodeScan = async (barcode: string) => {
+    
     setShowScanner(false);
     setData((p) => ({ ...p, barcode }));
     setLookupLoading(true);
@@ -83,7 +85,7 @@ export default function StockWizard() {
 
     // Global lookup (local catalog → scraper → fuzzy)
     try {
-      const result = await productLookupApi.lookup(barcode);
+      const result = await productLookupApi.lookup(data.barcode ?? "");
 
       if (result.source === "fuzzy" && result.suggestions?.length) {
         setLookupLoading(false);
@@ -167,15 +169,16 @@ export default function StockWizard() {
 
       if (!itemId) {
         // Create new inventory item
-        const inserted = await inventoryApi.create({
-          barcode: data.barcode,
-          product_name: data.product_name || "Produto sem nome",
-          category: data.category,
-          expiry_date: data.expiry_date || null,
-          expiry_photo_url: data.expiry_photo_url || null,
-          quantity: data.quantity,
-          cost_price: data.cost_price,
-        });
+        
+     const inserted = await stockApi.create({
+      bar_code: data.barcode,
+       quantity: data.quantity,
+       cost_price: data.cost_price,
+      expiration_date: data.expiry_date || undefined,     // aceita vazio
+      name: data.product_name || "Produto sem nome",       // sempre string
+      category: data.category || "",                       // garante string
+      natura_sku: data.sku ?? "", 
+     });
         itemId = inserted.id;
       } else {
         // Update existing item quantity

@@ -93,17 +93,20 @@ export interface LookupResult {
     | "remote_partial"
     | "suggestion"
     | "fuzzy"          // ✅ adiciona o valor que o front usa
-    | null;
+     | "none";
   product?: GlobalProduct | null; // ✅ adiciona o campo esperado
   suggestions?: GlobalProduct[];  // ✅ adiciona o campo usado no fuzzy match
   data?: any;                     // opcional, cobre payloads diferentes
-  message?: string;
+  message?: string | null; // opcional, para mensagens de erro ou status
 }
 
 export const productLookupApi = {
-  lookup: (barcodeOrName: string) =>
-    apiRequest<LookupResult>(`/api/products/lookup/?q=${encodeURIComponent(barcodeOrName)}`),
-
+  lookup: (barcodeOrName: string | null) => {
+    const query = barcodeOrName ?? "";
+    return apiRequest<LookupResult>(
+      `/api/products/lookup/?q=${encodeURIComponent(query)}`
+    );
+  },
   confirmMatch: (barcode: string, productId: number) =>
     apiRequest<GlobalProduct>("/api/products/confirm-match/", {
       method: "POST",
