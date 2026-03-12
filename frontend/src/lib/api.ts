@@ -133,6 +133,17 @@ export interface InventoryItem {
   updated_at: string;
 }
 
+export const stockApi = {
+    // ✅ criação corrigida para rota real
+  create: (data: Record<string, any>) => 
+    isDemoMode()
+      ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
+      : apiRequest<InventoryItem>("/api/stock/entry/", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      }
+
 export const inventoryApi = {
   list: () => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY)
                             : apiRequest<InventoryItem[]>("/api/inventory/")),
@@ -143,14 +154,7 @@ export const inventoryApi = {
   getByBarcode: (barcode: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.barcode === barcode) || null)
                                                    : apiRequest<InventoryItem | null>(`/api/inventory/barcode/${barcode}/`)),
 
-  // ✅ criação corrigida para rota real
-  create: (data: Record<string, any>) => 
-    isDemoMode()
-      ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
-      : apiRequest<InventoryItem>("/api/stock/entry/", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
+
 
   update: (id: string, data: Partial<InventoryItem>) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/`, {

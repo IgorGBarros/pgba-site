@@ -12,7 +12,8 @@ import UpgradeModal from "../components/UpgradeModal";
 import ProBadge from "../components/ProBadge";
 import {
   inventoryApi, movementsApi, ocrApi, productLookupApi, batchApi,
-  GlobalProduct, formatMoney
+  GlobalProduct, formatMoney,
+  stockApi
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../../src/hooks/usePlan";
@@ -182,7 +183,7 @@ export default function AddProduct() {
     if (!user) return;
     setLoading(true);
     try {
-      const inserted = await inventoryApi.create({
+      const inserted = await stockApi.create({
         bar_code: data.barcode,
         product_name: data.product_name || "Produto sem nome",
         category: data.category,
