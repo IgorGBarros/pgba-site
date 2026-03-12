@@ -1,3 +1,4 @@
+from aiohttp import request
 from django.db import models
 from django.db import transaction
 from rest_framework import viewsets,status, permissions, generics
@@ -166,6 +167,11 @@ class StockEntryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        print("\n=== [DEBUG] StockEntryView recebeu requisição ===")
+        print("URL chamada:", request.path)
+        print("Método:", request.method)
+        print("Usuário autenticado?:", request.user.is_authenticated)
+        print("Body recebido:", request.data, "\n")
         serializer = StockEntrySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
