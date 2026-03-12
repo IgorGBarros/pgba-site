@@ -218,9 +218,9 @@ class StockEntryView(APIView):
                     if barcode_input and not product.bar_code:
                         product.bar_code = barcode_input
                         updated = True
-                    if sku_input and not product.natura_sku:
-                        product.natura_sku = sku_input
-                        updated = True
+                    #if sku_input and not product.natura_sku:
+                       # product.natura_sku = sku_input
+                        #updated = True
                     if data.get('name') and "Produto Novo" in product.name:
                         product.name = data['name']
                         updated = True
