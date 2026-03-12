@@ -183,14 +183,14 @@ export default function AddProduct() {
     setLoading(true);
     try {
       const inserted = await inventoryApi.create({
-        barcode: data.barcode,
+        bar_code: data.barcode,
         product_name: data.product_name || "Produto sem nome",
         category: data.category,
         expiry_date: data.expiry_date || null,
         expiry_photo_url: data.expiry_photo_url || null,
         quantity: data.quantity,
         cost_price: data.cost_price,
-      });
+      } as any);
 
       await batchApi.create(inserted.id, {
         quantity: data.quantity,

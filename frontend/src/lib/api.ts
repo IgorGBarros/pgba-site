@@ -144,7 +144,7 @@ export const inventoryApi = {
                                                    : apiRequest<InventoryItem | null>(`/api/inventory/barcode/${barcode}/`)),
 
   // ✅ criação corrigida para rota real
-  create: (data: Partial<InventoryItem>) =>
+  create: (data: Record<string, any>) => 
     isDemoMode()
       ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
       : apiRequest<InventoryItem>("/api/stock/entry/", {
