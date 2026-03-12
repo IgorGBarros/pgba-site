@@ -50,16 +50,18 @@ export function useStockEntry() {
 
       // ① Criar produto/estoque se ainda não existir
       if (!itemId) {
-        const inserted = await stockApi.create({
-          bar_code: data.bar_code,
-          quantity: data.quantity,
-          cost_price: data.cost_price,
-          expiration_date: data.expiry_date || undefined,
-          name: data.product_name || "Produto sem nome",
-          category: data.category || "",
-          natura_sku: data.sku ?? "",
-        });
-        itemId = inserted.id;
+            const inserted = await stockApi.create({
+            bar_code: data.bar_code,
+            quantity: Number(data.quantity),                       // transforma em número
+            cost_price: Number(data.cost_price),                   // transforma em número
+            expiration_date: data.expiry_date                      // converte mês → dia
+                ? `${data.expiry_date}-01`
+                : undefined,
+            name: data.product_name || "Produto sem nome",
+            category: data.category || "",
+            natura_sku: data.sku ?? "",
+            });
+            itemId = inserted.id;
       } else {
         // ② Atualizar quantidade de item existente
         const existing = await inventoryApi.get(itemId);
