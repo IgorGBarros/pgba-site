@@ -30,27 +30,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // --- CARREGAR SESSÃO INICIAL ---
-  useEffect(() => {
-    const loadStorageData = () => {
-      const storedToken = localStorage.getItem("auth_token");
-      const storedUser = localStorage.getItem("auth_user");
-
-      if (storedToken && storedUser) {
-        // Se tem token, configura o Axios para enviar em todas as requisições
+useEffect(() => {
+  const loadStorageData = async () => {
+    const storedToken = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
+    if (storedToken && storedUser) {
+      try {
         api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+        // Opcional: valida token
+        await api.get("/api/profile/");
         setUser(JSON.parse(storedUser));
+      } catch {
+        // se token inválido, limpa session
+        localStorage.clear();
       }
-      setLoading(false);
-    };
-
-    loadStorageData();
-  }, []);
+    }
+    setLoading(false);
+  };
+  loadStorageData();
+}, []);
 
   // --- LOGIN NORMAL (Email/Senha) ---
   const signIn = async (email: string, password: string) => {
     try {
       // Chama o endpoint CustomTokenObtainPairView
-      const response = await api.post("auth/login/", { username: email, password });
+      const response = await api.post("/api/auth/login/", { email, password });
       
       const { access } = response.data;
       
@@ -73,12 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // --- CADASTRO MANUAL ---
   const signUp = async (email: string, password: string, name: string) => {
       // Chama CustomUserCreateView
-      await api.post("auth/register/", { 
-          username: email, 
-          email: email, 
-          password: password, 
-          first_name: name 
-      });
+  await api.post("/api/auth/register/", { email, password, name });
   };
 
   // --- LOGIN GOOGLE (Firebase -> Django) ---
@@ -95,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 3. Envia para o Django (FirebaseLoginView que acabamos de simplificar)
-      const response = await api.post("auth/firebase/", { token: idToken });
+      const response = await api.post("/api/auth/firebase/", { token: idToken });
       
       // 4. Recebe a resposta do Django
       const token = response.data.access; 
@@ -144,8 +143,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     
     // Tenta deslogar do firebase localmente para forçar escolha de conta na próxima vez
-    try { await auth.signOut(); } catch (e) {}
-  };
+    try { await auth.signOut().catch(() => {});
+        localStorage.clear();
+        delete api.defaults.headers.common["Authorization"]; } catch (e) {}
+          };
 
   return (
     <AuthContext.Provider

@@ -202,12 +202,13 @@ export interface Movement {
 export const movementsApi = {
   list: () => {
     if (isDemoMode()) return Promise.resolve(DEMO_MOVEMENTS);
-    return apiRequest<Movement[]>("/api/movements/");
+    // ✅ Corrigido
+    return apiRequest<Movement[]>("/api/transactions/");
   },
-
   create: (data: Omit<Movement, "id" | "created_at" | "profit">) => {
     if (isDemoMode()) return Promise.resolve({ id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement);
-    return apiRequest<Movement>("/api/movements/", { method: "POST", body: JSON.stringify(data) });
+    // ✅ Corrigido
+    return apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
   },
 };
 
@@ -287,7 +288,7 @@ export const storefrontApi = {
 
   listBySlug: (slug: string) => {
     if (slug === "demo") return storefrontApi.list("demo");
-    return apiRequest<StorefrontItem[]>(`/api/storefront/?slug=${slug}`);
+    return apiRequest<StorefrontItem[]>(`/api/storefront/${slug}`);
   },
 };
 
@@ -317,3 +318,10 @@ export function formatMoney(value: number | null | undefined): string {
   if (value == null || isNaN(value)) return "—";
   return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+export const salesApi = {
+  checkout: (payload: any) =>
+    apiRequest<{ message: string; total: number }>("/api/sales/checkout/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+};
