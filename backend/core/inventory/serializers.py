@@ -13,17 +13,29 @@ from .models import CustomUser, Product, InventoryItem, InventoryBatch, Store, S
 
 
 
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Autenticação via email + senha para JWT."""
+    def validate(self, attrs):
+        email_field = CustomUser.USERNAME_FIELD  # "email"
+        credentials = {
+            email_field: attrs.get("email"),
+            "password": attrs.get("password"),
+        }
+        user = CustomUser.objects.filter(email=credentials[email_field]).first()
+
+        if user and user.check_password(credentials["password"]) and user.is_active:
+            data = super().validate(attrs)
+            data["email"] = user.email
+            data["name"] = user.name
+            return data
+        raise serializers.ValidationError("Invalid credentials.")
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        
-        # Adiciona claims personalizados ao token
-        token['email'] = user.email
-        # Como o User padrão não tem 'name', usamos o nome completo ou username
-        token['name'] = user.get_full_name() or user.username
-        token['is_staff'] = user.is_staff
-        
+        token["email"] = user.email
+        token["name"] = user.name
         return token
 
 class CustomUserSerializer(serializers.ModelSerializer):
