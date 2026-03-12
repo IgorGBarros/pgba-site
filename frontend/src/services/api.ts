@@ -6,13 +6,7 @@ const rawBaseUrl =(import.meta as any).env?.VITE_API_BASE_URL || "https://gestao
 
 // garante que o baseURL termine com `/api/`
 // garante que termina com /api/
-const finalBaseUrl = rawBaseUrl.endsWith("/api/")
-  ? rawBaseUrl
-  : rawBaseUrl.endsWith("/api")
-  ? rawBaseUrl + "/"
-  : rawBaseUrl.endsWith("/")
-  ? rawBaseUrl + "api/"
-  : rawBaseUrl + "/api/";
+const finalBaseUrl = rawBaseUrl.replace(/\/$/, "") + "/api/";
 
 // 🔐 token helpers
 export function getToken(): string | null {
@@ -37,10 +31,9 @@ api.interceptors.request.use((config) => {
   if (token) {
     // AxiosHeaders tem o método set, use-o
     if (config.headers?.set) {
-      config.headers.set("Authorization", `Token ${token}`);
+      config.headers.set("Authorization", `Bearer ${token}`);
     } else {
-      // fallback para versões antigas ou se set não existir
-      (config.headers as any)["Authorization"] = `Token ${token}`;
+      (config.headers as any)["Authorization"] = `Bearer ${token}`;
     }
   }
   return config;
