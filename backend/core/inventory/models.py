@@ -78,7 +78,16 @@ class Store(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     whatsapp = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    PLAN_CHOICES = [
+        ('free', 'Free'),
+        ('pro', 'Pro'),
+    ]
+    plan = models.CharField(
+        max_length=20,
+        choices=PLAN_CHOICES,
+        default='pro',
+        help_text="Plano de assinatura da loja"
+    )
     def __str__(self):
             # Se for usar CustomUser que não tem username nativo, proteja a chamada
             username = getattr(self.user, 'name', getattr(self.user, 'email', 'Desconhecido')) if self.user else "Sem Usuário"

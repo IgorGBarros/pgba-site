@@ -172,5 +172,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             "slug",
             "whatsapp",
             "created_at",
+            'plan'
         ]
         read_only_fields = ["id", "user", "created_at"]
