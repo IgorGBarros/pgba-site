@@ -19,6 +19,7 @@ import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../../src/hooks/usePlan";
 import { useFeatureGates } from "../../src/hooks/useFeatureGates";
 import { useToast } from "../hooks/use-toast";
+import { useStockEntry } from "../hooks/useStockEntry";
 
 const STEPS = [
   { id: "scan", label: "Código de Barras", icon: ScanBarcode },
@@ -47,7 +48,7 @@ export default function AddProduct() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState({ feature: "", description: "" });
-  const [loading, setLoading] = useState(false);
+  const { loading, saveEntry } = useStockEntry();
   const [ocrLoading, setOcrLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [fuzzyModal, setFuzzyModal] = useState<{ barcode: string; suggestions: GlobalProduct[] } | null>(null);
@@ -179,47 +180,24 @@ export default function AddProduct() {
     }
   };
 
-  const handleSave = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const inserted = await stockApi.create({
-        bar_code: data.barcode,
-        product_name: data.product_name || "Produto sem nome",
-        category: data.category,
-        expiry_date: data.expiry_date || null,
-        expiry_photo_url: data.expiry_photo_url || null,
-        quantity: data.quantity,
-        cost_price: data.cost_price,
-      } as any);
-
-      await batchApi.create(inserted.id, {
-        quantity: data.quantity,
-        cost_price: data.cost_price,
-        expiry_date: data.expiry_date || null,
-        expiry_photo_url: data.expiry_photo_url || null,
-      });
-
-      await movementsApi.create({
-        product_id: inserted.id,
-        batch_id: null,
-        product_name: data.product_name || "Produto sem nome",
-        barcode: data.barcode,
-        movement_type: "entrada",
-        quantity: data.quantity,
-        unit_price: data.cost_price,
-        sale_type: null,
-        notes: null,
-      });
-
-      toast({ title: "Produto cadastrado!", description: `${data.product_name} adicionado ao estoque.` });
-      navigate("/");
-    } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleSave = async () => {
+  try {
+    await saveEntry({
+      bar_code: data.barcode,
+      product_name: data.product_name || "Produto sem nome",
+      category: data.category,
+      sku: data.sku,
+      expiry_date: data.expiry_date,
+      expiry_photo_url: data.expiry_photo_url,
+      quantity: data.quantity,
+      cost_price: data.cost_price,
+      lookup_source: data.lookup_source,
+    });
+    navigate("/");
+  } catch {
+    // erro tratado pelo hook (toast)
+  }
+};
 
   const canAdvance = () => {
     if (step === 0) return !!data.barcode && !lookupLoading;

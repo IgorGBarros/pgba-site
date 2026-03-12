@@ -14,6 +14,7 @@ import {
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/use-toast";
+import { useStockEntry } from "../hooks/useStockEntry";
 
 const STEPS = [
   { id: "scan", label: "Escanear", icon: ScanBarcode },
@@ -40,7 +41,7 @@ interface EntryData {
 export default function StockWizard() {
   const [step, setStep] = useState(0);
   const [showScanner, setShowScanner] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const { loading, saveEntry } = useStockEntry();
   const [ocrLoading, setOcrLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [fuzzyModal, setFuzzyModal] = useState<{ barcode: string; suggestions: GlobalProduct[] } | null>(null);
@@ -160,63 +161,26 @@ export default function StockWizard() {
   };
 
   // ── Save (creates batch) ──
-  const handleSave = async () => {
-    if (!user) return;
-    setLoading(true);
 
-    try {
-      let itemId = data.existing_item_id;
-
-      if (!itemId) {
-        // Create new inventory item
-        
-     const inserted = await stockApi.create({
+const handleSave = async () => {
+  try {
+    await saveEntry({
       bar_code: data.barcode,
-       quantity: data.quantity,
-       cost_price: data.cost_price,
-      expiration_date: data.expiry_date || undefined,     // aceita vazio
-      name: data.product_name || "Produto sem nome",       // sempre string
-      category: data.category || "",                       // garante string
-      natura_sku: data.sku ?? "", 
-     });
-        itemId = inserted.id;
-      } else {
-        // Update existing item quantity
-        const existing = await inventoryApi.get(itemId);
-        await inventoryApi.update(itemId, {
-          quantity: existing.quantity + data.quantity,
-        });
-      }
-
-      // Create batch for this entry
-      await batchApi.create(itemId, {
-        quantity: data.quantity,
-        cost_price: data.cost_price,
-        expiry_date: data.expiry_date || null,
-        expiry_photo_url: data.expiry_photo_url || null,
-      });
-
-      // Record movement
-      await movementsApi.create({
-        product_id: itemId,
-        batch_id: null,
-        product_name: data.product_name || "Produto sem nome",
-        barcode: data.barcode,
-        movement_type: "entrada",
-        quantity: data.quantity,
-        unit_price: data.cost_price,
-        sale_type: null,
-        notes: data.lookup_source ? `Fonte: ${data.lookup_source}` : null,
-      });
-
-      toast({ title: "Entrada registrada!", description: `+${data.quantity} ${data.product_name}` });
-      navigate("/");
-    } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+      product_name: data.product_name || "Produto sem nome",
+      category: data.category,
+      sku: data.sku,
+      expiry_date: data.expiry_date,
+      expiry_photo_url: data.expiry_photo_url,
+      quantity: data.quantity,
+      cost_price: data.cost_price,
+      lookup_source: data.lookup_source,
+      existing_item_id: data.existing_item_id,
+    });
+    navigate("/");
+  } catch {
+    // erro tratado pelo hook
+  }
+};
 
   const canAdvance = () => {
     if (step === 0) return !!data.barcode && !lookupLoading;
