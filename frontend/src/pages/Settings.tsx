@@ -61,33 +61,28 @@ export default function Settings() {
     }).catch(() => setLoading(false));
   }, [user]);
 
-  // 🚀 CORREÇÃO DO SALVAMENTO DE SETTINGS
+  // 🚀 CORREÇÃO DO SALVAMENTO DE SETTINGS (Apenas o que pertence a esta página)
   const handleSave = async () => {
     setSaving(true);
     try {
-      // 1. Tenta salvar remotamente (só a vitrine, que é o único dado q vai pro servidor)
+      // Tenta salvar no backend APENAS o estado da vitrine (storefront_enabled)
       await profileApi.update({
         storefront_enabled: storefrontEnabled,
-      } as any);
-
-      // 2. Salva preferências locais (navegador)
-      localStorage.setItem("expiry_alert_days", String(expiryDays));
-      localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
-      
-      toast({ title: "Configurações salvas com sucesso!" });
-    } catch (err: any) {
-      // Se falhar o backend, ainda preserva as locais
-      localStorage.setItem("expiry_alert_days", String(expiryDays));
-      localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
-      
-      console.error("Erro ao salvar vitrine:", err);
-      toast({ 
-        title: "Aviso", 
-        description: "Preferências locais salvas. Ocorreu um erro ao sincronizar a vitrine na nuvem.", 
-        variant: "destructive" 
       });
+
+      // Salva preferências locais (navegador)
+      localStorage.setItem("expiry_alert_days", String(expiryDays));
+      localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
+      
+      toast({ title: "Configurações salvas!" });
+    } catch (err: any) {
+      // Se der erro na nuvem, garante que as configurações locais continuam salvas
+      localStorage.setItem("expiry_alert_days", String(expiryDays));
+      localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
+      toast({ title: "Aviso", description: "Configurações locais salvas. Erro ao sincronizar vitrine.", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleLogout = async () => {
