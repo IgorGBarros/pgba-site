@@ -2,20 +2,19 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Package, TrendingDown, DollarSign, BarChart3, ArrowLeft,
-  AlertTriangle, Calendar, Filter, Layers, Brain, Loader2
+  AlertTriangle, Calendar, Layers, Brain, Loader2
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, LineChart, Line, CartesianGrid, Legend
+  ResponsiveContainer
 } from "recharts";
-import { api } from "../services/api"; // Usa a sua API Django
-import { formatMoney } from "../lib/utils"; // Certifique-se de ter essa função em utils ou crie-a
+// 🚀 Importações consolidadas da nossa API centralizada
+import { inventoryApi, movementsApi, InventoryItem, Movement, formatMoney } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
 import { useFeatureGates } from "../hooks/useFeatureGates";
 import ProOverlay from "../components/ProOverlay";
 import UpgradeModal from "../components/UpgradeModal";
-import ConsultantAnalyticsView from "../components/ConsultantAnalyticsView";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { useToast } from "../hooks/use-toast";
 
@@ -25,62 +24,43 @@ const COLORS = [
   "hsl(30, 70%, 50%)", "hsl(220, 55%, 55%)",
 ];
 
-// Tipagem baseada no backend Django
-interface InventoryItem {
-  id: number;
-  product: { id: number; name: string; bar_code: string; category: string; };
-  total_quantity: number;
-  min_quantity: number;
-  cost_price: number;
-  sale_price: number;
-  batches?: any[]; 
-}
-
-interface StockTransaction {
-  id: number;
-  transaction_type: string;
-  quantity: number;
-  unit_price: number | null;
-  unit_cost: number | null;
-  created_at: string;
-  product_name: string;
-  batch_code?: string;
-}
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isPro } = usePlan();
   const { isLocked } = useFeatureGates();
   const { toast } = useToast();
-
+  
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [movements, setMovements] = useState<StockTransaction[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpgrade, setShowUpgrade] = useState(false);
   
-  // IA States (Deixado preparado para quando o endpoint Python existir)
+  // IA States
   const [myAnalytics, setMyAnalytics] = useState<any>(null);
   const [myAnalyticsLoading, setMyAnalyticsLoading] = useState(false);
-  const [myInsights, setMyInsights] = useState<any>(null);
-  const [myInsightsLoading, setMyInsightsLoading] = useState(false);
   
   // Filters for value over time
-  const [selectedProduct, setSelectedProduct] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   useEffect(() => {
     if (!user) return;
     
-    // Busca dados do Django via API
+    // 🚀 Uso das rotas padronizadas que configuramos na api.ts
     Promise.all([
-      api.get("/inventory/"),
-      api.get("/inventory/transactions/") // Rota que você criou no capítulo anterior!
+      inventoryApi.list(),
+      movementsApi.list()
     ])
       .then(([invRes, movRes]) => {
-        setItems(invRes.data);
-        setMovements(movRes.data);
+        setItems(invRes);
+        
+        // Normaliza os dados de transações (mesma lógica do Extrato)
+        const normalizedMovements = movRes.map(m => ({
+          ...m,
+          movement_type: (m as any).transaction_type?.toLowerCase() || m.movement_type || "saida"
+        })) as Movement[];
+        
+        setMovements(normalizedMovements);
         setLoading(false);
       })
       .catch((err) => {
@@ -92,137 +72,71 @@ export default function Dashboard() {
 
   // ── KPIs ──
   const totalProducts = items.length;
-  const totalValue = items.reduce((s, i) => s + (i.total_quantity * Number(i.cost_price)), 0);
-  const lowStock = items.filter((i) => i.total_quantity <= i.min_quantity && i.total_quantity > 0);
+  
+  const totalValue = items.reduce((s, i) => {
+    const qty = i.total_quantity ?? i.quantity ?? 0;
+    return s + (qty * Number(i.cost_price));
+  }, 0);
+  
+  const lowStock = items.filter((i) => {
+    const qty = i.total_quantity ?? i.quantity ?? 0;
+    const minQty = i.min_quantity ?? 5;
+    return qty <= minQty && qty > 0;
+  });
   
   const now = new Date();
   
-  // Filtra as movimentações do mês atual
+  // Movimentações do mês atual
   const monthMovements = movements.filter((m) => {
     const d = new Date(m.created_at);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
   
-  // Pega apenas VENDAS
-  const salesMovements = monthMovements.filter((m) => m.transaction_type === "VENDA");
+  // Vendas do Mês
+  const salesMovements = monthMovements.filter((m) => m.movement_type === "saida" && m.sale_type === "venda");
   
   const monthSales = salesMovements.reduce((s, m) => s + (Number(m.unit_price) || 0) * Math.abs(m.quantity), 0);
-  const monthProfit = monthSales - salesMovements.reduce((s, m) => {
-    return s + (Number(m.unit_cost) || 0) * Math.abs(m.quantity);
-  }, 0);
+  const monthProfit = salesMovements.reduce((s, m) => s + (m.profit || 0), 0);
 
-  // Produtos Vencendo (Checa os lotes de cada item)
+  // Produtos Vencendo (Caso o backend envie o array batches)
   const expiringSoon = items.flatMap(item => {
-      if (!item.batches) return [];
-      return item.batches.filter(b => {
+      const batches = (item as any).batches || [];
+      return batches.filter((b: any) => {
           if (!b.expiration_date) return false;
           const d = new Date(b.expiration_date);
           const today = new Date();
           const soon = new Date();
           soon.setMonth(soon.getMonth() + 3);
           return d <= soon && d >= today;
-      }).map(b => ({ ...item, ...b, product_name: item.product.name }));
+      }).map((b: any) => ({ ...item, ...b, product_name: item.product?.name || item.product_name }));
   });
 
-  // ── Category aggregations ──
+  // ── Agrupamento por Categoria ──
   const categoryMap = useMemo(() => {
     const map = new Map<string, { qty: number; value: number }>();
     items.forEach((i) => {
-      const cat = i.product.category || "Geral";
+      const cat = i.product?.category || i.category || "Geral";
+      const qty = i.total_quantity ?? i.quantity ?? 0;
       const cur = map.get(cat) || { qty: 0, value: 0 };
-      cur.qty += i.total_quantity;
-      cur.value += i.total_quantity * Number(i.cost_price);
+      
+      cur.qty += qty;
+      cur.value += qty * Number(i.cost_price);
       map.set(cat, cur);
     });
     return map;
   }, [items]);
-
+  
   const pieData = Array.from(categoryMap.entries()).map(([name, d]) => ({ name, value: d.qty }));
   const barData = Array.from(categoryMap.entries()).map(([name, d]) => ({ name, valor: d.value }));
 
-  // ── Average cost per product ──
-  const avgPriceData = useMemo(() => {
-    const map = new Map<string, { totalCost: number; totalQty: number; name: string }>();
-    items.forEach((i) => {
-      const cur = map.get(i.product.bar_code) || { totalCost: 0, totalQty: 0, name: i.product.name };
-      cur.totalCost += i.total_quantity * Number(i.cost_price);
-      cur.totalQty += i.total_quantity;
-      cur.name = i.product.name;
-      map.set(i.product.bar_code, cur);
-    });
-    // Opcional: Adicionar custo das entradas anteriores baseando no `movements` (simplificado aqui)
-    return Array.from(map.values())
-      .filter((v) => v.totalQty > 0)
-      .map((v) => ({
-        name: v.name.length > 20 ? v.name.slice(0, 18) + "…" : v.name,
-        media: Number((v.totalCost / v.totalQty).toFixed(2)),
-      }))
-      .sort((a, b) => b.media - a.media)
-      .slice(0, 15);
-  }, [items]);
-
-  // ── Value over time (movements) ──
-  const availableYears = useMemo(() => {
-    const years = new Set<string>();
-    movements.forEach((m) => years.add(new Date(m.created_at).getFullYear().toString()));
-    return Array.from(years).sort();
-  }, [movements]);
-
-  const availableProducts = useMemo(() => {
-    const prods = new Map<string, string>();
-    items.forEach((i) => prods.set(i.product.bar_code, i.product.name));
-    return Array.from(prods.entries()).map(([barcode, name]) => ({ barcode, name }));
-  }, [items]);
-
-  const timeSeriesData = useMemo(() => {
-    let filtered = movements;
-    // O StockTransaction da API do Django talvez não retorne o bar_code direto, 
-    // mas sim o product_name ou product_id. Ajuste se necessário.
-    if (selectedYear !== "all") {
-      filtered = filtered.filter((m) => new Date(m.created_at).getFullYear().toString() === selectedYear);
-    }
-    if (selectedMonth !== "all") {
-      filtered = filtered.filter((m) => (new Date(m.created_at).getMonth() + 1).toString() === selectedMonth);
-    }
-
-    const map = new Map<string, { entradas: number; saidas: number }>();
-    filtered.forEach((m) => {
-      const d = new Date(m.created_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const cur = map.get(key) || { entradas: 0, saidas: 0 };
-      const val = (Number(m.unit_price) || Number(m.unit_cost) || 0) * Math.abs(m.quantity);
-      
-      if (m.transaction_type === "ENTRADA") cur.entradas += val;
-      else if (m.transaction_type === "VENDA") cur.saidas += val;
-      
-      map.set(key, cur);
-    });
-    
-    return Array.from(map.entries())
-      .map(([key, v]) => ({ mes: key, entradas: Number(v.entradas.toFixed(2)), saidas: Number(v.saidas.toFixed(2)) }))
-      .sort((a, b) => a.mes.localeCompare(b.mes));
-  }, [movements, selectedProduct, selectedYear, selectedMonth]);
-
-  const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-  // MOCK DE IA (Para não quebrar a tela)
+  // ── MOCK DE IA ──
   const fetchMyAnalytics = async () => {
     if (isLocked("ai_insights")) { setShowUpgrade(true); return; }
     setMyAnalyticsLoading(true);
-    // Simula tempo de rede
     setTimeout(() => {
-        setMyAnalytics({ total_sales: monthSales, best_product: "Kaiak" });
+        setMyAnalytics({ total_sales: monthSales, best_product: "Em breve com a IA!" });
         setMyAnalyticsLoading(false);
     }, 1500);
-  };
-
-  const fetchMyInsights = async () => {
-    if (!myAnalytics) return;
-    setMyInsightsLoading(true);
-    setTimeout(() => {
-        setMyInsights([{ title: "Venda Mais", description: "O Kaiak está vendendo bem, faça um kit." }]);
-        setMyInsightsLoading(false);
-    }, 2000);
   };
 
   if (loading) {
@@ -259,7 +173,7 @@ export default function Dashboard() {
                 <span className="text-xs text-muted-foreground">{s.label}</span>
                 <s.icon className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className={`mt-1 font-display text-xl font-bold text-foreground ${s.pro && isLocked(s.pro === true ? "dashboard_kpi_advanced" : "dashboard_kpi_advanced") ? "blur-sm select-none" : ""}`}>
+              <p className={`mt-1 font-display text-xl font-bold text-foreground ${s.pro && isLocked("dashboard_kpi_advanced") ? "blur-sm select-none" : ""}`}>
                 {s.value}
               </p>
               {s.pro && isLocked("dashboard_kpi_advanced") && <ProOverlay message="PRO" onClick={() => setShowUpgrade(true)} />}
@@ -271,18 +185,11 @@ export default function Dashboard() {
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="overview" className="text-xs">Visão Geral</TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs">Valor no Tempo</TabsTrigger>
-            <TabsTrigger value="avgprice" className="text-xs">Preço Médio</TabsTrigger>
-            <TabsTrigger value="products" className="text-xs">Produtos</TabsTrigger>
-            <TabsTrigger
-              value="ai"
-              className="text-xs"
-              onClick={() => { if (!myAnalytics && !myAnalyticsLoading) fetchMyAnalytics(); }}
-            >
+            <TabsTrigger value="ai" className="text-xs" onClick={() => { if (!myAnalytics && !myAnalyticsLoading) fetchMyAnalytics(); }}>
               <Brain className="h-3 w-3 mr-1" /> IA Insights
             </TabsTrigger>
           </TabsList>
-
+          
           {/* ── TAB: Overview ── */}
           <TabsContent value="overview" className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -302,7 +209,7 @@ export default function Dashboard() {
                 ) : <p className="text-sm text-muted-foreground text-center py-10">Sem dados</p>}
                 {isLocked("dashboard_charts") && <ProOverlay message="Disponível no Premium" onClick={() => setShowUpgrade(true)} />}
               </div>
-
+              
               <div className="relative rounded-xl border border-border bg-card p-5">
                 <h2 className="font-display text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-primary" /> Valor por Categoria (R$)
@@ -331,39 +238,18 @@ export default function Dashboard() {
                   {lowStock.map((i) => (
                     <div key={i.id} className="flex items-center justify-between rounded-lg bg-destructive/5 px-4 py-2.5">
                       <div className="min-w-0">
-                        <span className="text-sm font-medium text-foreground block truncate">{i.product.name}</span>
-                        <span className="text-[10px] text-muted-foreground">{i.product.category}</span>
+                        <span className="text-sm font-medium text-foreground block truncate">{i.product?.name || i.product_name}</span>
+                        <span className="text-[10px] text-muted-foreground">{i.product?.category || i.category}</span>
                       </div>
                       <span className="text-sm font-mono text-destructive font-semibold shrink-0 ml-2">
-                        {i.total_quantity}/{i.min_quantity}
+                        {i.total_quantity ?? i.quantity}/{i.min_quantity ?? 5}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : <p className="text-sm text-muted-foreground text-center py-6">Nenhum produto com estoque baixo 🎉</p>}
             </div>
-            
-            {/* Expiring */}
-            {expiringSoon.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-5">
-                <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
-                  <Calendar className="h-4 w-4 text-accent" /> Próximos da Validade
-                </h2>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {expiringSoon.map((i, idx) => (
-                    <div key={idx} className="flex items-center justify-between rounded-lg bg-accent/10 px-4 py-2.5">
-                      <span className="text-sm font-medium text-foreground truncate">{i.product_name}</span>
-                      <span className="text-sm font-mono text-accent-foreground font-semibold">{new Date(i.expiration_date).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </TabsContent>
-
-          {/* ... Restante das abas (Timeline, AvgPrice, Products) usa a mesma lógica ... */}
-          {/* Você pode manter o JSX que já estava no seu arquivo, ele vai funcionar com o novo State! */}
-
         </Tabs>
       </main>
       
