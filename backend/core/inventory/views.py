@@ -188,8 +188,15 @@ class StockEntryView(APIView):
 
         try:
             with transaction.atomic():
-                sku_input = data.get('natura_sku')
-                barcode_input = data.get('bar_code')
+                
+                # 🚀 CORREÇÃO AQUI: Converte strings vazias ("") para None (NULL)
+                # Isso impede o erro de "Unique Constraint" no PostgreSQL para novos usuários.
+                raw_sku = data.get('natura_sku')
+                sku_input = raw_sku if raw_sku and str(raw_sku).strip() != "" else None
+                
+                raw_barcode = data.get('bar_code')
+                barcode_input = raw_barcode if raw_barcode and str(raw_barcode).strip() != "" else None
+                
                 name_input = data.get('name', '').strip()
                 category_input = data.get('category', 'Geral')
 
@@ -207,7 +214,7 @@ class StockEntryView(APIView):
                     product = Product.objects.filter(bar_code=barcode_input).first()
                     
                 # PRIORIDADE 2: SKU Natura (Apenas se não achar pelo EAN e o SKU for válido)
-                if not product and sku_input and str(sku_input).strip() != "":
+                if not product and sku_input:
                     product = Product.objects.filter(natura_sku=sku_input).first()
 
                 print(f"Produto encontrado: {product}")
@@ -216,29 +223,26 @@ class StockEntryView(APIView):
                 if product:
                     is_protected = getattr(product, 'is_protected', False)
                     if is_protected:
-                        print("Produto oficial protegido - apenas vincular [1]")
+                        print("Produto oficial protegido - apenas vincular")
                     else:
-                        print("Produto local não protegido - validando atualizações [1]")
+                        print("Produto local não protegido - validando atualizações")
                         updated = False
                         
                         if barcode_input and not product.bar_code:
                             product.bar_code = barcode_input
                             updated = True
                             
-                        # 🚀 ATUALIZAÇÃO SEGURA DO SKU (Evita erro 500 de UNIQUE constraint)
+                        # 🚀 ATUALIZAÇÃO SEGURA DO SKU
                         if sku_input and not product.natura_sku:
                             if not Product.objects.exclude(id=product.id).filter(natura_sku=sku_input).exists():
                                 product.natura_sku = sku_input
                                 updated = True
                         
-                        # 🚀 PROTEÇÃO 2 (CURA AUTOMÁTICA): 
-                        # Atualiza o nome sempre que for diferente (limpando sujeira de testes antigos), 
-                        # desde que o nome enviado NÃO seja um fallback ("Produto Novo")
+                        # 🚀 PROTEÇÃO 2 (CURA AUTOMÁTICA)
                         if name_input != "Produto Novo" and product.name != name_input:
                             product.name = name_input
                             updated = True
                             
-                        # Aproveita para preencher a imagem se estiver faltando no catálogo
                         if data.get('image_url') and not getattr(product, 'image_url', ''):
                             product.image_url = data['image_url']
                             updated = True
@@ -322,6 +326,7 @@ class StockEntryView(APIView):
             "product": product.name,
             "new_total": item.total_quantity
         })
+    
 class SaleCheckoutView(APIView):
     """
     CAIXA / PDV (SCAN DE SAÍDA)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Loader2, LogOut, Sun, Moon, Monitor, Bell, Download, Lock } from "lucide-react";
+import { ArrowLeft, Save, Loader2, LogOut, Sun, Moon, Monitor, Bell, Download, Lock, Phone, Store } from "lucide-react";
 import { profileApi, inventoryApi, movementsApi, InventoryItem, Movement, formatMoney } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
@@ -23,7 +23,11 @@ export default function Settings() {
   const [exporting, setExporting] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: "", new_password: "", confirm: "" });
   const [changingPassword, setChangingPassword] = useState(false);
+  
+  // 🚀 ADICIONADO ESTADOS DO PERFIL AQUI
   const [storefrontEnabled, setStorefrontEnabled] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [storeSlug, setStoreSlug] = useState("");
   
   const [expiryDays, setExpiryDays] = useState(() => {
     return parseInt(localStorage.getItem("expiry_alert_days") || "30", 10);
@@ -55,31 +59,34 @@ export default function Settings() {
   useEffect(() => {
     if (!user) return;
     profileApi.get().then((data) => {
-      // Carrega o estado atual da vitrine salvo no banco
+      // 🚀 CARREGA OS DADOS PARA OS CAMPOS
       setStorefrontEnabled(data.storefront_enabled ?? false);
+      setWhatsappNumber(data.whatsapp_number || "");
+      setStoreSlug(data.store_slug || "");
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user]);
 
-  // 🚀 CORREÇÃO DO SALVAMENTO DE SETTINGS (Apenas o que pertence a esta página)
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Tenta salvar no backend APENAS o estado da vitrine (storefront_enabled)
+      // 🚀 ENVIA PARA O BACKEND: Vitrine, WhatsApp e Slug
+      const slug = storeSlug.trim();
       await profileApi.update({
         storefront_enabled: storefrontEnabled,
-      });
+        whatsapp_number: whatsappNumber.trim() || null,
+        store_slug: slug.length > 0 ? slug : null,
+      } as any);
 
-      // Salva preferências locais (navegador)
+      // Salva preferências locais
       localStorage.setItem("expiry_alert_days", String(expiryDays));
       localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
       
       toast({ title: "Configurações salvas!" });
     } catch (err: any) {
-      // Se der erro na nuvem, garante que as configurações locais continuam salvas
       localStorage.setItem("expiry_alert_days", String(expiryDays));
       localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
-      toast({ title: "Aviso", description: "Configurações locais salvas. Erro ao sincronizar vitrine.", variant: "destructive" });
+      toast({ title: "Aviso", description: "Configurações locais salvas. O Slug pode já estar em uso.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -177,6 +184,54 @@ export default function Settings() {
       </header>
       <main className="mx-auto max-w-lg px-6 py-6 space-y-5">
 
+        {/* 🚀 ADICIONADO: Vitrine Digital - Configurações Gerais */}
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
+            <Store className="h-4 w-4 text-accent" /> Vitrine Digital
+          </h2>
+          
+          <div className="flex items-center justify-between pb-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">Ativar Vitrine Pública</p>
+              <p className="text-xs text-muted-foreground">Clientes poderão ver seus produtos</p>
+            </div>
+            <button onClick={() => { if (isLocked("storefront")) { setShowUpgrade(true); return; } setStorefrontEnabled(!storefrontEnabled); }} className={`relative h-6 w-11 rounded-full transition-colors ${storefrontEnabled && !isLocked("storefront") ? "bg-primary" : "bg-muted"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${storefrontEnabled && !isLocked("storefront") ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
+              <Store className="h-3.5 w-3.5" /> Nome do Link (Slug)
+            </label>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">/vitrine/</span>
+              <input
+                type="text"
+                value={storeSlug}
+                onChange={(e) => setStoreSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                placeholder="maria-natura"
+                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">Este será o endereço do seu site (Ex: seunegocio.com.br/vitrine/maria-natura).</p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
+              <Phone className="h-3.5 w-3.5" /> WhatsApp da Vitrine (com DDD)
+            </label>
+            <input
+              type="tel"
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value)}
+              placeholder="5511999999999"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">Os pedidos da vitrine serão enviados para este número.</p>
+          </div>
+        </div>
+
         {/* Tema */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
@@ -245,22 +300,6 @@ export default function Settings() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Vitrine Digital - Toggle */}
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
-            Vitrine Digital
-          </h2>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Ativar Vitrine Pública</p>
-              <p className="text-xs text-muted-foreground">Clientes poderão ver seus produtos</p>
-            </div>
-            <button onClick={() => { if (isLocked("storefront")) { setShowUpgrade(true); return; } setStorefrontEnabled(!storefrontEnabled); }} className={`relative h-6 w-11 rounded-full transition-colors ${storefrontEnabled && !isLocked("storefront") ? "bg-primary" : "bg-muted"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${storefrontEnabled && !isLocked("storefront") ? "left-[22px]" : "left-0.5"}`} />
-            </button>
-          </div>
         </div>
 
         {/* Exportar Dados */}
