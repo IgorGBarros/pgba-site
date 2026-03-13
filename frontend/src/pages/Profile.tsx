@@ -51,16 +51,16 @@ export default function Profile() {
     ([form.display_name, form.whatsapp_number, user?.email, form.store_slug].filter(Boolean).length / 4) * 100
   );
 
-  const handleSave = async () => {
+   const handleSave = async () => {
     setSaving(true);
     try {
-      // 🚀 CORREÇÃO DO ERRO 500: 
-      // Removemos o '|| null'. O banco de dados (PostgreSQL) exige strings "" para CharFields.
-      // Enviar null para um campo que não tem null=True no models.py causa crash no Django.
+      // 🚀 CORREÇÃO PARA EVITAR O ERRO 500:
+      // Não use "|| null" para campos de texto. Envie a string vazia ("")
+      // e garanta que o slug vá sempre em letras minúsculas e sem espaços.
       const payload = {
-        display_name: form.display_name.trim(),
-        whatsapp_number: form.whatsapp_number.trim(),
-        store_slug: form.store_slug.trim().toLowerCase(), // Garante letras minúsculas no link
+        display_name: form.display_name?.trim() || "",
+        whatsapp_number: form.whatsapp_number?.trim() || "",
+        store_slug: form.store_slug?.trim().toLowerCase() || "", 
       };
 
       const updated = await profileApi.update(payload as any);
@@ -71,7 +71,8 @@ export default function Profile() {
       console.error("Erro ao salvar perfil:", err);
       toast({ 
         title: "Erro ao salvar", 
-        description: err.message || "Verifique se o nome da vitrine já está sendo usado por outra pessoa.", 
+        // Mensagem amigável caso o slug já exista no banco
+        description: err.message || "Este nome de vitrine já está em uso ou ocorreu um erro no servidor.", 
         variant: "destructive" 
       });
     } finally {
