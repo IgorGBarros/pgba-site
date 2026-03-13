@@ -57,6 +57,9 @@ export default function AddProduct() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   
+  // 🚀 NOVO ESTADO: Controla a animação de sucesso no Step 3
+  const [isSuccess, setIsSuccess] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [data, setData] = useState<EntryData>({
@@ -78,7 +81,6 @@ export default function AddProduct() {
     setShowScanner(true);
   };
 
-  // 🚀 LÓGICA DE BUSCA IDÊNTICA AO PRODUCTFORM
   const handleLookup = async (barcode: string) => {
     if (!barcode.trim()) return;
     setLookupLoading(true);
@@ -95,7 +97,7 @@ export default function AddProduct() {
           bar_code: barcode,
           name: remote?.name || resData?.name || prev.name,
           sale_price: remote?.sale_price || resData?.sale_price || prev.sale_price,
-          cost_price: prev.cost_price, // Mantém o que usuário digitou
+          cost_price: prev.cost_price, 
           natura_sku: remote?.natura_sku || resData?.natura_sku || prev.natura_sku,
           image_url: remote?.image_url || resData?.image_url || prev.image_url,
           category: remote?.category || resData?.category || prev.category,
@@ -116,7 +118,7 @@ export default function AddProduct() {
     setShowScanner(false);
     setData(prev => ({ ...prev, bar_code: barcode }));
     await handleLookup(barcode);
-    setStep(1); // Avança após escanear
+    setStep(1); 
   };
 
   const selectSuggestion = (product: any) => {
@@ -131,7 +133,7 @@ export default function AddProduct() {
       sale_price: product.official_price || prev.sale_price,
     }));
     setIsSearchOpen(false);
-    setStep(1); // Avança após escolher sugestão
+    setStep(1); 
   };
 
   const handleExpiryPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,10 +174,15 @@ export default function AddProduct() {
         cost_price: data.cost_price,
         sale_price: data.sale_price,
         batch_code: data.batch_code,
-        
+     
       });
-      // O Toast de sucesso já vem do useStockEntry
-      navigate("/");
+      
+      // 🚀 SUCESSO: Ativa a animação e redireciona após 2 segundos
+      setIsSuccess(true);
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+
     } catch {
       // O Toast de erro já vem do useStockEntry
     }
@@ -226,7 +233,6 @@ export default function AddProduct() {
                     onScan={handleBarcodeScan} 
                     onClose={() => {
                         setShowScanner(false);
-                        // 🚀 Requisito: Fechar scanner abre busca por nome
                         setIsSearchOpen(true);
                     }} 
                   />
@@ -288,7 +294,6 @@ export default function AddProduct() {
           {step === 1 && (
             <motion.div key="expiry" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-                 {/* ... Mantido igual, apenas omitido para não ficar gigante, é o mesmo código de validade ... */}
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Camera className="h-5 w-5 text-primary" /></div>
                   <div><p className="text-sm font-semibold text-foreground">Foto da Validade</p></div>
@@ -317,8 +322,6 @@ export default function AddProduct() {
           {step === 2 && (
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
-                
-                {/* Nome e Imagem */}
                 <div className="flex gap-4 items-start">
                    <div className="flex-1">
                       <label className="text-sm font-medium text-foreground">Nome do Produto *</label>
@@ -334,7 +337,7 @@ export default function AddProduct() {
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-sm font-medium text-foreground">Categoria</label>
-                        <select value={data.category} onChange={(e) => setData(p => ({ ...p, category: e.target.value }))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none">
+                        <select value={data.category} onChange={(e) => setData(p => ({ ...p, category: e.target.value }))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none bg-background">
                             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
@@ -344,7 +347,6 @@ export default function AddProduct() {
                     </div>
                 </div>
 
-                {/* Estoque e Lote */}
                 <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-primary/5">
                     <div>
                         <label className="text-sm font-bold text-primary">Qtd Entrada *</label>
@@ -360,7 +362,6 @@ export default function AddProduct() {
                     </div>
                 </div>
 
-                {/* Preços */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-foreground">Preço de Custo</label>
@@ -375,43 +376,74 @@ export default function AddProduct() {
             </motion.div>
           )}
 
-          {/* STEP 3: CONFIRMAR (RESUMO PERFEITO) */}
+          {/* STEP 3: CONFIRMAR COM ANIMAÇÃO DE SUCESSO */}
           {step === 3 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center gap-3">
-                  {data.image_url ? (
-                    <img src={data.image_url} alt="Produto" className="h-12 w-12 rounded-lg object-cover border" />
+              <div className="space-y-4 rounded-xl border border-border bg-card p-5 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {!isSuccess ? (
+                    <motion.div key="summary" exit={{ opacity: 0, scale: 0.9 }}>
+                      <div className="flex items-center gap-3 mb-4">
+                        {data.image_url ? (
+                          <img src={data.image_url} alt="Produto" className="h-12 w-12 rounded-lg object-cover border" />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Package className="text-primary" /></div>
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Confirmar Entrada</p>
+                          <p className="text-xs text-muted-foreground">{data.name || "Sem Nome"}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
+                        <Row label="EAN" value={data.bar_code} />
+                        <Row label="SKU" value={data.natura_sku || "—"} />
+                        <Row label="Lote" value={data.batch_code || "—"} />
+                        <Row label="Validade" value={data.expiry_date || "Não informada"} />
+                        <Row label="Qtd Entrada" value={`${data.quantity} un.`} />
+                        <Row label="Custo" value={formatMoney(data.cost_price)} />
+                        <Row label="Venda" value={formatMoney(data.sale_price)} />
+                      </div>
+                    </motion.div>
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10"><Package className="text-primary" /></div>
+                    /* 🚀 MÁGICA: ANIMAÇÃO DE SUCESSO */
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex flex-col items-center justify-center py-10 space-y-4"
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.1 }}
+                        className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg"
+                      >
+                        <Check size={48} strokeWidth={3} />
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-center space-y-1"
+                      >
+                        <h3 className="text-xl font-bold text-foreground">Sucesso!</h3>
+                        <p className="text-sm text-muted-foreground">Produto adicionado ao estoque.</p>
+                      </motion.div>
+                    </motion.div>
                   )}
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Confirmar Entrada</p>
-                    {/* 🚀 RESOLVIDO: O nome aparece perfeitamente aqui agora! */}
-                    <p className="text-xs text-muted-foreground">{data.name || "Sem Nome"}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
-                  <Row label="EAN" value={data.bar_code} />
-                  <Row label="SKU" value={data.natura_sku || "—"} />
-                  <Row label="Lote" value={data.batch_code || "—"} />
-                  <Row label="Validade" value={data.expiry_date || "Não informada"} />
-                  <Row label="Qtd Entrada" value={`${data.quantity} un.`} />
-                  <Row label="Custo" value={formatMoney(data.cost_price)} />
-                  <Row label="Venda" value={formatMoney(data.sale_price)} />
-                </div>
+                </AnimatePresence>
               </div>
             </motion.div>
           )}
 
         </AnimatePresence>
 
-        {/* NAVIGATION BUTTONS */}
-        {(!showScanner || step > 0) && (
+        {/* NAVIGATION BUTTONS (ESCONDE DURANTE O SUCESSO) */}
+        {(!showScanner || step > 0) && !isSuccess && (
           <div className="mt-6 flex gap-3">
             {step > 0 && (
-              <button onClick={() => setStep((s) => s - 1)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border bg-card py-3 text-sm font-medium">
+              <button onClick={() => setStep((s) => s - 1)} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl border bg-card py-3 text-sm font-medium disabled:opacity-50">
                 <ChevronLeft className="h-4 w-4" /> Voltar
               </button>
             )}
@@ -420,7 +452,7 @@ export default function AddProduct() {
                 Próximo <ChevronRight className="h-4 w-4" />
               </button>
             ) : (
-              <button onClick={handleSave} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+              <button onClick={handleSave} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 transition-all active:scale-95">
                 {loading ? <Loader2 className="animate-spin" /> : <Check />} Confirmar
               </button>
             )}
