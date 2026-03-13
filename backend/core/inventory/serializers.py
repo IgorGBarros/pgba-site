@@ -1,59 +1,57 @@
 from rest_framework import serializers
-from django.contrib.auth.models import User  # ✅ Usa o User padrão para evitar erros
+from django.contrib.auth import get_user_model, authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 
 # Importa seus modelos de negócio
-from .models import CustomUser, Product, InventoryItem, InventoryBatch, Store, Sale, SaleItem
+from .models import CustomUser, Product, InventoryItem, InventoryBatch, Store, Sale, SaleItem, StockTransaction
+
+# 🚀 CORREÇÃO 1: Usar o modelo de usuário ativo (CustomUser) dinamicamente
+User = get_user_model()
 
 # ==========================================
 # 1. SERIALIZERS DE AUTENTICAÇÃO
 # ==========================================
 
-
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Permite login com email e senha."""
-    username_field = CustomUser.USERNAME_FIELD  # "email"
-
+    username_field = User.USERNAME_FIELD  # "email"
+    
     def validate(self, attrs):
         credentials = {
             "email": attrs.get("email"),
             "password": attrs.get("password"),
         }
-
         user = authenticate(email=credentials["email"], password=credentials["password"])
         if not user:
             raise serializers.ValidationError("Invalid credentials.")
-
+        
         # retoma validação padrão do JWT
         data = super().validate(attrs)
         data["email"] = user.email
-        data["name"] = user.name
+        data["name"] = getattr(user, 'name', user.email)
         return data
-
+        
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
         token["email"] = user.email
-        token["name"] = user.name
+        token["name"] = getattr(user, 'name', user.email)
         return token
 
 class CustomUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-
+    
     class Meta:
-        model = User  # ✅ Ajustado para User padrão
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'password']
-
+        model = User
+        fields = ['id', 'email', 'name', 'password']
+        
     def create(self, validated_data):
-        # Cria o usuário usando o método seguro do Django
+        # Cria o usuário usando o método seguro do Django adaptado pro CustomUser
         user = User.objects.create_user(
-            username=validated_data['username'],
             email=validated_data.get('email', ''),
             password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', '')
+            name=validated_data.get('name', '')
         )
         return user
 
@@ -77,8 +75,6 @@ class InventoryBatchSerializer(serializers.ModelSerializer):
 class InventoryItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     batches = InventoryBatchSerializer(many=True, read_only=True)
-    
-    # Campo calculado (Preço da consultora ou oficial)
     display_price = serializers.SerializerMethodField()
     
     class Meta:
@@ -89,51 +85,48 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         ]
     
     def get_display_price(self, obj):
-        # Se a consultora definiu preço, usa ele. Se não, usa o oficial do produto.
-        return obj.sale_price if obj.sale_price > 0 else obj.product.official_price
+        return obj.sale_price if obj.sale_price and obj.sale_price > 0 else obj.product.official_price
 
 # ==========================================
 # 3. SERIALIZER DE ENTRADA (SCAN)
 # ==========================================
 
 class StockEntrySerializer(serializers.Serializer):
-    bar_code = serializers.CharField()
+    # 🚀 CORREÇÃO 2: Permitir null e blindar contra erros 400
+    bar_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     quantity = serializers.IntegerField()
-    cost_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
-    sale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
-    batch_code = serializers.CharField(required=False, allow_blank=True)
+    cost_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    sale_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    batch_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     expiration_date = serializers.DateField(required=False, allow_null=True)
     
     # Campos de criação de produto
-    name = serializers.CharField(required=False, allow_blank=True)
-    category = serializers.CharField(required=False, allow_blank=True)
-    natura_sku = serializers.CharField(required=False, allow_blank=True) # <--- ADICIONAR ISTO
+    name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    category = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    natura_sku = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    image_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
 # ==========================================
-# 4. SERIALIZERS DE VENDA (PDV)
+# 4. SERIALIZERS DE VENDA E TRANSAÇÕES
 # ==========================================
 
 class SaleItemInputSerializer(serializers.Serializer):
     bar_code = serializers.CharField()
     quantity = serializers.IntegerField(min_value=1)
-    batch_id = serializers.IntegerField(required=False) # ID do lote específico (opcional)
-    price_sold = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    batch_id = serializers.IntegerField(required=False, allow_null=True) 
+    price_sold = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
 
 class SaleSerializer(serializers.Serializer):
     items = SaleItemInputSerializer(many=True)
-    client_name = serializers.CharField(required=False, allow_blank=True)
+    client_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     payment_method = serializers.CharField(default="DINHEIRO")
-    transaction_type = serializers.CharField(default="VENDA") # VENDA, PRESENTE, ETC
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-    # Em backend/core/inventory/serializers.py
-
-from rest_framework import serializers
-from .models import StockTransaction  # Certifique-se de importar o modelo
+    transaction_type = serializers.CharField(default="VENDA") 
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 class StockTransactionSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     batch_code = serializers.CharField(source='batch.batch_code', read_only=True)
-
+    
     class Meta:
         model = StockTransaction
         fields = [
@@ -148,6 +141,9 @@ class StockTransactionSerializer(serializers.ModelSerializer):
             'batch_code'
         ]
 
+# ==========================================
+# 5. SERIALIZERS DE PERFIL / LOJA
+# ==========================================
 
 class UserNestedSerializer(serializers.ModelSerializer):
     """Dados básicos do usuário (email, nome)"""
@@ -155,34 +151,30 @@ class UserNestedSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ["id", "email", "name"]
 
-
 class ProfileSerializer(serializers.ModelSerializer):
     """
     Serializador de Perfil — baseado na Store vinculada ao usuário.
-    Permite editar nome da loja, WhatsApp e slug.
     """
     user = UserNestedSerializer(read_only=True)
     
-    # 🚀 CRIANDO OS 'ALIASES' PARA O FRONTEND:
-    # O frontend manda 'display_name', o Django salva em 'name'
+    # Aliases
     display_name = serializers.CharField(source='name', required=False, allow_blank=True, allow_null=True)
-    # O frontend manda 'whatsapp_number', o Django salva em 'whatsapp'
     whatsapp_number = serializers.CharField(source='whatsapp', required=False, allow_blank=True, allow_null=True)
-    # O frontend manda 'store_slug', o Django salva em 'slug'
     store_slug = serializers.CharField(source='slug', required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Store
-        # 🚀 Atualizamos a lista de campos para aceitar os nomes que vêm do Frontend
-        # E incluímos o 'storefront_enabled' para que a tela de Settings também salve!
         fields = [
-            "id",
-            "user",
-            "display_name",     # Substituiu 'name'
-            "store_slug",       # Substituiu 'slug'
-            "whatsapp_number",  # Substituiu 'whatsapp'
-            "storefront_enabled", # Adicionado para habilitar a Vitrine no Settings
-            "created_at",
-            "plan"
+            "id", "user", "display_name", "store_slug", "whatsapp_number", 
+            "storefront_enabled", "created_at", "plan"
         ]
         read_only_fields = ["id", "user", "created_at", "plan"]
+
+    # 🚀 CORREÇÃO 3: BLINDAGEM CONTRA O ERRO 500
+    # Se o frontend enviar null nessas chaves, o serializer converte para string vazia
+    # protegendo o banco de dados de quebrar.
+    def validate_display_name(self, value):
+        return value if value is not None else ""
+        
+    def validate_store_slug(self, value):
+        return value if value is not None else ""
