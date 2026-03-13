@@ -15,10 +15,12 @@ export default function Profile() {
   const { user } = useAuth();
   const { isPro } = usePlan();
   const { toast } = useToast();
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [profile, setProfile] = useState<ProfileType | null>(null);
+  
   const [form, setForm] = useState({
     display_name: "",
     whatsapp_number: "",
@@ -27,10 +29,12 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
+    
     profileApi.get().then((data) => {
       setProfile(data);
+      // 🚀 CORREÇÃO 1: Trás o nome do Firebase (user.name) se o backend estiver vazio
       setForm({
-        display_name: data.display_name || "",
+        display_name: data.display_name || user.name || "",
         whatsapp_number: data.whatsapp_number || "",
         store_slug: data.store_slug || "",
       });
@@ -47,23 +51,31 @@ export default function Profile() {
     ([form.display_name, form.whatsapp_number, user?.email, form.store_slug].filter(Boolean).length / 4) * 100
   );
 
-const handleSave = async () => {
-  setSaving(true);
-  try {
-    const updated = await profileApi.update({
-      display_name: form.display_name,
-      whatsapp_number: form.whatsapp_number,
-      store_slug: form.store_slug || null,
-    } as any);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // 🚀 CORREÇÃO 2: Limpa strings vazias para null, evitando erros de validação no Django
+      const payload = {
+        display_name: form.display_name.trim() || null,
+        whatsapp_number: form.whatsapp_number.trim() || null,
+        store_slug: form.store_slug.trim() || null,
+      };
 
-    setProfile(updated);
-    toast({ title: "Perfil atualizado!" });
-  } catch (err: any) {
-    toast({ title: "Erro", description: err.message, variant: "destructive" });
-  } finally {
-    setSaving(false);
-  }
-};
+      const updated = await profileApi.update(payload as any);
+      setProfile(updated);
+      toast({ title: "Perfil atualizado com sucesso!" });
+      
+    } catch (err: any) {
+      console.error("Erro ao salvar perfil:", err);
+      toast({ 
+        title: "Erro ao salvar", 
+        description: err.message || "Verifique se o slug da vitrine já está em uso.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -83,8 +95,8 @@ const handleSave = async () => {
           <h1 className="font-display text-lg font-bold text-foreground">Meu Perfil</h1>
         </div>
       </header>
-
       <main className="mx-auto max-w-lg px-6 py-6 space-y-5">
+        
         {/* Completion Banner */}
         {missingFields.length > 0 && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
@@ -114,7 +126,6 @@ const handleSave = async () => {
               </div>
             </div>
           </div>
-
           {/* Progress bar */}
           <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
             <div
@@ -127,7 +138,6 @@ const handleSave = async () => {
         {/* Editable Fields */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h2 className="font-display text-sm font-semibold text-foreground">Informações Pessoais</h2>
-
           <div>
             <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <User className="h-3.5 w-3.5" /> Nome de Exibição
@@ -141,7 +151,6 @@ const handleSave = async () => {
               className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </div>
-
           <div>
             <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Mail className="h-3.5 w-3.5" /> Email
@@ -151,7 +160,6 @@ const handleSave = async () => {
               <CheckCircle2 className="h-3.5 w-3.5 text-primary ml-auto" />
             </div>
           </div>
-
           <div>
             <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Phone className="h-3.5 w-3.5" /> WhatsApp (com DDD)
@@ -166,7 +174,6 @@ const handleSave = async () => {
             />
             <p className="mt-1 text-[10px] text-muted-foreground">Usado para clientes contatarem pela vitrine</p>
           </div>
-
           <div>
             <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Store className="h-3.5 w-3.5" /> Slug da Vitrine
@@ -224,7 +231,6 @@ const handleSave = async () => {
           <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-primary" /> Assinatura
           </h2>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-secondary/30 p-3">
               <div className="flex items-center gap-1.5 mb-1">
@@ -245,7 +251,6 @@ const handleSave = async () => {
               </Badge>
             </div>
           </div>
-
           {!isPro && (
             <button
               onClick={() => navigate("/admin-panel")}
