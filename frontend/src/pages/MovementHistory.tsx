@@ -16,19 +16,32 @@ const TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
 export default function MovementHistory() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [movements, setMovements] = useState<Movement[]>([]);
+  
+  // Usamos 'any' temporariamente para absorver as diferenças de serialização do backend
+  const [movements, setMovements] = useState<any[]>([]);
+  
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "entrada" | "saida">("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
-    movementsApi.list().then((data) => {
-      // 🚀 CORREÇÃO PRINCIPAL: Normaliza os tipos vindos do banco ("ENTRADA" -> "entrada")
-      const normalizedData = data.map(m => ({
-        ...m,
-        movement_type: m.movement_type?.toLowerCase() as "entrada" | "saida"
-      }));
+    movementsApi.list().then((data: any[]) => {
+      
+      // 🚀 CORREÇÃO DEFINITIVA: O backend usa "transaction_type" e os dados do produto vêm aninhados.
+      const normalizedData = data.map(m => {
+        // Transforma 'ENTRADA' ou 'SAIDA' em 'entrada' ou 'saida' minúsculo
+        const tType = (m.transaction_type || m.movement_type || "").toLowerCase();
+        
+        return {
+          ...m,
+          // Mapeia as chaves para a lógica do frontend
+          movement_type: tType,
+          product_name: m.product?.name || m.product_name || "Produto Desconhecido",
+          barcode: m.product?.bar_code || m.barcode || "",
+        };
+      });
+      
       setMovements(normalizedData);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -40,13 +53,13 @@ export default function MovementHistory() {
     return matchSearch && matchFilter;
   });
 
-  // 🚀 CORREÇÃO 2: Math.abs garante que a soma funcione independente se o backend mandar negativo ou positivo
+  // Math.abs garante que a soma funcione independente de vir negativo do backend
   const totalEntradas = filtered.filter((m) => m.movement_type === "entrada").reduce((s, m) => s + Math.abs(m.quantity), 0);
   const totalSaidas = filtered.filter((m) => m.movement_type === "saida").reduce((s, m) => s + Math.abs(m.quantity), 0);
   
   const totalReceita = filtered
     .filter((m) => m.movement_type === "saida" && m.sale_type === "venda")
-    .reduce((s, m) => s + (m.unit_price || 0) * Math.abs(m.quantity), 0);
+    .reduce((s, m) => s + (m.unit_price || m.unit_price_sold || 0) * Math.abs(m.quantity), 0);
     
   const totalLucro = filtered.filter((m) => m.profit != null).reduce((s, m) => s + (m.profit || 0), 0);
 
@@ -116,7 +129,7 @@ export default function MovementHistory() {
             {filtered.map((m, i) => {
               const typeInfo = m.sale_type ? TYPE_LABELS[m.sale_type] : null;
               
-              // 🚀 CORREÇÃO 3: Extrai o valor absoluto para a interface
+              // Extrai o valor absoluto para a interface
               const displayQuantity = Math.abs(m.quantity);
               
               return (
@@ -134,7 +147,7 @@ export default function MovementHistory() {
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <span className="font-mono">{m.barcode}</span>
                       {typeInfo && <span>· {typeInfo.emoji} {typeInfo.label}</span>}
-                      {m.notes && <span>· {m.notes}</span>}
+                      {m.description && <span>· {m.description}</span>}
                     </div>
                   </div>
                   <div className="text-right shrink-0">

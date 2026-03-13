@@ -16,6 +16,7 @@ export default function Settings() {
   const { isLocked } = useFeatureGates();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -23,13 +24,15 @@ export default function Settings() {
   const [passwordForm, setPasswordForm] = useState({ current: "", new_password: "", confirm: "" });
   const [changingPassword, setChangingPassword] = useState(false);
   const [storefrontEnabled, setStorefrontEnabled] = useState(false);
+  
   const [expiryDays, setExpiryDays] = useState(() => {
     return parseInt(localStorage.getItem("expiry_alert_days") || "30", 10);
   });
+  
   const [expiryEnabled, setExpiryEnabled] = useState(() => {
     return localStorage.getItem("expiry_alert_enabled") !== "false";
   });
-
+  
   const [notifPrefs, setNotifPrefs] = useState(() => ({
     sales_milestones: localStorage.getItem("notif_sales_milestones") !== "false",
     weekly_insights: localStorage.getItem("notif_weekly_insights") !== "false",
@@ -52,27 +55,40 @@ export default function Settings() {
   useEffect(() => {
     if (!user) return;
     profileApi.get().then((data) => {
-      setStorefrontEnabled(data.storefront_enabled);
+      // Carrega o estado atual da vitrine salvo no banco
+      setStorefrontEnabled(data.storefront_enabled ?? false);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user]);
 
+  // 🚀 CORREÇÃO DO SALVAMENTO DE SETTINGS
   const handleSave = async () => {
     setSaving(true);
     try {
+      // 1. Tenta salvar remotamente (só a vitrine, que é o único dado q vai pro servidor)
       await profileApi.update({
         storefront_enabled: storefrontEnabled,
       } as any);
+
+      // 2. Salva preferências locais (navegador)
       localStorage.setItem("expiry_alert_days", String(expiryDays));
       localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
-      toast({ title: "Configurações salvas!" });
+      
+      toast({ title: "Configurações salvas com sucesso!" });
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      // Se falhar o backend, ainda preserva as locais
+      localStorage.setItem("expiry_alert_days", String(expiryDays));
+      localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
+      
+      console.error("Erro ao salvar vitrine:", err);
+      toast({ 
+        title: "Aviso", 
+        description: "Preferências locais salvas. Ocorreu um erro ao sincronizar a vitrine na nuvem.", 
+        variant: "destructive" 
+      });
     }
     setSaving(false);
   };
-
-
 
   const handleLogout = async () => {
     await signOut();
@@ -87,7 +103,7 @@ export default function Settings() {
         const items = await inventoryApi.list();
         const header = "Nome,Código de Barras,Categoria,Quantidade,Preço Custo,Preço Venda,Validade\n";
         const rows = items.map((i: InventoryItem) =>
-          `"${i.product_name}","${i.barcode}","${i.category}",${i.quantity},${i.cost_price},${i.sale_price || ""},${i.expiry_date || ""}`
+          `"${i.product_name || i.product?.name}","${i.barcode || i.product?.bar_code}","${i.category || i.product?.category}",${i.quantity || i.total_quantity},${i.cost_price},${i.sale_price || ""},${i.expiry_date || ""}`
         ).join("\n");
         downloadFile(header + rows, "estoque.csv");
       } else {
@@ -127,7 +143,7 @@ export default function Settings() {
     }
     setChangingPassword(true);
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
+      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
       const token = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE_URL}/api/auth/change-password/`, {
         method: "POST",
@@ -164,9 +180,7 @@ export default function Settings() {
           <h1 className="font-display text-lg font-bold text-foreground">Configurações</h1>
         </div>
       </header>
-
       <main className="mx-auto max-w-lg px-6 py-6 space-y-5">
-
 
         {/* Tema */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -197,7 +211,6 @@ export default function Settings() {
             <Bell className="h-4 w-4 text-accent" /> Notificações
           </h2>
           <p className="text-xs text-muted-foreground">Escolha quais notificações deseja receber.</p>
-
           {[
             { key: "sales_milestones" as const, label: "Metas de Vendas", desc: "Aviso ao atingir metas de faturamento (R$500, R$1.000, etc.)" },
             { key: "weekly_insights" as const, label: "Resumo Semanal", desc: "Produtos mais vendidos da semana" },
@@ -217,7 +230,6 @@ export default function Settings() {
               </button>
             </div>
           ))}
-
           {notifPrefs.expiry_alerts && (
             <div>
               <label className="text-sm text-muted-foreground">Alertar quantos dias antes?</label>
