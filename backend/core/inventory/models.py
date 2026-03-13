@@ -77,7 +77,10 @@ class Store(models.Model):
     name = models.CharField(max_length=100, default="Minha Loja Natura")
     slug = models.SlugField(unique=True, blank=True)
     whatsapp = models.CharField(max_length=20, blank=True, null=True)
+    storefront_enabled = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
+
     PLAN_CHOICES = [
         ('free', 'Free'),
         ('pro', 'Pro'),
