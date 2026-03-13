@@ -32,7 +32,7 @@ export default function Profile() {
     
     profileApi.get().then((data) => {
       setProfile(data);
-      // 🚀 CORREÇÃO 1: Trás o nome do Firebase (user.name) se o backend estiver vazio
+      // Trás o nome do Firebase (user.name) se o backend estiver vazio
       setForm({
         display_name: data.display_name || user.name || "",
         whatsapp_number: data.whatsapp_number || "",
@@ -54,11 +54,13 @@ export default function Profile() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // 🚀 CORREÇÃO 2: Limpa strings vazias para null, evitando erros de validação no Django
+      // 🚀 CORREÇÃO DO ERRO 500: 
+      // Removemos o '|| null'. O banco de dados (PostgreSQL) exige strings "" para CharFields.
+      // Enviar null para um campo que não tem null=True no models.py causa crash no Django.
       const payload = {
-        display_name: form.display_name.trim() || null,
-        whatsapp_number: form.whatsapp_number.trim() || null,
-        store_slug: form.store_slug.trim() || null,
+        display_name: form.display_name.trim(),
+        whatsapp_number: form.whatsapp_number.trim(),
+        store_slug: form.store_slug.trim().toLowerCase(), // Garante letras minúsculas no link
       };
 
       const updated = await profileApi.update(payload as any);
@@ -69,7 +71,7 @@ export default function Profile() {
       console.error("Erro ao salvar perfil:", err);
       toast({ 
         title: "Erro ao salvar", 
-        description: err.message || "Verifique se o slug da vitrine já está em uso.", 
+        description: err.message || "Verifique se o nome da vitrine já está sendo usado por outra pessoa.", 
         variant: "destructive" 
       });
     } finally {
