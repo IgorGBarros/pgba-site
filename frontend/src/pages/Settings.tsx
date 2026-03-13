@@ -1,33 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Loader2, LogOut, Sun, Moon, Monitor, Bell, Download, Lock, Phone, Store } from "lucide-react";
-import { profileApi, inventoryApi, movementsApi, InventoryItem, Movement, formatMoney } from "../lib/api";
+import { ArrowLeft, Save, Loader2, LogOut, Sun, Moon, Monitor, Bell, Download } from "lucide-react";
+import { inventoryApi, movementsApi, InventoryItem, Movement } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
-import { usePlan } from "../hooks/usePlan";
-import { useFeatureGates } from "../hooks/useFeatureGates";
 import { useTheme } from "../hooks/useTheme";
 import { useToast } from "../hooks/use-toast";
-import UpgradeModal from "../components/UpgradeModal";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
-  const { isPro } = usePlan();
-  const { isLocked } = useFeatureGates();
+  const { signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({ current: "", new_password: "", confirm: "" });
-  const [changingPassword, setChangingPassword] = useState(false);
-  
-  // 🚀 ADICIONADO ESTADOS DO PERFIL AQUI
-  const [storefrontEnabled, setStorefrontEnabled] = useState(false);
-  const [whatsappNumber, setWhatsappNumber] = useState("");
-  const [storeSlug, setStoreSlug] = useState("");
   
   const [expiryDays, setExpiryDays] = useState(() => {
     return parseInt(localStorage.getItem("expiry_alert_days") || "30", 10);
@@ -56,40 +42,18 @@ export default function Settings() {
     });
   };
 
-  useEffect(() => {
-    if (!user) return;
-    profileApi.get().then((data) => {
-      // 🚀 CARREGA OS DADOS PARA OS CAMPOS
-      setStorefrontEnabled(data.storefront_enabled ?? false);
-      setWhatsappNumber(data.whatsapp_number || "");
-      setStoreSlug(data.store_slug || "");
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [user]);
-
   const handleSave = async () => {
     setSaving(true);
-    try {
-      // 🚀 ENVIA PARA O BACKEND: Vitrine, WhatsApp e Slug
-      const slug = storeSlug.trim();
-      await profileApi.update({
-        storefront_enabled: storefrontEnabled,
-        whatsapp_number: whatsappNumber.trim() || null,
-        store_slug: slug.length > 0 ? slug : null,
-      } as any);
-
-      // Salva preferências locais
+    
+    // Como os dados são puramente locais (navegador), não precisamos bater no backend!
+    // Usamos um pequeno timeout apenas para dar um feedback visual (UX) de "Salvando..."
+    setTimeout(() => {
       localStorage.setItem("expiry_alert_days", String(expiryDays));
       localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
       
-      toast({ title: "Configurações salvas!" });
-    } catch (err: any) {
-      localStorage.setItem("expiry_alert_days", String(expiryDays));
-      localStorage.setItem("expiry_alert_enabled", String(expiryEnabled));
-      toast({ title: "Aviso", description: "Configurações locais salvas. O Slug pode já estar em uso.", variant: "destructive" });
-    } finally {
+      toast({ title: "Configurações do sistema salvas!" });
       setSaving(false);
-    }
+    }, 500);
   };
 
   const handleLogout = async () => {
@@ -105,7 +69,7 @@ export default function Settings() {
         const items = await inventoryApi.list();
         const header = "Nome,Código de Barras,Categoria,Quantidade,Preço Custo,Preço Venda,Validade\n";
         const rows = items.map((i: InventoryItem) =>
-          `"${i.product_name || i.product?.name}","${i.barcode || i.product?.bar_code}","${i.category || i.product?.category}",${i.quantity || i.total_quantity},${i.cost_price},${i.sale_price || ""},${i.expiry_date || ""}`
+          `"${i.product?.name || i.product_name}","${i.product?.bar_code || i.barcode}","${i.product?.category || i.category}",${i.total_quantity || i.quantity},${i.cost_price},${i.sale_price || ""},${i.expiry_date || ""}`
         ).join("\n");
         downloadFile(header + rows, "estoque.csv");
       } else {
@@ -133,41 +97,6 @@ export default function Settings() {
     URL.revokeObjectURL(url);
   };
 
-  // ── Change password ──
-  const handleChangePassword = async () => {
-    if (passwordForm.new_password !== passwordForm.confirm) {
-      toast({ title: "As senhas não coincidem", variant: "destructive" });
-      return;
-    }
-    if (passwordForm.new_password.length < 6) {
-      toast({ title: "A senha deve ter no mínimo 6 caracteres", variant: "destructive" });
-      return;
-    }
-    setChangingPassword(true);
-    try {
-      const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
-      const token = localStorage.getItem("auth_token");
-      const res = await fetch(`${API_BASE_URL}/api/auth/change-password/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Token ${token}` } : {}) },
-        body: JSON.stringify({ current_password: passwordForm.current, new_password: passwordForm.new_password }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || body.error || "Erro ao alterar senha");
-      }
-      toast({ title: "Senha alterada com sucesso!" });
-      setPasswordForm({ current: "", new_password: "", confirm: "" });
-    } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
-    }
-    setChangingPassword(false);
-  };
-
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-background"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
-  }
-
   const themeOptions = [
     { value: "light" as const, icon: Sun, label: "Claro" },
     { value: "dark" as const, icon: Moon, label: "Escuro" },
@@ -179,58 +108,10 @@ export default function Settings() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-lg items-center gap-3 px-6 py-4">
           <button onClick={() => navigate("/")} className="rounded-lg p-2 text-muted-foreground hover:text-foreground"><ArrowLeft className="h-5 w-5" /></button>
-          <h1 className="font-display text-lg font-bold text-foreground">Configurações</h1>
+          <h1 className="font-display text-lg font-bold text-foreground">Configurações do Sistema</h1>
         </div>
       </header>
       <main className="mx-auto max-w-lg px-6 py-6 space-y-5">
-
-        {/* 🚀 ADICIONADO: Vitrine Digital - Configurações Gerais */}
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
-            <Store className="h-4 w-4 text-accent" /> Vitrine Digital
-          </h2>
-          
-          <div className="flex items-center justify-between pb-2">
-            <div>
-              <p className="text-sm font-medium text-foreground">Ativar Vitrine Pública</p>
-              <p className="text-xs text-muted-foreground">Clientes poderão ver seus produtos</p>
-            </div>
-            <button onClick={() => { if (isLocked("storefront")) { setShowUpgrade(true); return; } setStorefrontEnabled(!storefrontEnabled); }} className={`relative h-6 w-11 rounded-full transition-colors ${storefrontEnabled && !isLocked("storefront") ? "bg-primary" : "bg-muted"}`}>
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${storefrontEnabled && !isLocked("storefront") ? "left-[22px]" : "left-0.5"}`} />
-            </button>
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
-              <Store className="h-3.5 w-3.5" /> Nome do Link (Slug)
-            </label>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">/vitrine/</span>
-              <input
-                type="text"
-                value={storeSlug}
-                onChange={(e) => setStoreSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                placeholder="maria-natura"
-                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              />
-            </div>
-            <p className="mt-1 text-[10px] text-muted-foreground">Este será o endereço do seu site (Ex: seunegocio.com.br/vitrine/maria-natura).</p>
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
-              <Phone className="h-3.5 w-3.5" /> WhatsApp da Vitrine (com DDD)
-            </label>
-            <input
-              type="tel"
-              value={whatsappNumber}
-              onChange={(e) => setWhatsappNumber(e.target.value)}
-              placeholder="5511999999999"
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground">Os pedidos da vitrine serão enviados para este número.</p>
-          </div>
-        </div>
 
         {/* Tema */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -258,9 +139,9 @@ export default function Settings() {
         {/* Notificações */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
-            <Bell className="h-4 w-4 text-accent" /> Notificações
+            <Bell className="h-4 w-4 text-accent" /> Alertas e Notificações
           </h2>
-          <p className="text-xs text-muted-foreground">Escolha quais notificações deseja receber.</p>
+          <p className="text-xs text-muted-foreground">Escolha quais notificações visuais deseja ativar no aplicativo.</p>
           {[
             { key: "sales_milestones" as const, label: "Metas de Vendas", desc: "Aviso ao atingir metas de faturamento (R$500, R$1.000, etc.)" },
             { key: "weekly_insights" as const, label: "Resumo Semanal", desc: "Produtos mais vendidos da semana" },
@@ -280,9 +161,10 @@ export default function Settings() {
               </button>
             </div>
           ))}
+          
           {notifPrefs.expiry_alerts && (
-            <div>
-              <label className="text-sm text-muted-foreground">Alertar quantos dias antes?</label>
+            <div className="pt-2">
+              <label className="text-sm text-muted-foreground">Alertar quantos dias antes do vencimento?</label>
               <div className="mt-2 flex items-center gap-3">
                 {[7, 15, 30, 60, 90].map((d) => (
                   <button
@@ -307,7 +189,7 @@ export default function Settings() {
           <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
             <Download className="h-4 w-4 text-accent" /> Exportar Dados
           </h2>
-          <p className="text-xs text-muted-foreground">Baixe seus dados em formato CSV para backup ou análise.</p>
+          <p className="text-xs text-muted-foreground">Baixe seus dados em formato CSV para backup ou análise externa.</p>
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => exportCSV("inventory")}
@@ -328,35 +210,8 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Alterar Senha */}
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <h2 className="font-display text-sm font-semibold text-foreground flex items-center gap-2">
-            <Lock className="h-4 w-4 text-accent" /> Alterar Senha
-          </h2>
-          <div>
-            <label className="text-sm text-muted-foreground">Senha Atual</label>
-            <input type="password" value={passwordForm.current} onChange={(e) => setPasswordForm(p => ({ ...p, current: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Nova Senha</label>
-            <input type="password" value={passwordForm.new_password} onChange={(e) => setPasswordForm(p => ({ ...p, new_password: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Confirmar Nova Senha</label>
-            <input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm(p => ({ ...p, confirm: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
-          </div>
-          <button
-            onClick={handleChangePassword}
-            disabled={changingPassword || !passwordForm.current || !passwordForm.new_password}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary py-3 text-sm font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
-          >
-            {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-            Alterar Senha
-          </button>
-        </div>
-
         {/* Salvar */}
-        <button onClick={handleSave} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+        <button onClick={handleSave} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 transition-all active:scale-95">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar Configurações
         </button>
@@ -366,13 +221,6 @@ export default function Settings() {
           <LogOut className="h-4 w-4" /> Sair da Conta
         </button>
       </main>
-
-      <UpgradeModal
-        isOpen={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-        feature="Vitrine Digital"
-        description="Crie sua loja virtual e venda pelo WhatsApp. Exclusivo PRO."
-      />
     </div>
   );
 }
