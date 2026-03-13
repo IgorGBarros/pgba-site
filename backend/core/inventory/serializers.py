@@ -162,16 +162,27 @@ class ProfileSerializer(serializers.ModelSerializer):
     Permite editar nome da loja, WhatsApp e slug.
     """
     user = UserNestedSerializer(read_only=True)
+    
+    # 🚀 CRIANDO OS 'ALIASES' PARA O FRONTEND:
+    # O frontend manda 'display_name', o Django salva em 'name'
+    display_name = serializers.CharField(source='name', required=False, allow_blank=True, allow_null=True)
+    # O frontend manda 'whatsapp_number', o Django salva em 'whatsapp'
+    whatsapp_number = serializers.CharField(source='whatsapp', required=False, allow_blank=True, allow_null=True)
+    # O frontend manda 'store_slug', o Django salva em 'slug'
+    store_slug = serializers.CharField(source='slug', required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Store
+        # 🚀 Atualizamos a lista de campos para aceitar os nomes que vêm do Frontend
+        # E incluímos o 'storefront_enabled' para que a tela de Settings também salve!
         fields = [
             "id",
             "user",
-            "name",
-            "slug",
-            "whatsapp",
+            "display_name",     # Substituiu 'name'
+            "store_slug",       # Substituiu 'slug'
+            "whatsapp_number",  # Substituiu 'whatsapp'
+            "storefront_enabled", # Adicionado para habilitar a Vitrine no Settings
             "created_at",
-            'plan'
+            "plan"
         ]
-        read_only_fields = ["id", "user", "created_at"]
+        read_only_fields = ["id", "user", "created_at", "plan"]
