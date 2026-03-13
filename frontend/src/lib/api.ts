@@ -115,27 +115,42 @@ export const productLookupApi = {
 };
 
 // ── Inventory (user_inventory) ──
+// ── Inventory (user_inventory) ──
 export interface InventoryItem {
   id: string;
-  barcode: string;
-  product_name: string;
-  custom_name: string | null;
-  category: string;
-  quantity: number;
+  total_quantity: number;     // 🚀 Novo campo do backend
   min_quantity: number;
   cost_price: number;
   sale_price: number | null;
-  official_price: number | null;
-  sale_type: string | null;
-  expiry_date: string | null;
-  expiry_photo_url: string | null;
-  image_url: string | null;
-  sku: string | null;
-  is_available_storefront: boolean;
-  created_at: string;
-  updated_at: string;
-}
+  
+  // 🚀 Novo objeto aninhado que vem do backend
+  product?: {
+    id: number | string;
+    name: string;
+    bar_code: string;
+    natura_sku: string;
+    category: string;
+    image_url: string;
+    official_price: number;
+  };
 
+  // Mantemos os campos antigos como opcionais (?) 
+  // para não quebrar a sua base de dados de demonstração (DEMO_INVENTORY)
+  quantity?: number;
+  barcode?: string;
+  product_name?: string;
+  custom_name?: string | null;
+  category?: string;
+  official_price?: number | null;
+  sale_type?: string | null;
+  expiry_date?: string | null;
+  expiry_photo_url?: string | null;
+  image_url?: string | null;
+  sku?: string | null;
+  is_available_storefront?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
 export const stockApi = {
     // ✅ criação corrigida para rota real
   create: (data: Record<string, any>) => 
@@ -273,24 +288,26 @@ export const storefrontApi = {
         d7: "/products/ekos.jpg",
       };
       const demoItems: StorefrontItem[] = DEMO_INVENTORY
-        .filter((i) => i.is_available_storefront && i.quantity > 0)
+        .filter((i) => i.is_available_storefront && (i.quantity ?? 0) > 0)
         .map((i) => ({
           id: i.id,
-          product_name: i.product_name,
-          display_name: i.custom_name || i.product_name,
-          custom_name: i.custom_name,
-          category: i.category,
-          sale_price: i.sale_price,
-          barcode: i.barcode,
-          expiry_date: i.expiry_date,
+          // 🚀 Fallbacks adicionados para satisfazer a interface StorefrontItem
+          product_name: i.product?.name || i.product_name || "Produto Demo",
+          display_name: i.custom_name || i.product?.name || i.product_name || "Produto Demo",
+          custom_name: i.custom_name || null,
+          category: i.product?.category || i.category || "Geral",
+          sale_price: i.sale_price ?? null,
+          barcode: i.product?.bar_code || i.barcode || "0000000000000",
+          expiry_date: i.expiry_date ?? null,
           seller_name: DEMO_PROFILE.display_name,
           seller_whatsapp: DEMO_PROFILE.whatsapp_number,
           user_id: "demo",
-          image_url: imageMap[i.id] || i.image_url || null,
+          image_url: imageMap[i.id] || i.product?.image_url || i.image_url || null,
           store_slug: DEMO_PROFILE.store_slug,
         }));
       return Promise.resolve(demoItems);
     }
+
     // Support both slug and ID
     const params = sellerId ? `?seller=${sellerId}` : "";
     return apiRequest<StorefrontItem[]>(`/api/storefront/${params}`);

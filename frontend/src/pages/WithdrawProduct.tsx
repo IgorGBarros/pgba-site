@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
 import BatchSelectModal from "../components/BatchSelectModal";
-import ProductSearchModal from "../components/ProductSearchModal";
+import InventorySearchModal from "../components/InventorySearchModal"; 
 import UpgradeModal from "../components/UpgradeModal";
 import ProBadge from "../components/ProBadge";
 import {
@@ -44,20 +44,22 @@ interface WithdrawData {
 
 export default function WithdrawProduct() {
   const [step, setStep] = useState(0);
-  const [showScanner, setShowScanner] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); 
+  
   const [data, setData] = useState<WithdrawData>({
     barcode: "", product_id: "", product_name: "", category: "",
     current_quantity: 0, cost_price: 0, withdraw_qty: 1, sale_price: null,
     sale_type: "venda", selected_batch: null, batches: [],
   });
+
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isPro } = usePlan();
   const { isLocked } = useFeatureGates();
   const { toast } = useToast();
 
@@ -70,21 +72,29 @@ export default function WithdrawProduct() {
   };
 
   const handleBarcodeScan = async (barcode: string) => {
+    if (!barcode.trim()) return;
+    
     setShowScanner(false);
     setNotFound(false);
     setData((p) => ({ ...p, barcode }));
-
+    
     try {
       const item = await inventoryApi.getByBarcode(barcode);
       if (!item) { setNotFound(true); return; }
+      
+      const qty = item.total_quantity ?? item.quantity ?? 0;
+      if (qty <= 0) {
+          toast({ title: "Produto esgotado", description: "Você não tem estoque deste item.", variant: "destructive"});
+          setNotFound(true);
+          return;
+      }
 
-      // Load batches
       let batches: InventoryBatch[] = [];
       try {
         batches = await batchApi.listByItem(item.id);
         batches = batches.filter((b) => b.quantity > 0);
       } catch { /* no batch support, fallback */ }
-
+      
       const batchCost = batches.length > 0
         ? batches.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0].cost_price
         : item.cost_price;
@@ -92,22 +102,22 @@ export default function WithdrawProduct() {
       setData((p) => ({
         ...p,
         product_id: item.id,
-        product_name: item.product_name,
-        category: item.category,
-        current_quantity: item.quantity,
+        // 🚀 CORREÇÃO AQUI: Adicionado fallback de string vazia ou default
+        product_name: item.product?.name || item.product_name || "Produto sem nome",
+        category: item.product?.category || item.category || "Geral",
+        current_quantity: qty,
         cost_price: batchCost,
+        sale_price: item.sale_price || item.product?.official_price || null,
         batches,
         selected_batch: batches.length === 1 ? batches[0] : null,
       }));
 
-      // If multiple batches, show selector
       if (batches.length > 1) {
         setShowBatchModal(true);
       } else {
         setStep(1);
       }
-
-      toast({ title: "Produto encontrado!", description: `${item.product_name} — ${item.quantity} un.` });
+      toast({ title: "Produto encontrado!", description: `${item.product?.name || item.product_name || "Produto"} — ${qty} un.` });
     } catch {
       setNotFound(true);
     }
@@ -125,21 +135,17 @@ export default function WithdrawProduct() {
   };
 
   const maxQty = data.selected_batch?.quantity || data.current_quantity;
-
   const profit = data.sale_type === "venda" && data.sale_price
     ? (data.sale_price - data.cost_price) * data.withdraw_qty
     : null;
-
   const margin = data.sale_price && data.cost_price && data.cost_price > 0
     ? (((data.sale_price - data.cost_price) / data.cost_price) * 100).toFixed(1)
     : null;
-
   const currentSaleType = SALE_TYPES.find((t) => t.value === data.sale_type)!;
 
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
-
     try {
       const newQty = data.current_quantity - data.withdraw_qty;
       await inventoryApi.update(data.product_id, {
@@ -147,9 +153,9 @@ export default function WithdrawProduct() {
         sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
         sale_type: data.sale_type,
       });
-
+      
       const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
-
+      
       await movementsApi.create({
         product_id: data.product_id,
         batch_id: data.selected_batch?.id || null,
@@ -164,11 +170,11 @@ export default function WithdrawProduct() {
           : null,
       });
 
-      toast({
-        title: "Baixa registrada!",
-        description: `${data.withdraw_qty}x ${data.product_name} (${currentSaleType.label})`,
-      });
-      navigate("/");
+      setIsSuccess(true);
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -185,7 +191,7 @@ export default function WithdrawProduct() {
           <div className="w-9" />
         </div>
       </header>
-
+      
       <div className="mx-auto max-w-lg px-4 pt-4">
         <div className="flex items-center gap-1">
           {["Escanear", "Tipo & Preço", "Confirmar"].map((label, i) => (
@@ -205,32 +211,27 @@ export default function WithdrawProduct() {
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner && !isLocked("barcode_scanner") ? (
                 <div className="space-y-4">
-                  <BarcodeScanner onScan={handleBarcodeScan} onClose={() => setShowScanner(false)} />
-                  <button 
-                    onClick={() => setShowScanner(false)} 
-                    className="w-full text-center text-sm text-muted-foreground underline mt-4"
-                  >
-                    Não tem código? Buscar por nome/SKU
+                  <BarcodeScanner onScan={handleBarcodeScan} onClose={() => {
+                      setShowScanner(false);
+                      setIsSearchOpen(true);
+                  }} />
+                  <button onClick={() => setShowScanner(false)} className="w-full text-center text-sm text-muted-foreground underline mt-4">
+                    Cancelar Câmera
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-                  {/* Busca Manual */}
-                  <button 
-                    onClick={() => setIsSearchOpen(true)}
-                    className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 text-primary rounded-lg">
-                        <Search size={20} />
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm text-foreground">Buscar Manualmente</p>
-                        <p className="text-xs text-muted-foreground">Digite o nome ou código do produto</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
-                  </button>
+                <div className="space-y-6 rounded-xl border border-border bg-card p-5">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Código de Barras *</label>
+                    <input
+                      type="text"
+                      value={data.barcode}
+                      onChange={(e) => setData((p) => ({ ...p, barcode: e.target.value }))}
+                      onBlur={(e) => handleBarcodeScan(e.target.value)}
+                      placeholder="Escaneie ou digite..."
+                      className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:border-primary"
+                    />
+                  </div>
 
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-border"></div>
@@ -238,18 +239,14 @@ export default function WithdrawProduct() {
                     <div className="h-px flex-1 bg-border"></div>
                   </div>
 
-                  {/* Voltar ao scanner */}
-                  <button 
-                    onClick={handleScannerClick}
-                    className={`w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all ${isLocked("barcode_scanner") ? "opacity-80" : ""}`}
-                  >
+                  <button onClick={handleScannerClick} className={`w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all ${isLocked("barcode_scanner") ? "opacity-80" : ""}`}>
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${!isLocked("barcode_scanner") ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {!isLocked("barcode_scanner") ? <ScanBarcode size={20} /> : <Lock size={20} />}
                       </div>
                       <div>
                         <p className="font-bold text-sm text-foreground flex items-center gap-2">
-                          Escanear Código
+                          Escanear com Câmera
                           {isLocked("barcode_scanner") && <ProBadge />}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -260,39 +257,28 @@ export default function WithdrawProduct() {
                     <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
                   </button>
 
-                  {data.barcode && (
-                    <div className="flex items-center gap-3 pt-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><ScanBarcode className="h-5 w-5 text-primary" /></div>
+                  <button onClick={() => setIsSearchOpen(true)} className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 text-primary rounded-lg"><Search size={20} /></div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Código Lido</p>
-                        <p className="font-mono text-lg font-bold text-primary">{data.barcode}</p>
+                        <p className="font-bold text-sm text-foreground">Buscar Manualmente</p>
+                        <p className="text-xs text-muted-foreground">Pesquise produtos no seu estoque</p>
                       </div>
                     </div>
-                  )}
+                    <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                  </button>
+                  
                   {notFound && (
-                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">Produto não encontrado no seu estoque.</div>
+                    <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive animate-pulse text-center">Produto não encontrado no seu estoque.</div>
                   )}
                 </div>
               )}
-
-              {/* Modal de Busca */}
-              <ProductSearchModal 
-                isOpen={isSearchOpen} 
-                onClose={() => setIsSearchOpen(false)} 
-                onSelect={(product: GlobalProduct) => {
-                  setIsSearchOpen(false);
-                  if (product.barcode) {
-                    handleBarcodeScan(product.barcode);
-                  }
-                }}
-              />
             </motion.div>
           )}
 
           {step === 1 && (
             <motion.div key="type" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
-                {/* Product info */}
                 <div className="rounded-lg bg-secondary/50 p-3">
                   <p className="text-xs text-muted-foreground">Produto</p>
                   <p className="text-sm font-semibold text-foreground">{data.product_name}</p>
@@ -309,8 +295,7 @@ export default function WithdrawProduct() {
                     <button type="button" onClick={() => setShowBatchModal(true)} className="mt-1 text-xs text-primary hover:underline">Trocar lote</button>
                   )}
                 </div>
-
-                {/* Quantity */}
+                
                 <div>
                   <label className="text-sm font-medium text-foreground">Quantidade de Saída *</label>
                   <div className="mt-2 flex items-center gap-3">
@@ -320,7 +305,6 @@ export default function WithdrawProduct() {
                   </div>
                 </div>
 
-                {/* Transaction type */}
                 <div>
                   <label className="text-sm font-medium text-foreground">Classificação da Transação</label>
                   <div className="mt-2 grid grid-cols-3 gap-2">
@@ -344,10 +328,9 @@ export default function WithdrawProduct() {
                   </div>
                 </div>
 
-                {/* Sale price (only for venda) */}
                 {data.sale_type === "venda" && (
                   <div>
-                    <label className="text-sm font-medium text-foreground">Preço de Venda (R$)</label>
+                    <label className="text-sm font-medium text-foreground">Preço de Venda Unitário (R$)</label>
                     <div className="relative mt-2">
                       <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <input type="number" step="0.01" min="0" value={data.sale_price ?? ""} onChange={(e) => setData((p) => ({ ...p, sale_price: parseFloat(e.target.value) || null }))} placeholder="0.00" className="w-full rounded-lg border border-input bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary" />
@@ -357,7 +340,6 @@ export default function WithdrawProduct() {
                         Margem: {margin}% · Lucro: {formatMoney(profit)}
                       </p>
                     )}
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">Custo do lote: {formatMoney(data.cost_price)}</p>
                   </div>
                 )}
               </div>
@@ -366,41 +348,73 @@ export default function WithdrawProduct() {
 
           {step === 2 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Package className="h-5 w-5 text-primary" /></div>
-                  <p className="text-sm font-semibold text-foreground">Confirmar Baixa</p>
-                </div>
-                <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
-                  <Row label="Produto" value={data.product_name} />
-                  <Row label="Código" value={data.barcode} />
-                  <Row label="Quantidade Saída" value={`${data.withdraw_qty} un.`} />
-                  <Row label="Estoque Restante" value={`${data.current_quantity - data.withdraw_qty} un.`} />
-                  <Row label="Tipo" value={`${currentSaleType.emoji} ${currentSaleType.label}`} />
-                  {data.selected_batch?.expiry_date && (
-                    <Row label="Lote (Validade)" value={data.selected_batch.expiry_date} />
+              <div className="space-y-4 rounded-xl border border-border bg-card p-5 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {!isSuccess ? (
+                    <motion.div key="summary" exit={{ opacity: 0, scale: 0.9 }}>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Package className="h-5 w-5 text-primary" /></div>
+                        <p className="text-sm font-semibold text-foreground">Confirmar Baixa</p>
+                      </div>
+                      <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
+                        <Row label="Produto" value={data.product_name} />
+                        <Row label="Código" value={data.barcode} />
+                        <Row label="Quantidade Saída" value={`${data.withdraw_qty} un.`} />
+                        <Row label="Estoque Restante" value={`${data.current_quantity - data.withdraw_qty} un.`} />
+                        <Row label="Tipo" value={`${currentSaleType.emoji} ${currentSaleType.label}`} />
+                        {data.selected_batch?.expiry_date && (
+                          <Row label="Lote (Validade)" value={data.selected_batch.expiry_date} />
+                        )}
+                        <Row label="Custo Unitário" value={formatMoney(data.cost_price)} />
+                        {data.sale_type === "venda" && data.sale_price && (
+                          <>
+                            <Row label="Preço Venda Unitário" value={formatMoney(data.sale_price)} />
+                            <Row label="Receita Total" value={formatMoney(data.sale_price * data.withdraw_qty)} />
+                            <Row label="Lucro Total" value={formatMoney(profit)} />
+                          </>
+                        )}
+                        {!currentSaleType.hasRevenue && (
+                          <Row label="Receita" value="R$ 0,00" />
+                        )}
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="success"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex flex-col items-center justify-center py-10 space-y-4"
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.1 }}
+                        className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg"
+                      >
+                        <Check size={48} strokeWidth={3} />
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-center space-y-1"
+                      >
+                        <h3 className="text-xl font-bold text-foreground">Sucesso!</h3>
+                        <p className="text-sm text-muted-foreground">Baixa registrada no estoque.</p>
+                      </motion.div>
+                    </motion.div>
                   )}
-                  <Row label="Custo Unitário" value={formatMoney(data.cost_price)} />
-                  {data.sale_type === "venda" && data.sale_price && (
-                    <>
-                      <Row label="Preço Venda" value={formatMoney(data.sale_price)} />
-                      <Row label="Lucro Bruto" value={formatMoney(profit)} />
-                      <Row label="Margem" value={`${margin}%`} />
-                    </>
-                  )}
-                  {!currentSaleType.hasRevenue && (
-                    <Row label="Receita" value="R$ 0,00" />
-                  )}
-                </div>
+                </AnimatePresence>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {(step > 0 || (!showScanner && data.barcode && !notFound)) && (
+        {/* NAVIGATION BUTTONS */}
+        {(step > 0 || (!showScanner && data.barcode && !notFound)) && !isSuccess && (
           <div className="mt-6 flex gap-3">
             {step > 0 && (
-              <button onClick={() => setStep(step - 1)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground">
+              <button onClick={() => setStep(step - 1)} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground disabled:opacity-50">
                 <ChevronLeft className="h-4 w-4" /> Voltar
               </button>
             )}
@@ -409,7 +423,7 @@ export default function WithdrawProduct() {
                 Próximo <ChevronRight className="h-4 w-4" />
               </button>
             ) : (
-              <button onClick={handleSave} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+              <button onClick={handleSave} disabled={loading} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 active:scale-95 transition-all">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Confirmar Baixa
               </button>
@@ -418,7 +432,6 @@ export default function WithdrawProduct() {
         )}
       </main>
 
-      {/* Batch Selection Modal */}
       <AnimatePresence>
         {showBatchModal && data.batches.length > 0 && (
           <BatchSelectModal
@@ -429,6 +442,17 @@ export default function WithdrawProduct() {
           />
         )}
       </AnimatePresence>
+      
+      {/* 🚀 MODAL DE BUSCA EXCLUSIVO PARA O ESTOQUE */}
+      <InventorySearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelect={(item: any) => {
+          setIsSearchOpen(false);
+          const barcode = item.product?.bar_code || item.barcode;
+          if (barcode) handleBarcodeScan(barcode);
+        }}
+      />
 
       <UpgradeModal
         isOpen={showUpgrade}
@@ -442,7 +466,7 @@ export default function WithdrawProduct() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div className="flex items-center justify-between text-sm border-b border-border/50 pb-1 last:border-0">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium text-foreground">{value}</span>
     </div>

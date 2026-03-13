@@ -24,7 +24,12 @@ export default function MovementHistory() {
   useEffect(() => {
     if (!user) return;
     movementsApi.list().then((data) => {
-      setMovements(data);
+      // 🚀 CORREÇÃO PRINCIPAL: Normaliza os tipos vindos do banco ("ENTRADA" -> "entrada")
+      const normalizedData = data.map(m => ({
+        ...m,
+        movement_type: m.movement_type?.toLowerCase() as "entrada" | "saida"
+      }));
+      setMovements(normalizedData);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user]);
@@ -35,11 +40,14 @@ export default function MovementHistory() {
     return matchSearch && matchFilter;
   });
 
-  const totalEntradas = filtered.filter((m) => m.movement_type === "entrada").reduce((s, m) => s + m.quantity, 0);
-  const totalSaidas = filtered.filter((m) => m.movement_type === "saida").reduce((s, m) => s + m.quantity, 0);
+  // 🚀 CORREÇÃO 2: Math.abs garante que a soma funcione independente se o backend mandar negativo ou positivo
+  const totalEntradas = filtered.filter((m) => m.movement_type === "entrada").reduce((s, m) => s + Math.abs(m.quantity), 0);
+  const totalSaidas = filtered.filter((m) => m.movement_type === "saida").reduce((s, m) => s + Math.abs(m.quantity), 0);
+  
   const totalReceita = filtered
     .filter((m) => m.movement_type === "saida" && m.sale_type === "venda")
-    .reduce((s, m) => s + (m.unit_price || 0) * m.quantity, 0);
+    .reduce((s, m) => s + (m.unit_price || 0) * Math.abs(m.quantity), 0);
+    
   const totalLucro = filtered.filter((m) => m.profit != null).reduce((s, m) => s + (m.profit || 0), 0);
 
   const formatDate = (iso: string) => {
@@ -107,6 +115,10 @@ export default function MovementHistory() {
           <div className="space-y-2">
             {filtered.map((m, i) => {
               const typeInfo = m.sale_type ? TYPE_LABELS[m.sale_type] : null;
+              
+              // 🚀 CORREÇÃO 3: Extrai o valor absoluto para a interface
+              const displayQuantity = Math.abs(m.quantity);
+              
               return (
                 <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${m.movement_type === "entrada" ? "bg-primary/10" : "bg-destructive/10"}`}>
@@ -127,7 +139,7 @@ export default function MovementHistory() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`text-sm font-bold font-mono ${m.movement_type === "entrada" ? "text-primary" : "text-destructive"}`}>
-                      {m.movement_type === "entrada" ? "+" : "-"}{m.quantity}
+                      {m.movement_type === "entrada" ? "+" : "-"}{displayQuantity}
                     </p>
                     {m.unit_price != null && m.unit_price > 0 && (
                       <p className="text-[10px] text-muted-foreground">{formatMoney(m.unit_price)}/un</p>

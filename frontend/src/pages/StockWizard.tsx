@@ -40,22 +40,23 @@ interface EntryData {
 
 export default function StockWizard() {
   const [step, setStep] = useState(0);
-  const [showScanner, setShowScanner] = useState(false); // Inicia com false para mostrar input manual
+  const [showScanner, setShowScanner] = useState(false);
   const { loading, saveEntry } = useStockEntry();
   const [ocrLoading, setOcrLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [fuzzyModal, setFuzzyModal] = useState<{ barcode: string; suggestions: GlobalProduct[] } | null>(null);
+  
   const [data, setData] = useState<EntryData>({
     barcode: "", product_name: "", category: "Outro", sku: null,
     image_url: null, official_price: null, expiry_date: "", expiry_photo_url: "",
     quantity: 1, cost_price: 0, existing_item_id: null, lookup_source: null,
   });
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Função unificada para processar código (manual ou escaneado)
   const handleBarcodeInput = async (barcode: string) => {
     if (!barcode.trim()) return;
     
@@ -63,28 +64,28 @@ export default function StockWizard() {
     setLookupLoading(true);
     
     try {
-      // Check user's own inventory first
       const existing = await inventoryApi.getByBarcode(barcode);
       if (existing) {
         setData((p) => ({
           ...p,
-          product_name: existing.product_name,
-          category: existing.category,
-          image_url: existing.image_url,
-          sku: existing.sku,
-          official_price: existing.official_price,
+          product_name: existing.product?.name || existing.product_name || p.product_name,
+          category: existing.product?.category || existing.category || p.category,
+          image_url: existing.product?.image_url || existing.image_url || null,
+          sku: existing.product?.natura_sku || existing.sku || null,
+          official_price: existing.product?.official_price || existing.official_price || null,
           cost_price: existing.cost_price,
           existing_item_id: existing.id,
           lookup_source: "inventory",
         }));
-        toast({ title: "Produto encontrado!", description: `${existing.product_name} — ${existing.quantity} un. em estoque` });
+        const qty = existing.total_quantity ?? existing.quantity ?? 0;
+        const name = existing.product?.name || existing.product_name;
+        toast({ title: "Produto encontrado!", description: `${name} — ${qty} un. em estoque` });
         setLookupLoading(false);
         setStep(1);
         return;
       }
     } catch { /* not in user inventory */ }
 
-    // Global lookup (local catalog → scraper → fuzzy)
     try {
       const result = await productLookupApi.lookup(barcode ?? "");
       if (result.source === "fuzzy" && result.suggestions?.length) {
@@ -108,14 +109,15 @@ export default function StockWizard() {
     await handleBarcodeInput(barcode);
   };
 
+  // 🚀 CORREÇÃO DO ERRO DO TYPESCRIPT (Fallback explícito para evitar undefined)
   const applyGlobalProduct = (product: GlobalProduct, source: string) => {
     setData((p) => ({
       ...p,
-      product_name: product.name,
-      category: product.category || p.category,
-      sku: product.sku,
-      image_url: product.image_url,
-      official_price: product.official_price,
+      product_name: product.name ?? p.product_name,
+      category: product.category ?? p.category,
+      sku: product.sku ?? product.barcode ?? p.sku,
+      image_url: product.image_url ?? p.image_url,
+      official_price: product.official_price ?? p.official_price,
       lookup_source: source,
     }));
   };
@@ -123,7 +125,6 @@ export default function StockWizard() {
   const handleFuzzyConfirm = async (product: GlobalProduct) => {
     setFuzzyModal(null);
     applyGlobalProduct(product, "fuzzy");
-    // Self-healing: link barcode to product
     try {
       await productLookupApi.confirmMatch(data.barcode, product.id);
       toast({ title: "Vínculo salvo!", description: "Próximos scans serão instantâneos." });
@@ -136,7 +137,6 @@ export default function StockWizard() {
     setStep(1);
   };
 
-  // ── OCR ──
   const handleExpiryPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -159,18 +159,11 @@ export default function StockWizard() {
     }
   };
 
-  // ── Save (creates batch) ──
   const handleSave = async () => {
-    // Validação obrigatória do código de barras
     if (!data.barcode?.trim()) {
-      toast({ 
-        title: "Código obrigatório", 
-        description: "Digite ou escaneie um código de barras válido.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Código obrigatório", description: "Digite ou escaneie um código de barras válido.", variant: "destructive" });
       return;
     }
-
     try {
       await saveEntry({
         bar_code: data.barcode.trim(),
@@ -209,8 +202,6 @@ export default function StockWizard() {
           <div className="w-9" />
         </div>
       </header>
-
-      {/* Progress */}
       <div className="mx-auto max-w-lg px-4 pt-4">
         <div className="flex items-center gap-1">
           {STEPS.map((s, i) => (
@@ -223,10 +214,8 @@ export default function StockWizard() {
           ))}
         </div>
       </div>
-
       <main className="mx-auto max-w-lg px-4 py-6">
         <AnimatePresence mode="wait">
-          {/* Step 0: Scan & Lookup */}
           {step === 0 && (
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner ? (
@@ -250,14 +239,12 @@ export default function StockWizard() {
                       <p className="font-mono text-lg font-bold text-primary">{data.barcode}</p>
                     </div>
                   </div>
-
                   {lookupLoading && (
                     <div className="flex items-center justify-center gap-2 rounded-lg bg-primary/5 py-4 text-sm text-primary">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span>Buscando produto...</span>
                     </div>
                   )}
-
                   {!lookupLoading && data.product_name && (
                     <div className="flex items-center gap-3 rounded-lg bg-primary/5 p-3">
                       {data.image_url ? (
@@ -279,7 +266,6 @@ export default function StockWizard() {
                       </div>
                     </div>
                   )}
-
                   {!lookupLoading && !data.product_name && (
                     <div>
                       <label className="text-sm text-muted-foreground">Nome do Produto *</label>
@@ -292,7 +278,6 @@ export default function StockWizard() {
                       />
                     </div>
                   )}
-
                   <button 
                     type="button" 
                     onClick={() => setData((p) => ({ ...p, barcode: "", product_name: "", sku: null, image_url: null, official_price: null, lookup_source: null }))} 
@@ -303,7 +288,6 @@ export default function StockWizard() {
                 </div>
               ) : (
                 <div className="space-y-6 rounded-xl border border-border bg-card p-5">
-                  {/* Campo manual SEMPRE disponível */}
                   <div>
                     <label className="text-sm font-medium text-foreground">Código de Barras *</label>
                     <input
@@ -318,14 +302,11 @@ export default function StockWizard() {
                       Digite e pressione Enter ou clique fora do campo
                     </p>
                   </div>
-
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-border" />
                     <span className="text-xs text-muted-foreground">OU</span>
                     <div className="h-px flex-1 bg-border" />
                   </div>
-
-                  {/* Scanner sempre disponível para todos */}
                   <button
                     onClick={() => setShowScanner(true)}
                     className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all"
@@ -345,8 +326,6 @@ export default function StockWizard() {
               )}
             </motion.div>
           )}
-
-          {/* Step 1: Expiry Photo + OCR */}
           {step === 1 && (
             <motion.div key="expiry" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
@@ -359,7 +338,6 @@ export default function StockWizard() {
                     <p className="text-xs text-muted-foreground">Auditoria e rastreabilidade do lote</p>
                   </div>
                 </div>
-
                 {data.expiry_photo_url ? (
                   <div className="space-y-3">
                     <img src={data.expiry_photo_url} alt="Foto da validade" className="w-full rounded-lg border border-border object-cover" style={{ maxHeight: 200 }} />
@@ -379,7 +357,6 @@ export default function StockWizard() {
                     <span className="text-xs">Usa câmera traseira com zoom</span>
                   </button>
                 )}
-
                 <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleExpiryPhoto} className="hidden" />
                 
                 <div>
@@ -390,8 +367,6 @@ export default function StockWizard() {
               </div>
             </motion.div>
           )}
-
-          {/* Step 2: Quantity & Price */}
           {step === 2 && (
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
@@ -404,7 +379,6 @@ export default function StockWizard() {
                     <p className="text-xs text-muted-foreground">Cada entrada cria um lote separado</p>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-foreground">Quantidade *</label>
                   <div className="mt-2 flex items-center gap-3">
@@ -413,7 +387,6 @@ export default function StockWizard() {
                     <button type="button" onClick={() => setData((p) => ({ ...p, quantity: p.quantity + 1 }))} className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-lg font-bold">+</button>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-foreground">Preço de Custo (R$) *</label>
                   <div className="relative mt-2">
@@ -424,14 +397,12 @@ export default function StockWizard() {
                     <p className="mt-1 text-[10px] text-muted-foreground">Preço oficial: {formatMoney(data.official_price)}</p>
                   )}
                 </div>
-
                 {!data.product_name && (
                   <div>
                     <label className="text-sm font-medium text-foreground">Nome do Produto *</label>
                     <input type="text" value={data.product_name} onChange={(e) => setData((p) => ({ ...p, product_name: e.target.value }))} placeholder="Nome do produto" className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
                   </div>
                 )}
-
                 <div>
                   <label className="text-sm font-medium text-foreground">Categoria</label>
                   <select value={data.category} onChange={(e) => setData((p) => ({ ...p, category: e.target.value }))} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary">
@@ -441,8 +412,6 @@ export default function StockWizard() {
               </div>
             </motion.div>
           )}
-
-          {/* Step 3: Confirm */}
           {step === 3 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
@@ -476,8 +445,6 @@ export default function StockWizard() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Navigation */}
         {(!showScanner || step > 0) && (
           <div className="mt-6 flex gap-3">
             {step > 0 && (
@@ -498,8 +465,6 @@ export default function StockWizard() {
           </div>
         )}
       </main>
-
-      {/* Fuzzy Match Modal */}
       <AnimatePresence>
         {fuzzyModal && (
           <FuzzyMatchModal
@@ -513,7 +478,6 @@ export default function StockWizard() {
     </div>
   );
 }
-
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
