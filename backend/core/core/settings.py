@@ -48,6 +48,21 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 
+
+from datetime import timedelta
+
+# Adicione esta configuração no seu settings.py
+SIMPLE_JWT = {
+    # Tempo de vida do token de acesso (sessão ativa) - Ex: 1 dia ou 7 dias
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), 
+    
+    # Tempo de vida do token de renovação (refresh) - Ex: 7 dias ou 30 dias
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
+
 # --------------------------------------------------------------------------
 # Apps / Middleware
 # --------------------------------------------------------------------------
