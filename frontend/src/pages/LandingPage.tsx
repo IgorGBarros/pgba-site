@@ -218,10 +218,10 @@ export default function LandingPage() {
             <span className="font-display text-base font-bold text-foreground">Estoque Natura</span>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/auth/login")} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={() => navigate("/auth")} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Entrar
             </button>
-            <button onClick={() => navigate("/auth/register")} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors">
+            <button onClick={() => navigate("/auth")} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors">
               Começar grátis
             </button>
           </div>
@@ -252,7 +252,7 @@ export default function LandingPage() {
             Controle seu inventário, acompanhe seus lucros e venda mais com a sua vitrine online.
           </motion.p>
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={3} className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <button onClick={() => navigate("/auth/register")} className="flex items-center gap-2 rounded-2xl bg-primary px-8 py-4 text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/40 transition-all">
+            <button onClick={() => navigate("/auth")} className="flex items-center gap-2 rounded-2xl bg-primary px-8 py-4 text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/40 transition-all">
               Começar grátis agora
               <ArrowRight className="h-4 w-4" />
             </button>
@@ -436,7 +436,7 @@ export default function LandingPage() {
               A revolução do seu estoque começa agora.
             </h2>
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <button onClick={() => navigate("/auth/register")} className="flex items-center gap-2 rounded-2xl bg-primary px-10 py-4 text-lg font-bold text-primary-foreground shadow-xl shadow-primary/30 hover:scale-105 transition-transform">
+              <button onClick={() => navigate("/auth")} className="flex items-center gap-2 rounded-2xl bg-primary px-10 py-4 text-lg font-bold text-primary-foreground shadow-xl shadow-primary/30 hover:scale-105 transition-transform">
                 Criar Conta Gratuita <ArrowRight className="h-5 w-5" />
               </button>
             </div>
