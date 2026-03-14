@@ -26,7 +26,6 @@ const STEPS = [
 
 const CATEGORIES = ["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Infantil", "Casa", "Outro"];
 
-// 🚀 CORREÇÃO DA INTERFACE: Adicionado lookup_source e alinhado com o estado
 interface EntryData {
   bar_code: string;
   name: string;
@@ -40,7 +39,6 @@ interface EntryData {
   batch_code: string;
   expiry_date: string;
   expiry_photo_url: string;
-  lookup_source: string | null; // Resolvido Erro 2339
 }
 
 export default function AddProduct() {
@@ -49,7 +47,7 @@ export default function AddProduct() {
   const { isLocked } = useFeatureGates();
   const { toast } = useToast();
   const { loading, saveEntry } = useStockEntry();
-  
+
   const [step, setStep] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -58,16 +56,16 @@ export default function AddProduct() {
   
   const [ocrLoading, setOcrLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
+  
+  // 🚀 NOVO ESTADO: Controla a animação de sucesso no Step 3
   const [isSuccess, setIsSuccess] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🚀 ESTADO INICIAL ALINHADO COM A INTERFACE
   const [data, setData] = useState<EntryData>({
     bar_code: "", name: "", category: "Perfumaria", natura_sku: "",
     image_url: "", official_price: 0, sale_price: 0, cost_price: 0,
     quantity: 1, batch_code: "", expiry_date: "", expiry_photo_url: "",
-    lookup_source: null,
   });
 
   const triggerProGate = (feature: string, description: string) => {
@@ -103,12 +101,11 @@ export default function AddProduct() {
           natura_sku: remote?.natura_sku || resData?.natura_sku || prev.natura_sku,
           image_url: remote?.image_url || resData?.image_url || prev.image_url,
           category: remote?.category || resData?.category || prev.category,
-          official_price: remote?.official_price || resData?.official_price || 0,
-          lookup_source: result.source || "search",
+          official_price: remote?.official_price || resData?.official_price || 0
         }));
         toast({ title: "Produto Identificado!", description: "Dados carregados com sucesso." });
       } else {
-        toast({ title: "Novo Código", description: "Preencha os dados abaixo." });
+        toast({ title: "Novo Código", description: "Preencha os dados no próximo passo." });
       }
     } catch {
       toast({ title: "Aviso", description: "Falha na busca remota. Preencha manualmente." });
@@ -134,7 +131,6 @@ export default function AddProduct() {
       image_url: product.image_url || "",
       official_price: product.official_price || 0,
       sale_price: product.official_price || prev.sale_price,
-      lookup_source: "search",
     }));
     setIsSearchOpen(false);
     setStep(1); 
@@ -178,14 +174,17 @@ export default function AddProduct() {
         cost_price: data.cost_price,
         sale_price: data.sale_price,
         batch_code: data.batch_code,
+     
       });
       
+      // 🚀 SUCESSO: Ativa a animação e redireciona após 2 segundos
       setIsSuccess(true);
       setTimeout(() => {
         navigate("/");
       }, 2000);
+
     } catch {
-      // O Toast de erro já vem do hook
+      // O Toast de erro já vem do useStockEntry
     }
   };
 
@@ -208,6 +207,7 @@ export default function AddProduct() {
         </div>
       </header>
 
+      {/* STEPS HEADER */}
       <div className="mx-auto max-w-lg px-4 pt-4">
         <div className="flex items-center gap-1">
           {STEPS.map((s, i) => (
@@ -224,6 +224,7 @@ export default function AddProduct() {
       <main className="mx-auto max-w-lg px-4 py-6">
         <AnimatePresence mode="wait">
           
+          {/* STEP 0: SCAN & IDENTIFICAÇÃO */}
           {step === 0 && (
             <motion.div key="scan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               {showScanner && !isLocked("barcode_scanner") ? (
@@ -247,33 +248,14 @@ export default function AddProduct() {
                       type="text"
                       value={data.bar_code}
                       onChange={(e) => setData((p) => ({ ...p, bar_code: e.target.value }))}
-                      // 🚀 RESOLVIDO ERRO 2552: Chama handleLookup no lugar da função velha
-                      onBlur={(e) => e.target.value.trim() && handleLookup(e.target.value)}
+                      onBlur={(e) => handleLookup(e.target.value)}
                       placeholder="Escaneie ou digite..."
                       className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:border-primary"
                     />
                     {lookupLoading && <p className="text-xs text-primary mt-1 animate-pulse">Buscando informações...</p>}
                   </div>
 
-                  {data.bar_code && !lookupLoading && (
-                    <div className="animate-in fade-in slide-in-from-top-2 pt-2">
-                      <label className="text-sm font-medium text-foreground">Nome do Produto *</label>
-                      <input
-                        type="text"
-                        value={data.name}
-                        onChange={(e) => setData((p) => ({ ...p, name: e.target.value }))}
-                        placeholder="Nome do produto"
-                        className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-                      />
-                      {data.lookup_source ? (
-                        <p className="text-[10px] text-primary mt-1 font-medium">✓ Produto identificado com sucesso</p>
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground mt-1">Código novo. Preencha o nome manualmente.</p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3 mt-4">
+                  <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-border" />
                     <span className="text-xs text-muted-foreground">OU</span>
                     <div className="h-px flex-1 bg-border" />
@@ -308,6 +290,7 @@ export default function AddProduct() {
             </motion.div>
           )}
 
+          {/* STEP 1: VALIDADE */}
           {step === 1 && (
             <motion.div key="expiry" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5">
@@ -335,6 +318,7 @@ export default function AddProduct() {
             </motion.div>
           )}
 
+          {/* STEP 2: DETALHES GERAIS (INCLUI NOME E PREÇOS) */}
           {step === 2 && (
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
@@ -349,6 +333,7 @@ export default function AddProduct() {
                       <div className="w-16 h-16 bg-muted rounded-lg border mt-6 flex items-center justify-center"><ImageIcon className="text-muted-foreground" size={20}/></div>
                    )}
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-sm font-medium text-foreground">Categoria</label>
@@ -361,6 +346,7 @@ export default function AddProduct() {
                         <input value={data.natura_sku} onChange={(e) => setData(p => ({...p, natura_sku: e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" placeholder="Opcional" />
                     </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-primary/5">
                     <div>
                         <label className="text-sm font-bold text-primary">Qtd Entrada *</label>
@@ -375,6 +361,7 @@ export default function AddProduct() {
                         <input value={data.batch_code} onChange={(e) => setData(p => ({...p, batch_code: e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" placeholder="Opcional" />
                     </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-foreground">Preço de Custo</label>
@@ -389,6 +376,7 @@ export default function AddProduct() {
             </motion.div>
           )}
 
+          {/* STEP 3: CONFIRMAR COM ANIMAÇÃO DE SUCESSO */}
           {step === 3 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5 overflow-hidden">
@@ -418,6 +406,7 @@ export default function AddProduct() {
                       </div>
                     </motion.div>
                   ) : (
+                    /* 🚀 MÁGICA: ANIMAÇÃO DE SUCESSO */
                     <motion.div
                       key="success"
                       initial={{ opacity: 0, scale: 0.8 }}
@@ -447,8 +436,10 @@ export default function AddProduct() {
               </div>
             </motion.div>
           )}
+
         </AnimatePresence>
 
+        {/* NAVIGATION BUTTONS (ESCONDE DURANTE O SUCESSO) */}
         {(!showScanner || step > 0) && !isSuccess && (
           <div className="mt-6 flex gap-3">
             {step > 0 && (
