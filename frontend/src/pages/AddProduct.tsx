@@ -223,6 +223,10 @@ export default function AddProduct() {
     return true;
   };
 
+  function handleFuzzySkip(): void {
+    throw new Error("Function not implemented.");
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
