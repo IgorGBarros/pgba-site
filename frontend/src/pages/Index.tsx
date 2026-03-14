@@ -2,10 +2,9 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   Package, TrendingDown, DollarSign, BarChart3, Plus, ScanBarcode, List,
-  ArrowDownCircle, Settings, PieChart, Store, History, Scale, Lock,
-  Crown, AlertTriangle, Clock, User
+  ArrowDownCircle, Settings, PieChart, Store, History, User
 } from "lucide-react";
-import { inventoryApi, movementsApi, Movement, profileApi } from "../lib/api"; // ✅ inclui profileApi
+import { inventoryApi, movementsApi, profileApi } from "../lib/api"; 
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
 import { useFeatureGates } from "../hooks/useFeatureGates";
@@ -28,10 +27,8 @@ interface Stats {
 export default function Index() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isPro, productLimit } = usePlan();
   const { isLocked } = useFeatureGates();
-  const { alerts, criticalCount, totalCount } = useExpiryAlerts();
-
+  
   const [stats, setStats] = useState<Stats>({
     totalProducts: 0,
     lowStockCount: 0,
@@ -40,58 +37,75 @@ export default function Index() {
     monthProfit: 0,
     lowStockItems: [],
   });
+  
   const [loading, setLoading] = useState(true);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
-
-  // ✅ adiciona estado da loja configurada
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-
-    // busca perfil para pegar o slug da vitrine
+    
     profileApi
       .get()
       .then((p) => setStoreSlug(p.store_slug))
       .catch(() => setStoreSlug(null));
-
-    // estatísticas de inventário/movimentos
+      
     Promise.all([inventoryApi.list(), movementsApi.list()])
       .then(([items, movements]) => {
-        const lowItems = items.filter((i) => i.quantity <= i.min_quantity && i.quantity > 0);
+        // 🚀 CORREÇÃO 1: Extração segura do Estoque Baixo
+        const lowItems = items.filter((i) => {
+          const qty = i.total_quantity ?? i.quantity ?? 0;
+          const min = i.min_quantity ?? 5;
+          return qty <= min && qty > 0;
+        });
+
         const now = new Date();
+        
+        // 🚀 CORREÇÃO 2: Normalização dos Movimentos
         const monthMovements = movements.filter((m) => {
           const d = new Date(m.created_at);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-        const monthSales = monthMovements
-          .filter((m) => m.movement_type === "saida" && m.sale_type === "venda")
-          .reduce((s, m) => s + (m.unit_price || 0) * m.quantity, 0);
-        const monthCost = monthMovements
-          .filter((m) => m.movement_type === "saida" && m.sale_type === "venda")
-          .reduce((s, m) => {
-            const item = items.find((i) => i.barcode === m.barcode);
-            return s + (item ? item.cost_price : 0) * m.quantity;
-          }, 0);
+        }).map(m => ({
+          ...m,
+          // Garante que a checagem funciona independente da serialização do backend
+          movement_type: (m as any).transaction_type?.toLowerCase() || m.movement_type || "saida"
+        }));
+
+        const salesMovements = monthMovements.filter((m) => m.movement_type === "saida" && m.sale_type === "venda");
+
+        const monthSales = salesMovements.reduce((s, m) => s + (m.unit_price || 0) * Math.abs(m.quantity), 0);
+        
+        const monthCost = salesMovements.reduce((s, m) => {
+          // Busca o item no array pelo código de barras aninhado ou legado
+          const item = items.find((i) => (i.product?.bar_code || i.barcode) === m.barcode);
+          return s + (item ? item.cost_price : 0) * Math.abs(m.quantity);
+        }, 0);
+
         setStats({
           totalProducts: items.length,
           lowStockCount: lowItems.length,
-          totalValue: items.reduce((s, i) => s + i.quantity * i.cost_price, 0),
+          totalValue: items.reduce((s, i) => {
+            const qty = i.total_quantity ?? i.quantity ?? 0;
+            return s + qty * i.cost_price;
+          }, 0),
           monthSales,
           monthProfit: monthSales - monthCost,
+          // 🚀 CORREÇÃO 3: Fallback obrigatório para string/number garantindo a tipagem Stats
           lowStockItems: lowItems.slice(0, 5).map((i) => ({
-            name: i.product_name,
-            qty: i.quantity,
-            min: i.min_quantity,
+            name: i.product?.name || i.product_name || "Produto sem nome",
+            qty: i.total_quantity ?? i.quantity ?? 0,
+            min: i.min_quantity ?? 5,
           })),
         });
+        
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [user]);
 
   const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  
   const statCards = [
     { label: "Total Produtos", value: String(stats.totalProducts), icon: Package },
     { label: "Estoque Baixo", value: String(stats.lowStockCount), icon: TrendingDown },
@@ -139,7 +153,6 @@ export default function Index() {
             </div>
           ))}
         </div>
-
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <ActionBtn onClick={() => navigate("/add")} icon={ScanBarcode} label="Cadastrar" desc="Escanear e cadastrar" primary />
           <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Saída de produto" />
@@ -147,8 +160,6 @@ export default function Index() {
           <ActionBtn onClick={() => navigate("/history")} icon={History} label="Histórico" desc="Movimentações" />
           <ActionBtn onClick={() => navigate("/dashboard")} icon={PieChart} label="Dashboard" desc="Gráficos e análises" proBadge={isLocked("dashboard_charts")} />
           <ActionBtn onClick={() => navigate("/products/new")} icon={Plus} label="Manual" desc="Cadastro sem scanner" />
-
-          {/* ✅ botão vitrine ajustado */}
           <ActionBtn
             onClick={() => {
               if (storeSlug) {
@@ -163,9 +174,6 @@ export default function Index() {
             proBadge={isLocked("storefront")}
           />
         </div>
-
-        {/* ... resto do componente original sem alterações ... */}
-        {/* Product limit warning, alerts, etc. */}
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
           {!isLocked("chat_assistant")
