@@ -53,7 +53,7 @@ const App = () => (
             <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
             <Route path="/vitrine/:slug" element={<Storefront />} />
             <Route path="/vitrine" element={<Storefront />} />
-            <Route path="/admin-panel" element={<AdminPanel />} />
+            <Route path="/admin-panel" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
             <Route path="/lp" element={<LandingPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

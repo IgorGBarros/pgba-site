@@ -81,7 +81,20 @@ export default function AdminPanel() {
       const res = await adminApi.listUsers(); 
       setUsers(res || []);
     } catch (err: any) {
-      toast({ title: "Erro ao carregar usuários", description: err.message, variant: "destructive" });
+      console.error(err);
+      
+      // Se o erro for 403 (ou mensagem de permissão), avisa o usuário
+      if (err.message.includes("403") || err.message.includes("permissão") || err.message.includes("privilege")) {
+        toast({ 
+          title: "Acesso Negado (403)", 
+          description: "Sua conta não tem privilégios de Administrador (is_staff) no Banco de Dados.", 
+          variant: "destructive" 
+        });
+        // Volta a trancar a tela localmente
+        setAuthenticated(false);
+      } else {
+        toast({ title: "Erro ao carregar usuários", description: err.message, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
