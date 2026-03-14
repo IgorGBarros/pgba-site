@@ -237,6 +237,26 @@ export const movementsApi = {
   },
 };
 
+
+
+export const adminApi = {
+  listUsers: () => {
+    // 🚀 Bate na API real do Django
+    return apiRequest<any[]>("/api/admin/users/");
+  },
+  updatePlan: (id: string | number, plan: "free" | "pro") => {
+    return apiRequest<{ message: string; plan: string }>(`/api/admin/users/${id}/plan/`, {
+      method: "PATCH",
+      body: JSON.stringify({ plan }),
+    });
+  },
+  updateSubscription: (id: string | number, data: any) => {
+    return apiRequest<{ message: string }>(`/api/admin/users/${id}/subscription/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+};
 // ── Profile ──
 export interface Profile {
   id: string;

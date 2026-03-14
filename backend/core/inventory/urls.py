@@ -12,6 +12,9 @@ from .views import (
     CustomTokenObtainPairView,
     StockTransactionViewSet,
     profile_view,
+    AdminUserListView,
+    AdminUpdatePlanView,
+    AdminUpdateSubscriptionView
     # FirebaseLoginView e CustomUserCreateView foram removidos daqui pois estão comentados na view
 )
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -35,6 +38,10 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/register/', CustomUserCreateView.as_view(), name='register'), 
     path('auth/firebase/', FirebaseLoginView.as_view(), name='firebase_login'),
+
+    path('admin/users/', AdminUserListView.as_view(), name='admin-users-list'),
+    path('admin/users/<int:pk>/plan/', AdminUpdatePlanView.as_view(), name='admin-update-plan'),
+    path('admin/users/<int:pk>/subscription/', AdminUpdateSubscriptionView.as_view(), name='admin-update-sub'),
 
     # --- Rotas Automáticas (Router) ---
     path('', include(router.urls)),

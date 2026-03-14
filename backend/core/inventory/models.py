@@ -91,6 +91,11 @@ class Store(models.Model):
         default='pro',
         help_text="Plano de assinatura da loja"
     )
+
+    payment_provider = models.CharField(max_length=50, blank=True, null=True, help_text="Ex: stripe, mercadopago")
+    payment_external_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID da transação/assinatura")
+    subscription_started_at = models.DateTimeField(blank=True, null=True)
+    subscription_expires_at = models.DateTimeField(blank=True, null=True)
     def __str__(self):
             # Se for usar CustomUser que não tem username nativo, proteja a chamada
             username = getattr(self.user, 'name', getattr(self.user, 'email', 'Desconhecido')) if self.user else "Sem Usuário"
