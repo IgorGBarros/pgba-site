@@ -99,6 +99,7 @@ export default function AdminPanel() {
       setLoading(false);
     }
   };
+  
 
   const togglePlan = async (user: AdminUser) => {
     const newPlan = user.plan === "pro" ? "free" : "pro";
