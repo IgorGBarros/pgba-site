@@ -7,19 +7,21 @@ import {
   Settings2, ToggleLeft, ToggleRight, CreditCard, Clock, CalendarCheck, CalendarX,
   X,
 } from "lucide-react";
-import { api } from "../services/api"; // ✅ API Django (Render) substitui o Supabase
+// 🚀 Usa a API centralizada (Django) em vez de Supabase direto
+import { profileApi, adminApi } from "../lib/api"; 
 import { useToast } from "../hooks/use-toast";
 import { Badge } from "../components/ui/badge";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
-// Remova ou comente o import abaixo se o componente não existir ou não estiver adaptado
+
+// Opcional: Se não tiver ConsultantAnalyticsView, ele não quebra a tela (foi ocultado)
 // import ConsultantAnalyticsView from "../components/ConsultantAnalyticsView";
 
 const ADMIN_SECRET = "natura2024admin";
 
-interface AdminUser {
+export interface AdminUser {
   id: string | number;
   email: string;
   display_name: string | null;
@@ -57,15 +59,14 @@ export default function AdminPanel() {
   const [updatingId, setUpdatingId] = useState<string | number | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  
   const [showSubForm, setShowSubForm] = useState(false);
   const [subForm, setSubForm] = useState({ external_id: "", started_at: "", expires_at: "" });
   const [subSaving, setSubSaving] = useState(false);
   
   const [globalProvider, setGlobalProvider] = useState(() => localStorage.getItem("admin_global_provider") || "");
+  
+  // Excluídos estados complexos de Feature Gates (que dependiam de Functions) por enquanto
+  // Deixado apenas a lógica de Usuários, focando no essencial do Django
   
   const PROVIDERS = [
     { value: "stripe", label: "Stripe" },
@@ -73,16 +74,12 @@ export default function AdminPanel() {
     { value: "manual", label: "Manual" },
   ];
 
-  // ==========================================
-  // CHAMADAS À API (Adaptadas para o Django)
-  // ==========================================
-
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Requer endpoint: GET /api/admin/users/
-      const res = await api.get("/admin/users/"); 
-      setUsers(res.data || []);
+      // 🚀 Chama o Django (via api.ts)
+      const res = await adminApi.listUsers(); 
+      setUsers(res || []);
     } catch (err: any) {
       toast({ title: "Erro ao carregar usuários", description: err.message, variant: "destructive" });
     } finally {
@@ -94,8 +91,8 @@ export default function AdminPanel() {
     const newPlan = user.plan === "pro" ? "free" : "pro";
     setUpdatingId(user.id);
     try {
-      // Requer endpoint: PATCH /api/admin/users/{id}/plan/
-      await api.patch(`/admin/users/${user.id}/plan/`, { plan: newPlan });
+      // 🚀 Chama o Django
+      await adminApi.updatePlan(user.id, newPlan);
       
       setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, plan: newPlan } : u)));
       toast({ title: `${user.display_name || user.email} → ${newPlan.toUpperCase()}` });
@@ -109,15 +106,15 @@ export default function AdminPanel() {
   const saveSubscription = async (userId: string | number) => {
     setSubSaving(true);
     try {
-      // Requer endpoint: PATCH /api/admin/users/{id}/subscription/
-      await api.patch(`/admin/users/${userId}/subscription/`, {
+      // 🚀 Chama o Django
+      await adminApi.updateSubscription(userId, {
           provider: globalProvider,
           external_id: subForm.external_id || null,
           started_at: subForm.started_at || new Date().toISOString(),
           expires_at: subForm.expires_at || null,
           plan: "pro",
       });
-
+      
       setUsers((prev) => prev.map((u) => u.id === userId ? {
         ...u,
         plan: "pro",
@@ -135,32 +132,11 @@ export default function AdminPanel() {
     }
   };
 
-  const fetchAnalytics = async (userId: string | number) => {
-    setAnalyticsLoading(true);
-    setShowAnalytics(true);
-    try {
-      // Requer endpoint: GET /api/admin/users/{id}/analytics/
-      const res = await api.get(`/admin/users/${userId}/analytics/`);
-      setAnalyticsData(res.data);
-    } catch (err: any) {
-      toast({ title: "Erro", description: "Falha ao carregar analytics", variant: "destructive" });
-      setShowAnalytics(false);
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  };
-
-  // Carrega ao logar no Admin
   useEffect(() => {
     if (authenticated) {
       fetchUsers();
     }
   }, [authenticated]);
-
-
-  // ==========================================
-  // LÓGICA DE INTERFACE (Mantida igual)
-  // ==========================================
 
   const filtered = useMemo(() => {
     let list = users;
@@ -189,7 +165,6 @@ export default function AdminPanel() {
       pro: users.filter((u) => u.plan === "pro").length,
       free: users.filter((u) => u.plan === "free").length,
       incomplete: users.filter((u) => !u.display_name || !u.whatsapp_number).length,
-      expiringSoon: 0 // Simplificado para não quebrar datas inválidas
     };
   }, [users]);
 
@@ -208,7 +183,6 @@ export default function AdminPanel() {
     return new Date(d).toLocaleDateString("pt-BR");
   };
 
-  // --- PORTA DE ENTRADA (SENHA) ---
   if (!authenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -241,7 +215,6 @@ export default function AdminPanel() {
     );
   }
 
-  // --- PAINEL PRINCIPAL ---
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-sm">
@@ -261,9 +234,8 @@ export default function AdminPanel() {
           </button>
         </div>
       </header>
-
+      
       <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
@@ -309,15 +281,15 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {/* Tabela */}
+        {/* Tabela de Usuários */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader className="bg-gray-50">
+            <TableHeader className="bg-secondary/20">
               <TableRow>
                 <TableHead onClick={() => handleSort("display_name")} className="cursor-pointer">Usuário <SortIcon field="display_name" /></TableHead>
                 <TableHead onClick={() => handleSort("plan")} className="cursor-pointer">Plano <SortIcon field="plan" /></TableHead>
-                <TableHead onClick={() => handleSort("product_count")} className="cursor-pointer">Produtos <SortIcon field="product_count" /></TableHead>
-                <TableHead>Ações</TableHead>
+                <TableHead onClick={() => handleSort("product_count")} className="cursor-pointer hidden md:table-cell">Produtos <SortIcon field="product_count" /></TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -327,19 +299,19 @@ export default function AdminPanel() {
                 <TableRow><TableCell colSpan={4} className="text-center py-10">Nenhum usuário.</TableCell></TableRow>
               ) : (
                 filtered.map((u) => (
-                  <TableRow key={u.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedUser(u)}>
+                  <TableRow key={u.id} className="cursor-pointer hover:bg-secondary/30" onClick={() => setSelectedUser(u)}>
                     <TableCell>
-                      <p className="font-medium text-sm">{u.display_name || 'Sem nome'}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
+                      <p className="font-medium text-sm text-foreground">{u.display_name || 'Sem nome'}</p>
+                      <p className="text-xs text-muted-foreground">{u.email}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant={u.plan === "pro" ? "default" : "secondary"}>{u.plan.toUpperCase()}</Badge>
                     </TableCell>
-                    <TableCell>{u.product_count}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">{u.product_count}</TableCell>
+                    <TableCell className="text-right">
                       <button
                         onClick={(e) => { e.stopPropagation(); togglePlan(u); }}
-                        className={`text-xs px-2 py-1 rounded font-bold ${u.plan === 'pro' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+                        className={`text-xs px-3 py-1 rounded-full font-bold transition-colors ${u.plan === 'pro' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}
                       >
                         {u.plan === 'pro' ? 'Rebaixar' : 'Virar PRO'}
                       </button>
@@ -351,22 +323,33 @@ export default function AdminPanel() {
           </Table>
         </div>
 
-        {/* Detalhe do Usuário (Rodapé) */}
+        {/* Detalhe do Usuário (Mostra ao clicar na linha) */}
         {selectedUser && (
-          <div className="p-4 bg-gray-50 border rounded-xl animate-in slide-in-from-bottom-5">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold">Detalhes: {selectedUser.display_name}</h3>
-              <button onClick={() => setSelectedUser(null)}><X className="text-gray-400"/></button>
+          <div className="p-5 bg-card border rounded-xl shadow-lg animate-in slide-in-from-bottom-5 mt-4">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <User className="h-5 w-5 text-primary"/> 
+                Detalhes: {selectedUser.display_name || selectedUser.email}
+              </h3>
+              <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-secondary rounded-lg transition-colors"><X className="text-muted-foreground"/></button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div><p className="text-gray-500 text-xs">Email</p><p>{selectedUser.email}</p></div>
-              <div><p className="text-gray-500 text-xs">WhatsApp</p><p>{selectedUser.whatsapp_number || 'N/A'}</p></div>
-              <div><p className="text-gray-500 text-xs">Vitrine</p><p>{selectedUser.store_slug || 'N/A'}</p></div>
-              <div><p className="text-gray-500 text-xs">Desde</p><p>{formatDate(selectedUser.created_at)}</p></div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm mb-6">
+              <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Email</p><p className="font-medium">{selectedUser.email}</p></div>
+              <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">WhatsApp</p><p className="font-medium">{selectedUser.whatsapp_number || 'Não informado'}</p></div>
+              <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Vitrine</p><p className="font-medium">{selectedUser.store_slug || 'Não criada'}</p></div>
+              <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Conta criada em</p><p className="font-medium">{formatDate(selectedUser.created_at)}</p></div>
+            </div>
+
+            <div className="bg-secondary/20 p-4 rounded-xl border border-border">
+              <h4 className="font-semibold mb-3 flex items-center gap-2"><CreditCard className="h-4 w-4"/> Assinatura Atual</h4>
+              <div className="flex gap-4">
+                 <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Gateway</p><p className="font-medium capitalize">{selectedUser.payment_provider || 'Nenhum'}</p></div>
+                 <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Expira em</p><p className="font-medium">{formatDate(selectedUser.subscription_expires_at)}</p></div>
+              </div>
             </div>
           </div>
         )}
-
       </main>
     </div>
   );
