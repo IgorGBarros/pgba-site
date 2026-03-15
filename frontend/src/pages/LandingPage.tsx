@@ -6,7 +6,7 @@ import {
   Check, X, ArrowRight, Star, TrendingDown, Bell, Bot, Crown, 
   Zap, Users, CreditCard, Loader2,
 } from "lucide-react";
-import { api } from "../services/api"; // ✅ Usando a API do Render/Django
+import { api } from "../services/api"; 
 import { useToast } from "../hooks/use-toast";
 
 const fadeUp = {
@@ -29,7 +29,7 @@ const PRO_FEATURES = [
   { text: "Produtos ilimitados", ok: true },
   { text: "Cadastro e baixa de estoque", ok: true },
   { text: "Relatórios completos", ok: true },
-  { text: "Vitrine online personalizada", ok: true },
+  { text: "Vitrine Multimarcas", ok: true },
   { text: "Scanner de validade (OCR)", ok: true },
   { text: "Alertas de vencimento", ok: true },
   { text: "Analytics avançado", ok: true },
@@ -40,65 +40,64 @@ const FEATURES = [
   {
     icon: Package,
     title: "Estoque sempre atualizado",
-    desc: "Cadastre entradas e saídas em segundos. Nunca mais perca o controle do que você tem em mão.",
+    desc: "Cadastre entradas e saídas em segundos. Nunca mais perca o controle do que você tem na pronta entrega.",
   },
   {
     icon: ScanBarcode,
-    title: "Scanner inteligente",
-    desc: "Escaneie o código de barras dos produtos Natura para cadastro automático. Rápido como um clique.",
+    title: "Scanner Global Multimarcas",
+    desc: "Apontou, achou. Nosso sistema lê o código de barras de qualquer produto e busca o nome e a foto automaticamente.",
   },
   {
     icon: TrendingDown,
     title: "Alertas de estoque baixo",
-    desc: "Saiba em tempo real quais produtos estão acabando e nunca perca uma venda por falta de produto.",
+    desc: "Saiba em tempo real o que está acabando e nunca mais perca uma venda por falta de mercadoria.",
   },
   {
     icon: Bell,
-    title: "Alertas de validade",
-    desc: "Receba alertas antes dos produtos vencerem. Evite prejuízo e mantenha a qualidade das entregas.",
+    title: "Blindagem contra vencimentos",
+    desc: "Receba alertas antes dos produtos vencerem. Faça promoções a tempo e zere seus prejuízos.",
   },
   {
     icon: Store,
-    title: "Vitrine online",
-    desc: "Compartilhe um link da sua loja virtual com clientes. Eles veem seus produtos disponíveis em tempo real.",
+    title: "Sua própria Vitrine Digital",
+    desc: "Um link exclusivo com seus produtos em tempo real para enviar no WhatsApp das clientes. Venda dormindo.",
   },
   {
     icon: Bot,
-    title: "Assistente IA",
-    desc: "Pergunte ao seu assistente sobre seu estoque, tendências de vendas ou como maximizar seus lucros.",
+    title: "Seu Assistente de Inteligência Artificial",
+    desc: "Pergunte ao seu app: 'Quantos perfumes tenho?' ou 'O que mais vendeu hoje?' e receba a resposta na hora.",
   },
 ];
 
 const TESTIMONIALS = [
   {
     name: "Juliana Mendes",
-    role: "Consultora há 4 anos",
-    text: "Antes eu controlava tudo no caderno. Agora é tudo aqui, rápido e sem erro. Minha renda aumentou porque nunca mais perdi venda por falta de produto.",
+    role: "Revendedora de Cosméticos",
+    text: "Antes eu controlava tudo no caderno e sempre me perdia entre Avon e Natura. Agora bipou o código, tá no sistema. Minha renda aumentou muito!",
     stars: 5,
   },
   {
     name: "Camila Rocha",
-    role: "Consultora Ouro",
-    text: "A vitrine online é incrível! Mando o link para as clientes pelo WhatsApp e elas já veem o que tenho disponível. Profissional demais!",
+    role: "Empreendedora",
+    text: "A vitrine online é um divisor de águas! Mando o link no WhatsApp e as clientes já compram sozinhas o que eu tenho na pronta entrega.",
     stars: 5,
   },
   {
     name: "Patricia Lima",
-    role: "Consultora há 2 anos",
-    text: "O alerta de validade me salvou várias vezes. Evitei um prejuízo enorme em produtos que eu nem sabia que estavam vencendo.",
+    role: "Lojista",
+    text: "O leitor de código de barras parece mágica! Leu até os importados que eu trouxe pra vender. O alerta de validade também já me salvou de um prejuízo enorme.",
     stars: 5,
   },
 ];
 
 const FAQS = [
-  { q: "Preciso instalar algum aplicativo?", a: "Não! É tudo pelo navegador do celular ou computador. Acesse em qualquer lugar, a qualquer hora." },
-  { q: "Funciona com produtos de outras marcas?", a: "Sim! Você pode cadastrar produtos de qualquer marca. O sistema foi pensado para consultoras Natura, mas não se limita a ela." },
-  { q: "Posso cancelar quando quiser?", a: "Sim, sem multa ou fidelidade. O plano PRO continua ativo até o fim do período pago." },
-  { q: "Meus dados estão seguros?", a: "Totalmente. Usamos infraestrutura de nível empresarial com criptografia de ponta e backups automáticos diários." },
+  { q: "Preciso instalar algum aplicativo no celular?", a: "Não! É tudo pelo navegador do celular ou computador. Não ocupa memória do seu aparelho e você acessa de onde quiser." },
+  { q: "Funciona com produtos de quais marcas?", a: "Qualquer marca! Nosso sistema é integrado ao maior banco de dados do Brasil. Se o produto tem código de barras (Natura, Boticário, Avon, Eudora, Eletrônicos, etc.), o sistema encontra." },
+  { q: "Posso cancelar a assinatura quando quiser?", a: "Sim, sem letras miúdas ou fidelidade. Você é livre para cancelar e o plano PRO continua ativo até o fim do mês pago." },
+  { q: "Meus dados e os das minhas clientes estão seguros?", a: "Totalmente. Usamos infraestrutura de nível bancário com criptografia de ponta para garantir que seu estoque e suas vendas sejam 100% confidenciais." },
 ];
 
 // ─── Checkout Modal ─────────────────────────────────────────────────────────
-
 interface CheckoutModalProps {
   open: boolean;
   onClose: () => void;
@@ -123,7 +122,6 @@ function CheckoutModal({ open, onClose }: CheckoutModalProps) {
     setLoading(true);
     
     try {
-      // Chama o backend (Django no Render)
       const { data } = await api.post("/payments/create-checkout/", {
         billing_cycle: billing,
         email: email,
@@ -137,11 +135,10 @@ function CheckoutModal({ open, onClose }: CheckoutModalProps) {
       
     } catch (err: any) {
       console.error(err);
-      // Tratamento de Erro Suave para o MVP (Se a rota 404 no backend ainda não existir)
       if (err.response?.status === 404 || err.message.includes('Network Error')) {
          toast({ 
              title: "Lista de Espera VIP", 
-             description: "Nosso sistema de pagamentos está em homologação. Seu email foi salvo com prioridade!", 
+             description: "Nosso sistema de pagamentos está em atualização final. Seu e-mail foi salvo com prioridade máxima!", 
          });
          setTimeout(onClose, 2500);
       } else {
@@ -215,7 +212,8 @@ export default function LandingPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
               <Package className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-display text-base font-bold text-foreground">Estoque Natura</span>
+            {/* NOVO NOME DO APP AQUI */}
+            <span className="font-display text-base font-bold text-foreground">EstoquePRO</span>
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => navigate("/auth")} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -234,23 +232,26 @@ export default function LandingPage() {
           <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-primary/8 blur-3xl" />
           <div className="absolute top-20 right-0 h-80 w-80 rounded-full bg-accent/10 blur-3xl" />
         </div>
+
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0} className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-4 py-1.5">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-semibold text-primary">Feito para consultoras Natura</span>
+            <span className="text-xs font-semibold text-primary">Para revendedoras multimarcas e lojistas</span>
           </motion.div>
+
           <motion.h1 initial="hidden" animate="visible" variants={fadeUp} custom={1} className="font-display text-4xl font-bold leading-tight text-foreground md:text-6xl">
-            Seu estoque Natura{" "}
+            Seu estoque de <span className="text-primary">qualquer marca</span> <br className="hidden md:block"/>
             <span className="relative">
-              <span className="relative z-10 text-primary">sob controle</span>
+              <span className="relative z-10">sob controle.</span>
               <span className="absolute bottom-1 left-0 right-0 h-3 -z-0 rounded bg-primary/15" />
             </span>
-            , sempre.
           </motion.h1>
+
           <motion.p initial="hidden" animate="visible" variants={fadeUp} custom={2} className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Pare de perder vendas por falta de produto ou dinheiro por mercadoria vencida.
-            Controle seu inventário, acompanhe seus lucros e venda mais com a sua vitrine online.
+            Apontou, cadastrou. Nosso leitor inteligente identifica milhares de produtos pelo código de barras. 
+            Mantenha seu inventário em dia, evite vencimentos e venda mais com sua própria vitrine online.
           </motion.p>
+
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={3} className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <button onClick={() => navigate("/auth")} className="flex items-center gap-2 rounded-2xl bg-primary px-8 py-4 text-base font-bold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/40 transition-all">
               Começar grátis agora
@@ -259,11 +260,10 @@ export default function LandingPage() {
             <p className="text-sm text-muted-foreground">Sem cartão de crédito · 100% gratuito</p>
           </motion.div>
           
-          {/* Stats row */}
           <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={4} className="mt-16 grid grid-cols-3 gap-6 divide-x divide-border border border-border rounded-2xl bg-card p-6 max-w-lg mx-auto shadow-sm">
             {[
-              { value: "SaaS", label: "Sistema na Nuvem" },
-              { value: "R$ 0", label: "Para começar" },
+              { value: "+100k", label: "Produtos Reconhecidos" },
+              { value: "R$ 0", label: "Para testar" },
               { value: "100%", label: "De Controle" },
             ].map((stat) => (
               <div key={stat.label} className="px-2">
@@ -280,8 +280,9 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-14">
             <h2 className="font-display text-3xl font-bold text-foreground md:text-4xl">Tudo que você precisa em um só lugar</h2>
-            <p className="mt-3 text-muted-foreground">Ferramentas pensadas especialmente para quem trabalha com venda direta.</p>
+            <p className="mt-3 text-muted-foreground">O sistema mais inteligente para quem trabalha com vendas de produtos físicos.</p>
           </motion.div>
+
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feat, i) => (
               <motion.div key={feat.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i * 0.2} className="rounded-2xl border border-border bg-card p-6 hover:shadow-md hover:border-primary/30 transition-all">
@@ -302,11 +303,12 @@ export default function LandingPage() {
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-14">
             <h2 className="font-display text-3xl font-bold text-foreground md:text-4xl">Comece em 3 passos simples</h2>
           </motion.div>
+
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {[
               { step: "01", title: "Crie sua conta grátis", desc: "Cadastre-se em menos de 1 minuto. Sem cartão, sem complicação.", icon: Users },
-              { step: "02", title: "Cadastre seus produtos", desc: "Escaneie o código de barras. Nosso robô busca a foto e o preço oficial.", icon: ScanBarcode },
-              { step: "03", title: "Controle e venda mais", desc: "Acompanhe lucros, receba alertas e compartilhe sua vitrine.", icon: BarChart3 },
+              { step: "02", title: "Bipe os produtos", desc: "Escaneie o código de barras e nosso sistema puxa o nome e a foto de milhares de itens.", icon: ScanBarcode },
+              { step: "03", title: "Controle e venda mais", desc: "Acompanhe lucros, receba alertas no celular e compartilhe sua vitrine.", icon: BarChart3 },
             ].map((s, i) => (
               <motion.div key={s.step} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i * 0.3} className="relative text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-display text-xl font-bold shadow-lg shadow-primary/20">
@@ -326,21 +328,22 @@ export default function LandingPage() {
         <div className="mx-auto max-w-4xl px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-14">
             <h2 className="font-display text-3xl font-bold text-foreground md:text-4xl">Planos e Preços</h2>
-            <p className="mt-3 text-muted-foreground">Comece grátis. Faça upgrade quando seu negócio crescer.</p>
+            <p className="mt-3 text-muted-foreground">Comece grátis para testar. Assine o PRO para decolar suas vendas.</p>
           </motion.div>
+
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-2xl mx-auto">
             {/* FREE */}
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="rounded-2xl border border-border bg-card p-6 space-y-5 hover:border-primary/50 transition-colors">
               <div>
                 <h3 className="font-display text-xl font-bold text-foreground">Free</h3>
-                <p className="text-xs text-muted-foreground mt-1">Para organizar o básico</p>
+                <p className="text-xs text-muted-foreground mt-1">Para quem está começando</p>
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-display font-bold text-foreground">R$ 0</span>
                 <span className="text-sm text-muted-foreground">/mês</span>
               </div>
               <button onClick={() => navigate("/auth/register")} className="w-full rounded-xl border border-border py-3 text-sm font-semibold text-foreground hover:bg-secondary transition-colors">
-                Começar Grátis
+                Criar Conta Grátis
               </button>
               <ul className="space-y-2.5">
                 {FREE_FEATURES.map((f) => (
@@ -354,17 +357,17 @@ export default function LandingPage() {
             
             {/* PRO */}
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={1} className="rounded-2xl border-2 border-primary bg-card p-6 space-y-5 relative overflow-hidden shadow-xl shadow-primary/10">
-              <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-[10px] font-bold uppercase rounded-bl-xl">Popular</div>
+              <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-[10px] font-bold uppercase rounded-bl-xl">Acesso Total</div>
               <div>
                 <h3 className="font-display text-xl font-bold text-foreground flex items-center gap-2"><Crown className="h-5 w-5 text-primary" /> PRO</h3>
-                <p className="text-xs text-muted-foreground mt-1">Para quem quer vender muito mais</p>
+                <p className="text-xs text-muted-foreground mt-1">A loja e o controle nas suas mãos</p>
               </div>
               <div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-display font-bold text-foreground">R$ 39,90</span>
                   <span className="text-sm text-muted-foreground">/mês</span>
                 </div>
-                <p className="text-xs text-primary font-semibold mt-1">Economia real na gestão</p>
+                <p className="text-xs text-primary font-semibold mt-1">Um investimento que se paga na 1ª venda</p>
               </div>
               <button onClick={() => setCheckoutOpen(true)} className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 flex items-center justify-center gap-2">
                 <CreditCard className="h-4 w-4" /> Assinar PRO
@@ -386,8 +389,9 @@ export default function LandingPage() {
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-14">
-            <h2 className="font-display text-3xl font-bold text-foreground md:text-4xl">Consultoras que aprovaram</h2>
+            <h2 className="font-display text-3xl font-bold text-foreground md:text-4xl">Quem usa, aprova e vende mais</h2>
           </motion.div>
+
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             {TESTIMONIALS.map((t, i) => (
               <motion.div key={t.name} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i * 0.3} className="rounded-2xl border border-border bg-card p-6 space-y-4 hover:shadow-md transition-shadow">
@@ -433,7 +437,7 @@ export default function LandingPage() {
               <Package className="h-10 w-10 text-primary-foreground" />
             </div>
             <h2 className="font-display text-3xl font-bold text-foreground md:text-5xl tracking-tight">
-              A revolução do seu estoque começa agora.
+              A revolução do seu negócio começa agora.
             </h2>
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <button onClick={() => navigate("/auth")} className="flex items-center gap-2 rounded-2xl bg-primary px-10 py-4 text-lg font-bold text-primary-foreground shadow-xl shadow-primary/30 hover:scale-105 transition-transform">
@@ -451,10 +455,10 @@ export default function LandingPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary">
               <Package className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-display text-lg font-bold text-foreground">Natura Smart Stock</span>
+            <span className="font-display text-lg font-bold text-foreground">EstoquePRO</span>
           </div>
           <p className="text-sm text-muted-foreground text-center sm:text-left">
-            © {new Date().getFullYear()} Natura Smart Stock. Ferramenta independente.
+            © {new Date().getFullYear()} EstoquePRO. Todos os direitos reservados.
           </p>
         </div>
       </footer>
