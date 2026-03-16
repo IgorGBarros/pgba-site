@@ -118,12 +118,12 @@ export const productLookupApi = {
 // ── Inventory (user_inventory) ──
 export interface InventoryItem {
   id: string;
-  total_quantity: number;     // 🚀 Novo campo do backend
-  min_quantity: number;
+  total_quantity?: number;
+  min_quantity?: number;
   cost_price: number;
   sale_price: number | null;
   
-  // 🚀 Novo objeto aninhado que vem do backend
+  // Objeto aninhado do produto que vem do backend
   product?: {
     id: number | string;
     name: string;
@@ -134,8 +134,10 @@ export interface InventoryItem {
     official_price: number;
   };
 
-  // Mantemos os campos antigos como opcionais (?) 
-  // para não quebrar a sua base de dados de demonstração (DEMO_INVENTORY)
+  // 🚀 CORREÇÃO AQUI: Adicionando o array de lotes para resolver o erro
+  batches?: InventoryBatch[];
+
+  // Mantemos os campos legados como opcionais para não quebrar a base de demonstração
   quantity?: number;
   barcode?: string;
   product_name?: string;
@@ -189,8 +191,14 @@ export interface InventoryBatch {
   inventory_item_id: string;
   quantity: number;
   cost_price: number;
-  expiry_date: string | null;
-  expiry_photo_url: string | null;
+  
+  // 🚀 ADICIONE ESTES DOIS CAMPOS (Nomes exatos do Django):
+  batch_code?: string;
+  expiration_date?: string | null;
+  
+  // Mantemos os antigos como opcionais para não quebrar outras telas
+  expiry_date?: string | null;
+  expiry_photo_url?: string | null;
   created_at: string;
 }
 

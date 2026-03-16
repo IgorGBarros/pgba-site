@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ScanBarcode, Save, Loader2, Search, Calendar, Package, ImageIcon } from "lucide-react";
-import { AnimatePresence } from "framer-motion";
-import { Product, productService, LookupData } from "../lib/productService";
+import { 
+  ArrowLeft, ScanBarcode, Save, Loader2, Search, Calendar, 
+  Package, ImageIcon, ChevronDown, ChevronUp, Info, Layers
+} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Product, productService } from "../lib/productService";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { useToast } from "../hooks/use-toast";
-import { api } from "../services/api";
-
-// 🚀 IMPORTAÇÃO DO NOVO HOOK CENTRALIZADO
+import {  inventoryApi } from "../lib/api";
 import { useStockEntry } from "../hooks/useStockEntry";
+import {api} from "../services/api";
 
 const CATEGORIES = ["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Infantil", "Casa", "Outro"];
 
@@ -34,7 +36,6 @@ export default function ProductForm() {
   const { toast } = useToast();
   const isEditing = Boolean(id);
   
-  // 🚀 INICIALIZAÇÃO DO HOOK
   const { saveEntry } = useStockEntry();
   
   const [form, setForm] = useState<Product>(emptyProduct);
@@ -45,9 +46,35 @@ export default function ProductForm() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // 🚀 NOVOS ESTADOS PARA A TELA DE EDIÇÃO
+  const [inventoryItem, setInventoryItem] = useState<any>(null);
+  const [showDetails, setShowDetails] = useState(false); // Controla o acordeão
+
   useEffect(() => {
     if (id) {
-      productService.get(Number(id)).then(setForm);
+      // 🚀 CORREÇÃO: Busca do inventário para pegar os dados completos (Lotes, Preços, etc)
+      inventoryApi.list().then(items => {
+        const item = items.find(i => String(i.product?.id) === id || String(i.id) === id);
+        if (item) {
+          setInventoryItem(item);
+          setForm(prev => ({
+            ...prev,
+            name: item.product?.name || item.product_name || "",
+            bar_code: item.product?.bar_code || item.barcode || "",
+            natura_sku: item.product?.natura_sku || item.sku || "",
+            category: item.product?.category || item.category || "Outro",
+            image_url: item.product?.image_url || item.image_url || "",
+            price: item.sale_price || item.product?.official_price || 0,
+            cost_price: item.cost_price || 0,
+            // Pega o lote mais recente como referência para edição
+            batch_code: item.batches?.[0]?.batch_code || "",
+            expiration_date: item.batches?.[0]?.expiration_date || "",
+          }));
+        } else {
+          // Fallback caso não ache no inventário
+          productService.get(Number(id)).then(setForm);
+        }
+      });
     }
   }, [id]);
 
@@ -55,7 +82,6 @@ export default function ProductForm() {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  // --- BUSCA POR NOME ---
   const handleNameChange = async (val: string) => {
     handleChange("name", val);
     
@@ -89,7 +115,6 @@ export default function ProductForm() {
     toast({ title: "Produto Vinculado!", description: `SKU ${suggestion.natura_sku} carregado.` });
   };
 
-  // --- BUSCA POR CÓDIGO (EAN) ---
   const handleLookup = async (ean: string) => {
     if (!ean) return;
     setSearching(true);
@@ -109,7 +134,6 @@ export default function ProductForm() {
            toast({ title: "Nome Encontrado!", description: `Possível match: ${google_name}` });
         } 
         else if (source?.includes('remote')) {
-           // 🚀 CORREÇÃO AQUI: Se o remoto não trouxer a info, preservamos o que já estava digitado (prev.name)
            setForm(prev => ({
              ...prev,
              name: remote?.name || data?.name || prev.name,
@@ -137,17 +161,11 @@ export default function ProductForm() {
     handleLookup(code);
   };
 
-  // 🚀 LÓGICA DE SUBMISSÃO ATUALIZADA
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 🚀 NOVA VALIDAÇÃO: Impede envio sem código de barras (evita Erro 400 no backend)
     if (!isEditing && (!form.bar_code || form.bar_code.trim() === "")) {
-      toast({ 
-        title: "Código Obrigatório", 
-        description: "O código de barras não pode ficar vazio.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Código Obrigatório", description: "O código de barras não pode ficar vazio.", variant: "destructive" });
       return;
     }
 
@@ -155,11 +173,30 @@ export default function ProductForm() {
     
     try {
       if (isEditing) {
-        // Se for edição, continua usando o update padrão
-        await productService.update(Number(id), form);
+        // 🚀 CORREÇÃO DO SALVAMENTO DE EDIÇÃO
+        if (inventoryItem) {
+          // 1. Atualiza Preços no Estoque Local
+          await inventoryApi.update(inventoryItem.id, {
+            cost_price: form.cost_price,
+            sale_price: form.price,
+          });
+          
+          // 2. Atualiza Dados Globais do Produto
+          const prodId = inventoryItem.product?.id || id;
+          await api.patch(`/products/${prodId}/`, {
+            name: form.name,
+            bar_code: form.bar_code,
+            natura_sku: form.natura_sku,
+            category: form.category,
+            image_url: form.image_url
+          }).catch(() => {}); // Ignora se o produto for protegido no backend
+        } else {
+          // Fallback para legado
+          await productService.update(Number(id), form);
+        }
+        
         toast({ title: "Sucesso!", description: "Produto atualizado com sucesso." });
       } else {
-        // SE FOR NOVO: Chama o super hook passando os dados mapeados
         await saveEntry({
           bar_code: form.bar_code,
           name: form.name,
@@ -167,7 +204,7 @@ export default function ProductForm() {
           natura_sku: form.natura_sku,
           quantity: form.quantity,
           cost_price: form.cost_price,
-          sale_price: form.price, // Mapeado do campo Preço Venda
+          sale_price: form.price, 
           batch_code: form.batch_code,
           expiration_date: form.expiration_date,
         });
@@ -175,9 +212,7 @@ export default function ProductForm() {
       
       navigate("/products");
     } catch (err: any) {
-      if (isEditing) {
-        toast({ title: "Erro", description: "Falha ao salvar as alterações.", variant: "destructive" });
-      }
+      toast({ title: "Erro", description: "Falha ao salvar as alterações.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -186,84 +221,143 @@ export default function ProductForm() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 border-b bg-card px-6 py-4 flex items-center gap-3">
-        <button type="button" onClick={() => navigate("/products")}><ArrowLeft /></button>
-        <h1 className="font-bold text-lg">{isEditing ? "Editar" : "Novo"} Produto</h1>
+        <button type="button" onClick={() => navigate("/products")}><ArrowLeft className="text-muted-foreground hover:text-foreground" /></button>
+        <h1 className="font-display text-lg font-bold text-foreground">{isEditing ? "Editar Produto" : "Novo Produto"}</h1>
       </header>
+
       <main className="max-w-2xl mx-auto p-6 space-y-6">
+        
+        {/* 🚀 ACORDEÃO DE DETALHES DO PRODUTO (SÓ APARECE NA EDIÇÃO) */}
+        {isEditing && inventoryItem && (
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between p-4 bg-secondary/30 hover:bg-secondary/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                <span className="text-sm font-bold text-foreground">Detalhes Atuais do Estoque</span>
+              </div>
+              {showDetails ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+
+            <AnimatePresence>
+              {showDetails && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden border-t border-border"
+                >
+                  <div className="p-4 space-y-4 bg-card text-sm">
+                    <div className="flex justify-between items-center bg-primary/5 p-3 rounded-lg border border-primary/10">
+                      <span className="font-semibold text-foreground">Quantidade Total:</span>
+                      <span className="font-mono font-bold text-primary text-lg">{inventoryItem.total_quantity ?? inventoryItem.quantity ?? 0} un.</span>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5" /> Lotes Registrados
+                      </p>
+                      {inventoryItem.batches && inventoryItem.batches.length > 0 ? (
+                        <div className="space-y-2">
+                          {inventoryItem.batches.map((b: any, idx: number) => (
+                            <div key={idx} className="flex justify-between items-center bg-secondary/30 p-2.5 rounded-lg border border-border/50">
+                              <div>
+                                <p className="font-medium text-foreground text-xs">Lote: {b.batch_code || "Sem Lote"}</p>
+                                <p className="text-[10px] text-muted-foreground">Vence: {b.expiration_date ? new Date(b.expiration_date).toLocaleDateString('pt-BR') : "N/A"}</p>
+                              </div>
+                              <span className="font-mono text-xs font-semibold">{b.quantity} un.</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">Nenhum lote detalhado encontrado.</p>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground text-center pt-2">
+                      A quantidade deve ser alterada pelo botão "Ajustar Saldo" (Balança) na lista de estoque.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           
           {/* BLOCO 1: IDENTIFICAÇÃO */}
-          <div className="bg-card p-4 rounded-xl border space-y-4">
+          <div className="bg-card p-5 rounded-xl border border-border space-y-4">
             <div>
-                <label className="text-sm font-medium">Código de Barras (EAN) *</label>
-                <div className="flex gap-2 relative mt-1">
+                <label className="text-sm font-medium text-foreground">Código de Barras (EAN) {isEditing ? "" : "*"}</label>
+                <div className="flex gap-2 relative mt-1.5">
                   <input 
                     required={!isEditing}
                     value={form.bar_code}
                     onChange={e => handleChange("bar_code", e.target.value)}
                     onBlur={() => handleLookup(form.bar_code)}
                     placeholder="Escaneie ou digite..."
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full border border-input rounded-lg px-3 py-2.5 outline-none focus:border-primary bg-background font-mono text-sm"
                   />
-                  <button type="button" onClick={() => setShowScanner(true)} className="bg-primary text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                  <button type="button" onClick={() => setShowScanner(true)} className="bg-primary text-primary-foreground px-4 py-2 rounded-lg flex items-center gap-2 hover:opacity-90 transition-opacity">
                     <ScanBarcode size={18} /> <span className="hidden sm:block">Scan</span>
                   </button>
                   {searching && <Loader2 className="absolute right-24 top-3 animate-spin text-muted-foreground" size={18} />}
                 </div>
             </div>
-            <div className="flex gap-4">
-                <div className="flex-1">
-                    <label className="text-sm text-muted-foreground">SKU Natura</label>
-                    <input
-                      type="text"
-                      value={form.natura_sku || ''}
-                      onChange={(e) => handleChange("natura_sku", e.target.value)}
-                      placeholder="Auto"
-                      className="w-full border rounded-lg px-3 py-2 mt-1 bg-gray-50"
-                    />
-                </div>
+            <div>
+                <label className="text-sm font-medium text-foreground">SKU Natura</label>
+                <input
+                  type="text"
+                  value={form.natura_sku || ''}
+                  onChange={(e) => handleChange("natura_sku", e.target.value)}
+                  placeholder="Código do produto no catálogo"
+                  className="w-full border border-input rounded-lg px-3 py-2.5 mt-1.5 bg-background outline-none focus:border-primary"
+                />
             </div>
           </div>
 
           {/* BLOCO 2: DETALHES COM IMAGEM */}
-          <div className="bg-card p-4 rounded-xl border space-y-4">
+          <div className="bg-card p-5 rounded-xl border border-border space-y-4">
              <div className="flex justify-between items-start">
-                <h2 className="font-bold text-sm flex gap-2 items-center"><Package size={16}/> Detalhes</h2>
-                <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden border flex items-center justify-center">
+                <h2 className="font-bold text-sm flex gap-2 items-center text-foreground"><Package size={16} className="text-primary"/> Detalhes do Produto</h2>
+                <div className="w-16 h-16 bg-secondary/50 rounded-lg overflow-hidden border border-border flex items-center justify-center">
                     {form.image_url ? (
                         <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
-                        <ImageIcon className="text-gray-400" size={24} />
+                        <ImageIcon className="text-muted-foreground/50" size={24} />
                     )}
                 </div>
              </div>
              
-             <div className="relative -mt-16 mr-24">
-                <label className="text-sm text-muted-foreground">Nome *</label>
+             <div className="relative -mt-12 mr-20">
+                <label className="text-sm font-medium text-foreground">Nome *</label>
                 <input 
                   required 
                   value={form.name} 
                   onChange={e => handleNameChange(e.target.value)} 
-                  className="w-full border rounded-lg px-3 py-2 mt-1" 
+                  className="w-full border border-input rounded-lg px-3 py-2.5 mt-1.5 bg-background outline-none focus:border-primary" 
                   placeholder="Digite para buscar..."
                 />
                 
                 {showSuggestions && (
-                  <div className="absolute z-20 w-full bg-white border rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto">
+                  <div className="absolute z-20 w-full bg-card border border-border rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto">
                     {suggestions.map((s) => (
                       <button
                         key={s.id}
                         type="button"
                         onClick={() => selectSuggestion(s)}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-0 transition-colors group"
+                        className="w-full text-left px-4 py-3 hover:bg-secondary border-b border-border/50 last:border-0 transition-colors group"
                       >
                         <div className="flex gap-3">
-                            <div className="w-8 h-8 bg-gray-100 rounded shrink-0 overflow-hidden">
+                            <div className="w-8 h-8 bg-secondary/50 rounded shrink-0 overflow-hidden">
                                 {s.image_url && <img src={s.image_url} className="w-full h-full object-cover"/>}
                             </div>
                             <div>
-                                <p className="font-medium text-sm text-gray-800 group-hover:text-primary">{s.name}</p>
-                                <span className="text-xs text-gray-500">Ref: R$ {s.official_price}</span>
+                                <p className="font-medium text-sm text-foreground group-hover:text-primary">{s.name}</p>
+                                <span className="text-xs text-muted-foreground">Ref: R$ {s.official_price}</span>
                             </div>
                         </div>
                       </button>
@@ -271,61 +365,68 @@ export default function ProductForm() {
                   </div>
                 )}
              </div>
+
              <div className="grid grid-cols-2 gap-4 mt-4">
                 <div>
-                  <label className="text-sm text-muted-foreground">Preço Venda</label>
-                  <input type="number" step="0.01" value={form.price} onChange={e => handleChange("price", parseFloat(e.target.value))} className="w-full border rounded-lg px-3 py-2 mt-1" />
+                  <label className="text-sm font-medium text-foreground">Preço Venda (R$)</label>
+                  <input type="number" step="0.01" value={form.price || ""} onChange={e => handleChange("price", parseFloat(e.target.value) || 0)} className="w-full border border-input rounded-lg px-3 py-2.5 mt-1.5 bg-background outline-none focus:border-primary" />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground">Preço Custo</label>
-                  <input type="number" step="0.01" value={form.cost_price} onChange={e => handleChange("cost_price", parseFloat(e.target.value))} className="w-full border rounded-lg px-3 py-2 mt-1" />
+                  <label className="text-sm font-medium text-foreground">Preço Custo (R$)</label>
+                  <input type="number" step="0.01" value={form.cost_price || ""} onChange={e => handleChange("cost_price", parseFloat(e.target.value) || 0)} className="w-full border border-input rounded-lg px-3 py-2.5 mt-1.5 bg-background outline-none focus:border-primary" />
                 </div>
              </div>
              
              <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="text-sm text-muted-foreground">Categoria</label>
-                    <select value={form.category} onChange={e => handleChange("category", e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1">
+                    <label className="text-sm font-medium text-foreground">Categoria</label>
+                    <select value={form.category} onChange={e => handleChange("category", e.target.value)} className="w-full border border-input rounded-lg px-3 py-2.5 mt-1.5 bg-background outline-none focus:border-primary">
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="text-sm text-muted-foreground">URL Imagem</label>
-                    <input value={form.image_url || ''} onChange={e => handleChange("image_url", e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1 text-xs" placeholder="https://..." />
+                    <label className="text-sm font-medium text-foreground">URL Imagem</label>
+                    <input value={form.image_url || ''} onChange={e => handleChange("image_url", e.target.value)} className="w-full border border-input rounded-lg px-3 py-2.5 mt-1.5 bg-background outline-none focus:border-primary text-xs" placeholder="https://..." />
                 </div>
              </div>
           </div>
 
-          {/* BLOCO 3: ENTRADA DE ESTOQUE (QUANTIDADE) */}
-          {!isEditing && (
-            <div className="bg-card p-4 rounded-xl border space-y-4 border-l-4 border-l-primary">
-               <h2 className="font-bold text-sm flex gap-2"><Calendar size={16}/> Entrada de Estoque</h2>
-               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-bold text-primary">Quantidade *</label>
+          {/* BLOCO 3: DADOS DE ESTOQUE (Validade, Lote e Qtd) */}
+          <div className="bg-card p-5 rounded-xl border border-border space-y-4 border-l-4 border-l-primary">
+              <h2 className="font-bold text-sm flex gap-2 text-foreground"><Calendar size={16} className="text-primary"/> Dados de Inventário</h2>
+              <div className="grid grid-cols-2 gap-4">
+                
+                {/* 🚀 QUANTIDADE ESCONDIDA QUANDO É EDIÇÃO */}
+                {!isEditing && (
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="text-sm font-bold text-primary">Quantidade Inicial *</label>
                     <input 
                         type="number" 
                         required 
                         min="1"
                         value={form.quantity} 
                         onChange={e => handleChange("quantity", parseInt(e.target.value))} 
-                        className="w-full border-2 border-primary/20 rounded-lg px-3 py-2 mt-1 text-lg font-bold text-center focus:border-primary outline-none" 
+                        className="w-full border-2 border-primary/20 rounded-lg px-3 py-2 mt-1.5 text-lg font-bold text-center focus:border-primary outline-none bg-primary/5" 
                     />
                   </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Lote</label>
-                    <input value={form.batch_code || ''} onChange={e => handleChange("batch_code", e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" placeholder="Ex: L2024" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-sm text-muted-foreground">Validade</label>
-                    <input type="date" value={form.expiration_date || ''} onChange={e => handleChange("expiration_date", e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
-                  </div>
-               </div>
-            </div>
-          )}
+                )}
+                
+                <div className={isEditing ? "col-span-2 sm:col-span-1" : ""}>
+                  <label className="text-sm font-medium text-foreground">Código do Lote</label>
+                  <input value={form.batch_code || ''} onChange={e => handleChange("batch_code", e.target.value)} className="w-full border border-input rounded-lg px-3 py-2 mt-1.5 bg-background outline-none focus:border-primary" placeholder="Ex: L2024" />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-foreground">Data de Validade</label>
+                  <input type="date" value={form.expiration_date || ''} onChange={e => handleChange("expiration_date", e.target.value)} className="w-full border border-input rounded-lg px-3 py-2 mt-1.5 bg-background outline-none focus:border-primary" />
+                </div>
+
+              </div>
+          </div>
           
-          <button disabled={loading} type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-transform">
-             {loading ? "Salvando..." : "Salvar Produto"}
+          <button disabled={loading} type="submit" className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-xl shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+             {loading ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
+             {isEditing ? "Salvar Alterações" : "Cadastrar Produto"}
           </button>
         </form>
       </main>
