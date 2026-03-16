@@ -203,4 +203,4 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
       </div>
     </AnimatePresence>
   );
-}
+} 
