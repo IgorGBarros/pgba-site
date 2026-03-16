@@ -8,9 +8,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Product, productService } from "../lib/productService";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { useToast } from "../hooks/use-toast";
-import {  inventoryApi } from "../lib/api";
+import { inventoryApi } from "../lib/api";
 import { useStockEntry } from "../hooks/useStockEntry";
-import {api} from "../services/api";
+import { api } from "../services/api";
 
 const CATEGORIES = ["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Infantil", "Casa", "Outro"];
 
@@ -45,14 +45,13 @@ export default function ProductForm() {
   
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-
-  // 🚀 NOVOS ESTADOS PARA A TELA DE EDIÇÃO
+  
+  // ESTADOS PARA A TELA DE EDIÇÃO
   const [inventoryItem, setInventoryItem] = useState<any>(null);
-  const [showDetails, setShowDetails] = useState(false); // Controla o acordeão
+  const [showDetails, setShowDetails] = useState(false); 
 
   useEffect(() => {
     if (id) {
-      // 🚀 CORREÇÃO: Busca do inventário para pegar os dados completos (Lotes, Preços, etc)
       inventoryApi.list().then(items => {
         const item = items.find(i => String(i.product?.id) === id || String(i.id) === id);
         if (item) {
@@ -66,12 +65,10 @@ export default function ProductForm() {
             image_url: item.product?.image_url || item.image_url || "",
             price: item.sale_price || item.product?.official_price || 0,
             cost_price: item.cost_price || 0,
-            // Pega o lote mais recente como referência para edição
             batch_code: item.batches?.[0]?.batch_code || "",
             expiration_date: item.batches?.[0]?.expiration_date || "",
           }));
         } else {
-          // Fallback caso não ache no inventário
           productService.get(Number(id)).then(setForm);
         }
       });
@@ -168,12 +165,10 @@ export default function ProductForm() {
       toast({ title: "Código Obrigatório", description: "O código de barras não pode ficar vazio.", variant: "destructive" });
       return;
     }
-
     setLoading(true);
     
     try {
       if (isEditing) {
-        // 🚀 CORREÇÃO DO SALVAMENTO DE EDIÇÃO
         if (inventoryItem) {
           // 1. Atualiza Preços no Estoque Local
           await inventoryApi.update(inventoryItem.id, {
@@ -181,7 +176,7 @@ export default function ProductForm() {
             sale_price: form.price,
           });
           
-          // 2. Atualiza Dados Globais do Produto
+          // 2. Atualiza Dados Globais do Produto (AQUI ACONTECIA O ERRO ESCONDIDO)
           const prodId = inventoryItem.product?.id || id;
           await api.patch(`/products/${prodId}/`, {
             name: form.name,
@@ -189,7 +184,10 @@ export default function ProductForm() {
             natura_sku: form.natura_sku,
             category: form.category,
             image_url: form.image_url
-          }).catch(() => {}); // Ignora se o produto for protegido no backend
+          }).catch((err) => {
+            // 🚀 CORREÇÃO: Pelo menos mostramos um log amarelo para não sermos enganados se falhar
+            console.warn("Aviso: O produto pode ser protegido ou a rota falhou.", err);
+          }); 
         } else {
           // Fallback para legado
           await productService.update(Number(id), form);
@@ -224,10 +222,9 @@ export default function ProductForm() {
         <button type="button" onClick={() => navigate("/products")}><ArrowLeft className="text-muted-foreground hover:text-foreground" /></button>
         <h1 className="font-display text-lg font-bold text-foreground">{isEditing ? "Editar Produto" : "Novo Produto"}</h1>
       </header>
-
       <main className="max-w-2xl mx-auto p-6 space-y-6">
         
-        {/* 🚀 ACORDEÃO DE DETALHES DO PRODUTO (SÓ APARECE NA EDIÇÃO) */}
+        {/* ACORDEÃO DE DETALHES DO PRODUTO (SÓ APARECE NA EDIÇÃO) */}
         {isEditing && inventoryItem && (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <button
@@ -241,7 +238,6 @@ export default function ProductForm() {
               </div>
               {showDetails ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
             </button>
-
             <AnimatePresence>
               {showDetails && (
                 <motion.div
@@ -255,7 +251,6 @@ export default function ProductForm() {
                       <span className="font-semibold text-foreground">Quantidade Total:</span>
                       <span className="font-mono font-bold text-primary text-lg">{inventoryItem.total_quantity ?? inventoryItem.quantity ?? 0} un.</span>
                     </div>
-
                     <div>
                       <p className="text-xs font-bold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
                         <Layers className="h-3.5 w-3.5" /> Lotes Registrados
@@ -396,7 +391,7 @@ export default function ProductForm() {
               <h2 className="font-bold text-sm flex gap-2 text-foreground"><Calendar size={16} className="text-primary"/> Dados de Inventário</h2>
               <div className="grid grid-cols-2 gap-4">
                 
-                {/* 🚀 QUANTIDADE ESCONDIDA QUANDO É EDIÇÃO */}
+                {/* QUANTIDADE ESCONDIDA QUANDO É EDIÇÃO */}
                 {!isEditing && (
                   <div className="col-span-2 sm:col-span-1">
                     <label className="text-sm font-bold text-primary">Quantidade Inicial *</label>

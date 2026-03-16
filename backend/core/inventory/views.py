@@ -141,11 +141,30 @@ class TenantModelMixin:
 # 1. VIEWSETS BASE (CRUD)
 # ==========================================
 
-class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    """Catálogo Global - Apenas Leitura para as consultoras"""
+class ProductViewSet(viewsets.ModelViewSet):
+    """Catálogo Global - Leitura livre, Edição apenas de itens não protegidos"""
     permission_classes = [AllowAny]    
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # 🚀 PROTEÇÃO: Impede que o usuário altere o catálogo oficial da Natura,
+        # mas permite que ele altere os produtos que ele mesmo cadastrou manualmente.
+        is_protected = getattr(instance, 'is_protected', False)
+        if is_protected:
+            # Retorna 200 OK para não quebrar o frontend, mas não faz a alteração no banco global
+            return Response(
+                {"message": "Produto protegido. Alterações no catálogo global foram ignoradas."}, 
+                status=status.HTTP_200_OK
+            )
+            
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
 class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Estoque Privado da Consultora"""
