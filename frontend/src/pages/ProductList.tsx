@@ -23,7 +23,7 @@ type StockFilter = "TODOS" | "COM_ESTOQUE" | "ESGOTADO";
 export default function ProductList() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Usamos any temporariamente ou você pode atualizar a tipagem na api.ts depois
+  
   const [inventory, setInventory] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [filterStock, setFilterStock] = useState<StockFilter>("COM_ESTOQUE");
@@ -43,14 +43,12 @@ export default function ProductList() {
   useEffect(() => { loadInventory(); }, []);
 
   const filtered = inventory.filter((item) => {
-    // 🚀 Mapeamento seguro para o novo formato aninhado do backend
     const qty = item.total_quantity ?? item.quantity ?? 0;
     const prodName = item.product?.name || item.product_name || "";
     const prodBarcode = item.product?.bar_code || item.barcode || "";
     const prodSku = item.product?.natura_sku || item.sku || "";
     const prodCat = item.product?.category || item.category || "";
 
-    // Filtro de Texto
     const textMatch = 
       prodName.toLowerCase().includes(search.toLowerCase()) ||
       (item.custom_name || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -58,11 +56,10 @@ export default function ProductList() {
       prodSku.toLowerCase().includes(search.toLowerCase()) ||
       prodCat.toLowerCase().includes(search.toLowerCase());
     
-    // Filtro de Estoque
     const stockMatch = 
       filterStock === "TODOS" ? true :
       filterStock === "COM_ESTOQUE" ? qty > 0 :
-      qty <= 0; // ESGOTADO
+      qty <= 0;
       
     return textMatch && stockMatch;
   });
@@ -105,8 +102,8 @@ export default function ProductList() {
           </div>
         </div>
       </header>
+
       <main className="mx-auto max-w-4xl px-6 py-6">
-        
         {/* Search */}
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -142,7 +139,7 @@ export default function ProductList() {
         </div>
 
         {/* Product List */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Package className="mb-3 h-12 w-12 opacity-30" />
@@ -150,7 +147,6 @@ export default function ProductList() {
             </div>
           ) : (
             filtered.map((item, i) => {
-              // 🚀 Extração Segura dos Dados Aninhados do Backend
               const qty = item.total_quantity ?? item.quantity ?? 0;
               const minQty = item.min_quantity ?? 5;
               const status = getStockStatus(qty, minQty);
@@ -162,7 +158,6 @@ export default function ProductList() {
               const category = item.product?.category || item.category;
               const officialPrice = item.product?.official_price || item.official_price;
               
-              // 🚀 O pulo do gato: ID correto para o botão Editar (ID do Produto Global)
               const productIdToEdit = item.product?.id || item.id;
 
               return (
@@ -171,87 +166,89 @@ export default function ProductList() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03 }}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm"
+                  // 🚀 MUDANÇA: flex-col no mobile, sm:flex-row no desktop
+                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm"
                 >
-                  {/* Image / Icon */}
-                  {imageUrl ? (
-                    <img src={imageUrl} alt={displayName} className="h-12 w-12 shrink-0 rounded-lg object-cover border border-border" />
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Package className="h-5 w-5 text-primary" />
-                    </div>
-                  )}
+                  {/* --- TOPO NO MOBILE / ESQUERDA NO PC (Foto + Info) --- */}
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {/* Imagem */}
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={displayName} className="h-14 w-14 shrink-0 rounded-lg object-cover border border-border" />
+                    ) : (
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Package className="h-6 w-6 text-primary" />
+                      </div>
+                    )}
 
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
-                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${status.color}`}>
-                        {status.label}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                      <span>{category}</span>
-                      <span>·</span>
-                      <span className="font-mono">{barcode}</span>
+                    {/* Textos */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-foreground line-clamp-2 leading-tight">
+                        {displayName}
+                      </p>
                       
-                      {item.expiry_date && (() => {
-                        const now = new Date(); now.setHours(0,0,0,0);
-                        const exp = new Date(item.expiry_date); exp.setHours(0,0,0,0);
-                        const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
-                        const alertDays = parseInt(localStorage.getItem("expiry_alert_days") || "30", 10);
-                        const alertEnabled = localStorage.getItem("expiry_alert_enabled") !== "false";
-                        if (!alertEnabled || daysLeft > alertDays) return null;
-                        return (
-                          <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${
-                            daysLeft <= 0 || daysLeft <= 7
-                              ? "border-destructive/20 bg-destructive/10 text-destructive"
-                              : "border-accent/20 bg-accent/10 text-accent-foreground"
-                          }`}>
-                            {daysLeft <= 7 ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                            {daysLeft <= 0 ? "Vencido" : `${daysLeft}d`}
-                          </span>
-                        );
-                      })()}
+                      {/* Flex-wrap para as tags debaixo do nome não vazarem */}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 font-semibold ${status.color}`}>
+                          {status.label}
+                        </span>
+                        <span className="bg-secondary px-1.5 py-0.5 rounded text-foreground">{category}</span>
+                        <span className="font-mono bg-secondary/50 px-1.5 py-0.5 rounded">{barcode}</span>
+                        
+                        {/* Lógica do Alerta de Validade */}
+                        {item.expiry_date && (() => {
+                          const now = new Date(); now.setHours(0,0,0,0);
+                          const exp = new Date(item.expiry_date); exp.setHours(0,0,0,0);
+                          const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
+                          const alertDays = parseInt(localStorage.getItem("expiry_alert_days") || "30", 10);
+                          const alertEnabled = localStorage.getItem("expiry_alert_enabled") !== "false";
+                          if (!alertEnabled || daysLeft > alertDays) return null;
+                          return (
+                            <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-semibold ${
+                              daysLeft <= 0 || daysLeft <= 7
+                                ? "border-destructive/20 bg-destructive/10 text-destructive"
+                                : "border-accent/20 bg-accent/10 text-accent-foreground"
+                            }`}>
+                              {daysLeft <= 7 ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                              {daysLeft <= 0 ? "Vencido" : `${daysLeft}d`}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Prices & Quantity */}
-                  <div className="text-right shrink-0 space-y-0.5">
-                    {officialPrice > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Oficial: <span className="font-mono font-medium text-foreground">{formatMoney(officialPrice)}</span>
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Custo: <span className="font-mono font-medium text-primary">{formatMoney(item.cost_price)}</span>
-                    </p>
-                    {item.sale_price > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Venda: <span className="font-mono font-medium text-accent-foreground">{formatMoney(item.sale_price)}</span>
-                      </p>
-                    )}
-                    <p className={`text-xs font-mono ${qty <= minQty ? (qty <= 0 ? "text-destructive font-bold" : "text-yellow-600 dark:text-yellow-400 font-semibold") : "text-muted-foreground"}`}>
-                      {qty} un.
-                    </p>
-                  </div>
+                  {/* --- BASE NO MOBILE / DIREITA NO PC (Preços + Botões) --- */}
+                  <div className="flex items-center justify-between gap-4 border-t sm:border-t-0 border-border/50 pt-3 sm:pt-0 w-full sm:w-auto">
+                    
+                    {/* Preços */}
+                    <div className="flex flex-col gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
+                      {officialPrice > 0 && (
+                        <p>Oficial: <span className="font-mono text-foreground">{formatMoney(officialPrice)}</span></p>
+                      )}
+                      <p>Custo: <span className="font-mono text-primary">{formatMoney(item.cost_price)}</span></p>
+                      {item.sale_price > 0 && (
+                        <p>Venda: <span className="font-mono text-accent-foreground">{formatMoney(item.sale_price)}</span></p>
+                      )}
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setAdjustItem(item)}
-                      title="Ajustar Saldo"
-                      className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                    >
-                      <Scale className="h-4 w-4" />
-                    </button>
-                    {/* 🚀 Abre o produto certo no formulário! */}
-                    <button onClick={() => navigate(`/products/${productIdToEdit}/edit`)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setDeleteId(item.id)} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {/* Quantidade e Ações */}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <p className={`text-sm font-mono ${qty <= minQty ? (qty <= 0 ? "text-destructive font-bold" : "text-yellow-600 dark:text-yellow-400 font-semibold") : "text-foreground font-semibold"}`}>
+                        {qty} un.
+                      </p>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button onClick={() => setAdjustItem(item)} className="rounded-lg p-2 bg-secondary/50 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary">
+                          <Scale className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => navigate(`/products/${productIdToEdit}/edit`)} className="rounded-lg p-2 bg-secondary/50 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setDeleteId(item.id)} className="rounded-lg p-2 bg-secondary/50 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 </motion.div>
               );
@@ -260,7 +257,7 @@ export default function ProductList() {
         </div>
       </main>
 
-      {/* Delete Dialog */}
+      {/* Dialogs e Modais */}
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
