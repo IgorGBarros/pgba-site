@@ -152,7 +152,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all().select_related('product')
     serializer_class = InventoryItemSerializer
 
-class StockTransactionViewSet(TenantModelMixin, viewsets.ReadOnlyModelViewSet):
+class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Extrato de Movimentações da Loja"""
     queryset = StockTransaction.objects.all().order_by('-created_at')
     serializer_class = StockTransactionSerializer

@@ -43,21 +43,30 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
 
     setLoading(true);
     try {
-      // 1. Atualiza a quantidade do inventário da loja
-      await inventoryApi.update(item.id, { quantity: realQty });
+      // 1. Atualiza a quantidade do inventário da loja (suportando novo e velho padrão)
+      await inventoryApi.update(item.id, { 
+        total_quantity: realQty, 
+        quantity: realQty 
+      });
 
       // 2. Registra o histórico com a diferença (Entrada ou Saída)
       await movementsApi.create({
+        // 🚀 CORREÇÃO AQUI: Enviando os nomes exatos que o Django espera
+        transaction_type: diff > 0 ? "ENTRADA" : "SAIDA",
+        description: notes.trim() || (diff < 0 ? "Ajuste de saldo (Perda/Saída)" : "Ajuste manual de saldo (Entrada)"),
+        unit_cost: item.cost_price || 0,
+        unit_price: 0,
+
+        // Mantendo os campos antigos para o TypeScript não reclamar
         product_id: productId as string,
         batch_id: null,
         product_name: productName,
         barcode: barcode,
         movement_type: diff > 0 ? "entrada" : "saida",
-        quantity: Math.abs(diff), // Math.abs garante que só enviamos números positivos
-        unit_price: 0,
-        sale_type: diff < 0 ? "perda" : null, // Se for ajuste negativo, cataloga como "perda/ajuste"
-        notes: notes.trim() || "Correção manual de inventário",
-      });
+        quantity: Math.abs(diff), // Math.abs garante que só enviamos números absolutos
+        sale_type: diff < 0 ? "perda" : null, 
+        notes: notes.trim(),
+      } as any);
 
       toast({
         title: "Estoque ajustado!",
@@ -203,4 +212,4 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
       </div>
     </AnimatePresence>
   );
-} 
+}
