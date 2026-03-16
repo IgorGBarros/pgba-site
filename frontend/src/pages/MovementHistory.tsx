@@ -17,9 +17,7 @@ export default function MovementHistory() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Usamos 'any' temporariamente para absorver as diferenças de serialização do backend
   const [movements, setMovements] = useState<any[]>([]);
-  
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "entrada" | "saida">("all");
   const [loading, setLoading] = useState(true);
@@ -27,15 +25,10 @@ export default function MovementHistory() {
   useEffect(() => {
     if (!user) return;
     movementsApi.list().then((data: any[]) => {
-      
-      // 🚀 CORREÇÃO DEFINITIVA: O backend usa "transaction_type" e os dados do produto vêm aninhados.
       const normalizedData = data.map(m => {
-        // Transforma 'ENTRADA' ou 'SAIDA' em 'entrada' ou 'saida' minúsculo
         const tType = (m.transaction_type || m.movement_type || "").toLowerCase();
-        
         return {
           ...m,
-          // Mapeia as chaves para a lógica do frontend
           movement_type: tType,
           product_name: m.product?.name || m.product_name || "Produto Desconhecido",
           barcode: m.product?.bar_code || m.barcode || "",
@@ -53,7 +46,6 @@ export default function MovementHistory() {
     return matchSearch && matchFilter;
   });
 
-  // Math.abs garante que a soma funcione independente de vir negativo do backend
   const totalEntradas = filtered.filter((m) => m.movement_type === "entrada").reduce((s, m) => s + Math.abs(m.quantity), 0);
   const totalSaidas = filtered.filter((m) => m.movement_type === "saida").reduce((s, m) => s + Math.abs(m.quantity), 0);
   
@@ -125,44 +117,68 @@ export default function MovementHistory() {
             <p className="text-sm">Nenhuma movimentação encontrada</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {filtered.map((m, i) => {
               const typeInfo = m.sale_type ? TYPE_LABELS[m.sale_type] : null;
-              
-              // Extrai o valor absoluto para a interface
               const displayQuantity = Math.abs(m.quantity);
               
               return (
-                <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${m.movement_type === "entrada" ? "bg-primary/10" : "bg-destructive/10"}`}>
-                    {m.movement_type === "entrada" ? <ArrowUpCircle className="h-5 w-5 text-primary" /> : <ArrowDownCircle className="h-5 w-5 text-destructive" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-medium text-foreground">{m.product_name}</p>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${m.movement_type === "entrada" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
-                        {m.movement_type === "entrada" ? "Entrada" : "Saída"}
-                      </span>
+                <motion.div 
+                  key={m.id} 
+                  initial={{ opacity: 0, y: 6 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  transition={{ delay: i * 0.02 }} 
+                  // 🚀 MUDANÇA: flex-col no mobile, sm:flex-row no desktop
+                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm"
+                >
+                  
+                  {/* --- TOPO NO MOBILE / ESQUERDA NO PC (Ícone + Info) --- */}
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${m.movement_type === "entrada" ? "bg-primary/10" : "bg-destructive/10"}`}>
+                      {m.movement_type === "entrada" ? <ArrowUpCircle className="h-5 w-5 text-primary" /> : <ArrowDownCircle className="h-5 w-5 text-destructive" />}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="font-mono">{m.barcode}</span>
-                      {typeInfo && <span>· {typeInfo.emoji} {typeInfo.label}</span>}
-                      {m.description && <span>· {m.description}</span>}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-sm font-bold font-mono ${m.movement_type === "entrada" ? "text-primary" : "text-destructive"}`}>
-                      {m.movement_type === "entrada" ? "+" : "-"}{displayQuantity}
-                    </p>
-                    {m.unit_price != null && m.unit_price > 0 && (
-                      <p className="text-[10px] text-muted-foreground">{formatMoney(m.unit_price)}/un</p>
-                    )}
-                    {m.profit != null && (
-                      <p className={`text-[10px] font-medium ${m.profit >= 0 ? "text-primary" : "text-destructive"}`}>
-                        Lucro: {formatMoney(m.profit)}
+                    
+                    <div className="min-w-0 flex-1">
+                      {/* Quebra o nome longo em 2 linhas se necessário */}
+                      <p className="text-sm font-bold text-foreground line-clamp-2 leading-tight">
+                        {m.product_name}
                       </p>
-                    )}
-                    <p className="text-[10px] text-muted-foreground">{formatDate(m.created_at)}</p>
+                      
+                      {/* Flex-wrap para as tags debaixo do nome não vazarem */}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${m.movement_type === "entrada" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                          {m.movement_type === "entrada" ? "Entrada" : "Saída"}
+                        </span>
+                        <span className="font-mono bg-secondary/50 px-1.5 py-0.5 rounded">{m.barcode}</span>
+                        {typeInfo && <span className="bg-secondary px-1.5 py-0.5 rounded text-foreground">{typeInfo.emoji} {typeInfo.label}</span>}
+                        {m.description && <span className="bg-secondary/30 px-1.5 py-0.5 rounded truncate max-w-[140px]">{m.description}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* --- BASE NO MOBILE / DIREITA NO PC (Qtd, Preços + Data) --- */}
+                  <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2 border-t sm:border-t-0 border-border/50 pt-3 sm:pt-0 w-full sm:w-auto shrink-0">
+                    
+                    {/* Quantidade e Valor Uni */}
+                    <div className="flex flex-col sm:items-end gap-0.5">
+                      <p className={`text-sm font-bold font-mono ${m.movement_type === "entrada" ? "text-primary" : "text-destructive"}`}>
+                        {m.movement_type === "entrada" ? "+" : "-"}{displayQuantity} un.
+                      </p>
+                      {m.unit_price != null && m.unit_price > 0 && (
+                        <p className="text-[10px] text-muted-foreground">{formatMoney(m.unit_price)}/un</p>
+                      )}
+                    </div>
+
+                    {/* Lucro e Data */}
+                    <div className="flex flex-col items-end gap-0.5 text-right">
+                      {m.profit != null && (
+                        <p className={`text-[10px] font-medium ${m.profit >= 0 ? "text-primary" : "text-destructive"}`}>
+                          Lucro: {formatMoney(m.profit)}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground font-medium">{formatDate(m.created_at)}</p>
+                    </div>
+
                   </div>
                 </motion.div>
               );
