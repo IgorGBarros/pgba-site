@@ -36,18 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem("auth_user");
       
       if (storedToken && storedUser) {
-        // 1. Configura o token ANTES de qualquer requisição
         api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
-        
-        // 2. Restaura o usuário instantaneamente para não derrubar a sessão na tela
         setUser(JSON.parse(storedUser));
         
         try {
-          // Opcional: valida token no backend
-          await api.get("/api/profile/");
+          // 🚀 CORREÇÃO: Removido o /api/ duplicado
+          await api.get("/profile/");
         } catch (error: any) {
-          // 🚀 CORREÇÃO 1: Só limpa a sessão se o token estiver explicitamente expirado (Erro 401)
-          // Se for erro de internet ou delay, a sessão continua salva!
           if (error.response && error.response.status === 401) {
             localStorage.clear();
             delete api.defaults.headers.common["Authorization"];
@@ -64,7 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // --- LOGIN NORMAL (Email/Senha) ---
   const signIn = async (email: string, password: string) => {
     try {
-      const response = await api.post("/api/auth/login/", { email, password });
+      // 🚀 CORREÇÃO: Removido o /api/ duplicado
+      const response = await api.post("/auth/login/", { email, password });
       const { access } = response.data;
       
       const userData: User = { id: 0, email: email, name: email.split('@')[0] };
@@ -81,7 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // --- CADASTRO MANUAL ---
   const signUp = async (email: string, password: string, name: string) => {
-    await api.post("/api/auth/register/", { email, password, name });
+    // 🚀 CORREÇÃO: Removido o /api/ duplicado
+    await api.post("/auth/register/", { email, password, name });
   };
 
   // --- LOGIN GOOGLE (Firebase -> Django) ---
@@ -94,8 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error("Falha ao gerar credencial do Google.");
       }
       
-      // 🚀 CORREÇÃO 2: Adicionado o prefixo /api/ para evitar o erro 404 Not Found [1]
-      const response = await api.post("/api/auth/firebase/", { token: idToken });
+      // 🚀 CORREÇÃO: Removido o /api/ duplicado para parar de dar 404
+      const response = await api.post("/auth/firebase/", { token: idToken });
       
       const token = response.data.access; 
       
