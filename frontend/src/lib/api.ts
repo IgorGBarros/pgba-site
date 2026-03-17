@@ -6,7 +6,7 @@ import {
 // limpa barra final da base URL antes de usar
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
-    .replace(/\/$/, "")+ "/api";
+    .replace(/\/$/, "");
 
 // 🔑 token helpers
 function getToken(): string | null {
