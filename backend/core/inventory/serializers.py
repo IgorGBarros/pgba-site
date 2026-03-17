@@ -138,7 +138,9 @@ class StockTransactionSerializer(serializers.ModelSerializer):
             'description', 
             'created_at', 
             'product_name', 
-            'batch_code'
+            'batch_code',
+            'product',
+            'batch'
         ]
 
 # ==========================================
