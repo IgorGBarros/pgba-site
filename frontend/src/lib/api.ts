@@ -53,23 +53,22 @@ export interface AuthUser {
 }
 export const authApi = {
   login: (email: string, password: string) =>
-    
-    apiRequest<{ access: string; refresh: string }>("/api/auth/login/", {
+    apiRequest<{ access: string; refresh: string }>("/auth/login/", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
   register: (email: string, password: string, name: string) =>
-    apiRequest<{ token: string; user: AuthUser }>("/api/auth/register/", {
+    apiRequest<{ token: string; user: AuthUser }>("/auth/register/", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
   firebaseLogin: (firebaseIdToken: string) =>
-    apiRequest<{ access: string; refresh: string }>("/api/auth/firebase/", {
+    apiRequest<{ access: string; refresh: string }>("/auth/firebase/", {
       method: "POST",
       body: JSON.stringify({ token: firebaseIdToken }),
     }),
-  me: () => apiRequest<AuthUser>("/api/auth/me/"),
-  logout: () => apiRequest<void>("/api/auth/logout/", { method: "POST" }).catch(() => {}),
+  me: () => apiRequest<AuthUser>("/auth/me/"),
+  logout: () => apiRequest<void>("/auth/logout/", { method: "POST" }).catch(() => {}),
 };
 // ── Product (Global Catalog) ──
 export interface GlobalProduct {
