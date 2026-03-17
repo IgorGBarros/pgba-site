@@ -4,17 +4,19 @@ import axios, { AxiosError } from "axios";
 // 🔧 lê a variável de ambiente e garante formato correto
 const rawBaseUrl =(import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com";
 
-// garante que o baseURL termine com `/api/`
-// garante que termina com /api/
-const finalBaseUrl = rawBaseUrl.replace(/\/$/, "") + "/api/";
+// 🚀 CORREÇÃO: Removemos o + "/api/" para não duplicar. 
+// Apenas limpamos a barra final caso ela exista.
+const finalBaseUrl = rawBaseUrl.replace(/\/$/, "");
 
 // 🔐 token helpers
 export function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
+
 export function setToken(token: string) {
   localStorage.setItem("auth_token", token);
 }
+
 export function clearToken() {
   localStorage.removeItem("auth_token");
 }
@@ -49,7 +51,6 @@ api.interceptors.response.use(
       window.location.href = "/auth";
       return Promise.reject(error);
     }
-
     if (error.response) {
       const detail =
         (error.response.data as any)?.detail ||
@@ -59,7 +60,6 @@ api.interceptors.response.use(
     } else {
       console.error("Erro de rede ou CORS:", error.message);
     }
-
     return Promise.reject(error);
   }
 );
