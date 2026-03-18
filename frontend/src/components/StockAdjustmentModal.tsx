@@ -45,9 +45,9 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
     try {
       // 1. Atualiza a quantidade do inventário da loja (suportando novo e velho padrão)
       await inventoryApi.update(item.id, { 
-        total_quantity: realQty, 
-        quantity: realQty 
-      });
+          total_quantity: realQty, 
+          quantity: realQty 
+        }); // ✅ Correct
 
       // 2. Registra o histórico com a diferença (Entrada ou Saída)
       await movementsApi.create({
