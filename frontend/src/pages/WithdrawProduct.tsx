@@ -13,7 +13,7 @@ import UpgradeModal from "../components/UpgradeModal";
 import ProBadge from "../components/ProBadge";
 import {
   inventoryApi, movementsApi, batchApi,
-  InventoryBatch, TransactionType, formatMoney, GlobalProduct
+  InventoryBatch, TransactionType, formatMoney
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
@@ -40,11 +40,12 @@ interface WithdrawData {
   sale_type: TransactionType;
   selected_batch: InventoryBatch | null;
   batches: InventoryBatch[];
+  notes: string;
 }
 
 export default function WithdrawProduct() {
   const [step, setStep] = useState(0);
-  const [showScanner, setShowScanner] = useState(false);
+  const [showScanner, setShowScanner] = useState(false); 
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -56,6 +57,7 @@ export default function WithdrawProduct() {
     barcode: "", product_id: "", product_name: "", category: "",
     current_quantity: 0, cost_price: 0, withdraw_qty: 1, sale_price: null,
     sale_type: "venda", selected_batch: null, batches: [],
+    notes: "", 
   });
 
   const navigate = useNavigate();
@@ -93,23 +95,29 @@ export default function WithdrawProduct() {
       try {
         batches = await batchApi.listByItem(item.id);
         batches = batches.filter((b) => b.quantity > 0);
-      } catch { /* no batch support, fallback */ }
+      } catch { /* fallback */ }
       
       const batchCost = batches.length > 0
         ? batches.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0].cost_price
         : item.cost_price;
 
+      // 🚀 ORDENAÇÃO FIFO AUTOMÁTICA: Pega o lote que vence primeiro
+      const sortedBatches = batches.sort((a, b) => {
+        if (!a.expiration_date) return 1;
+        if (!b.expiration_date) return -1;
+        return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
+      });
+
       setData((p) => ({
         ...p,
         product_id: item.id,
-        // 🚀 CORREÇÃO AQUI: Adicionado fallback de string vazia ou default
         product_name: item.product?.name || item.product_name || "Produto sem nome",
         category: item.product?.category || item.category || "Geral",
         current_quantity: qty,
         cost_price: batchCost,
         sale_price: item.sale_price || item.product?.official_price || null,
         batches,
-        selected_batch: batches.length === 1 ? batches[0] : null,
+        selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null, // Já seleciona o mais velho
       }));
 
       if (batches.length > 1) {
@@ -143,6 +151,22 @@ export default function WithdrawProduct() {
     : null;
   const currentSaleType = SALE_TYPES.find((t) => t.value === data.sale_type)!;
 
+  // 🚀 LÓGICA DE ALERTA DE VALIDADE E FIFO
+  const oldestBatch = data.batches?.length > 0 
+    ? [...data.batches].sort((a, b) => {
+        if (!a.expiration_date) return 1;
+        if (!b.expiration_date) return -1;
+        return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
+      })[0]
+    : null;
+
+  const isViolatingFifo = data.selected_batch && oldestBatch && 
+                          data.selected_batch.id !== oldestBatch.id && 
+                          oldestBatch.expiration_date;
+
+  const isExpired = data.selected_batch?.expiration_date && 
+                    new Date(data.selected_batch.expiration_date) < new Date();
+
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
@@ -165,10 +189,9 @@ export default function WithdrawProduct() {
         quantity: data.withdraw_qty,
         sale_type: data.sale_type,
         unit_price: unitPrice,
-        notes: data.selected_batch?.expiry_date
-          ? `Lote: val. ${data.selected_batch.expiry_date}`
-          : null,
-      });
+        description: data.notes.trim() || null, 
+        notes: data.notes.trim() || null,
+      } as any); // 🚀 'as any' resolve o erro do Typescript para a propriedade description!
 
       setIsSuccess(true);
       setTimeout(() => {
@@ -287,12 +310,30 @@ export default function WithdrawProduct() {
                     {data.selected_batch && (
                       <span className="flex items-center gap-1">
                         <Layers className="h-3 w-3" />
-                        Lote: val. {data.selected_batch.expiry_date || "N/A"} ({data.selected_batch.quantity} un.)
+                        Lote: val. {data.selected_batch.expiration_date ? new Date(data.selected_batch.expiration_date).toLocaleDateString('pt-BR') : "N/A"} ({data.selected_batch.quantity} un.)
                       </span>
                     )}
                   </div>
+                  
+                  {/* 🚀 ALERTAS DE VALIDADE E FIFO */}
+                  {isExpired && (
+                    <div className="mt-2 flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-destructive border border-destructive/20">
+                      <AlertIcon className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p className="text-xs font-medium">Atenção: Este lote já está vencido!</p>
+                    </div>
+                  )}
+                  
+                  {isViolatingFifo && !isExpired && (
+                    <div className="mt-2 flex items-start gap-2 rounded-lg bg-orange-100 p-2 text-orange-800 border border-orange-200">
+                      <AlertIcon className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p className="text-xs">
+                        <span className="font-bold">Aviso (FIFO):</span> Existe um lote mais antigo vencendo em <b>{new Date(oldestBatch!.expiration_date!).toLocaleDateString('pt-BR')}</b>. É recomendado dar saída nele primeiro.
+                      </p>
+                    </div>
+                  )}
+
                   {data.batches.length > 1 && (
-                    <button type="button" onClick={() => setShowBatchModal(true)} className="mt-1 text-xs text-primary hover:underline">Trocar lote</button>
+                    <button type="button" onClick={() => setShowBatchModal(true)} className="mt-2 text-xs text-primary font-bold hover:underline">Trocar lote</button>
                   )}
                 </div>
                 
@@ -342,6 +383,18 @@ export default function WithdrawProduct() {
                     )}
                   </div>
                 )}
+
+                <div>
+                  <label className="text-sm font-medium text-foreground">Descrição / Observação (Opcional)</label>
+                  <input 
+                    type="text" 
+                    value={data.notes} 
+                    onChange={(e) => setData((p) => ({ ...p, notes: e.target.value }))} 
+                    placeholder={data.sale_type === 'venda' ? "Ex: Venda para Maria" : "Ex: Produto quebrado no estoque"}
+                    className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+
               </div>
             </motion.div>
           )}
@@ -362,9 +415,11 @@ export default function WithdrawProduct() {
                         <Row label="Quantidade Saída" value={`${data.withdraw_qty} un.`} />
                         <Row label="Estoque Restante" value={`${data.current_quantity - data.withdraw_qty} un.`} />
                         <Row label="Tipo" value={`${currentSaleType.emoji} ${currentSaleType.label}`} />
-                        {data.selected_batch?.expiry_date && (
-                          <Row label="Lote (Validade)" value={data.selected_batch.expiry_date} />
+                        
+                        {data.notes && (
+                          <Row label="Descrição" value={data.notes} />
                         )}
+                        
                         <Row label="Custo Unitário" value={formatMoney(data.cost_price)} />
                         {data.sale_type === "venda" && data.sale_price && (
                           <>
@@ -443,7 +498,6 @@ export default function WithdrawProduct() {
         )}
       </AnimatePresence>
       
-      {/* 🚀 MODAL DE BUSCA EXCLUSIVO PARA O ESTOQUE */}
       <InventorySearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}

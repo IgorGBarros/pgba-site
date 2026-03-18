@@ -217,17 +217,21 @@ export const batchApi = {
 export type TransactionType = "venda" | "uso_proprio" | "presente" | "brinde" | "perda";
 
 export interface Movement {
-  id: string;
-  product_id: string | null;
-  batch_id: string | null;
+  id: string | number;
+  transaction_type?: string; 
+  description?: string | null; // 🚀 ADICIONE ESTA LINHA AQUI
+  unit_cost?: number | null;
+  batch_code?: string | null;
+  product_id?: string | null;
+  batch_id?: string | null;
   product_name: string;
   barcode: string;
-  movement_type: "entrada" | "saida";
+  movement_type?: "entrada" | "saida";
   quantity: number;
   unit_price: number | null;
-  sale_type: TransactionType | null;
-  notes: string | null;
-  profit: number | null;
+  sale_type?: TransactionType | null;
+  notes?: string | null;
+  profit?: number | null;
   created_at: string;
 }
 
