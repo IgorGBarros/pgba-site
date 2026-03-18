@@ -2,10 +2,12 @@ import {
   isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
   DEMO_PROFILE, DEMO_BATCHES
 } from "./demoData";
+
 // limpa barra final da base URL antes de usar
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
     .replace(/\/$/, "");
+
 // 🔑 token helpers
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
@@ -16,6 +18,7 @@ export function setToken(token: string) {
 export function clearToken() {
   localStorage.removeItem("auth_token");
 }
+
 // 🔧 request helper
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -23,45 +26,53 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-if (token) headers["Authorization"] = `Bearer ${token}`;
+  
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  
   const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+  
   if (response.status === 401) {
     clearToken();
     window.location.href = "/auth";
     throw new Error("Sessão expirada");
   }
+  
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail || body.error || `Erro ${response.status}`);
   }
+  
   if (response.status === 204) return null as T;
   return response.json();
 }
+
 // ── Auth ──
 export interface AuthUser {
   id: number | string;
   email: string;
   name?: string;
 }
+
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest<{ access: string; refresh: string }>("/auth/login/", {
+    apiRequest<{ access: string; refresh: string }>("/api/auth/login/", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
   register: (email: string, password: string, name: string) =>
-    apiRequest<{ token: string; user: AuthUser }>("/auth/register/", {
+    apiRequest<{ token: string; user: AuthUser }>("/api/auth/register/", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
   firebaseLogin: (firebaseIdToken: string) =>
-    apiRequest<{ access: string; refresh: string }>("/auth/firebase/", {
+    apiRequest<{ access: string; refresh: string }>("/api/auth/firebase/", {
       method: "POST",
       body: JSON.stringify({ token: firebaseIdToken }),
     }),
-  me: () => apiRequest<AuthUser>("/auth/me/"),
-  logout: () => apiRequest<void>("/auth/logout/", { method: "POST" }).catch(() => {}),
+  me: () => apiRequest<AuthUser>("/api/auth/me/"),
+  logout: () => apiRequest<void>("/api/auth/logout/", { method: "POST" }).catch(() => {}),
 };
+
 // ── Product (Global Catalog) ──
 export interface GlobalProduct {
   id: number;
@@ -74,6 +85,7 @@ export interface GlobalProduct {
   brand: string | null;
   description: string | null;
 }
+
 export interface LookupResult {
   found: boolean;
   source:
@@ -82,13 +94,14 @@ export interface LookupResult {
     | "remote_learned"
     | "remote_partial"
     | "suggestion"
-    | "fuzzy"          // ✅ adiciona o valor que o front usa
-     | "none";
-  product?: GlobalProduct | null; // ✅ adiciona o campo esperado
-  suggestions?: GlobalProduct[];  // ✅ adiciona o campo usado no fuzzy match
-  data?: any;                     // opcional, cobre payloads diferentes
-  message?: string | null; // opcional, para mensagens de erro ou status
+    | "fuzzy"          
+    | "none";
+  product?: GlobalProduct | null; 
+  suggestions?: GlobalProduct[];  
+  data?: any;                     
+  message?: string | null; 
 }
+
 export const productLookupApi = {
   lookup: (barcodeOrName: string | null) => {
     const query = barcodeOrName ?? "";
@@ -102,7 +115,7 @@ export const productLookupApi = {
       body: JSON.stringify({ barcode, product_id: productId }),
     }),
 };
-// ── Inventory (user_inventory) ──
+
 // ── Inventory (user_inventory) ──
 export interface InventoryItem {
   id: string;
@@ -111,7 +124,6 @@ export interface InventoryItem {
   cost_price: number;
   sale_price: number | null;
   
-  // Objeto aninhado do produto que vem do backend
   product?: {
     id: number | string;
     name: string;
@@ -121,9 +133,8 @@ export interface InventoryItem {
     image_url: string;
     official_price: number;
   };
-  // 🚀 CORREÇÃO AQUI: Adicionando o array de lotes para resolver o erro
+  
   batches?: InventoryBatch[];
-  // Mantemos os campos legados como opcionais para não quebrar a base de demonstração
   quantity?: number;
   barcode?: string;
   product_name?: string;
@@ -139,8 +150,8 @@ export interface InventoryItem {
   created_at?: string;
   updated_at?: string;
 }
+
 export const stockApi = {
-    // ✅ criação corrigida para rota real
   create: (data: Record<string, any>) => 
     isDemoMode()
       ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
@@ -148,14 +159,21 @@ export const stockApi = {
           method: "POST",
           body: JSON.stringify(data),
         }),
-      }
+};
+
 export const inventoryApi = {
   list: () => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY)
                             : apiRequest<InventoryItem[]>("/api/inventory/")),
   get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
                                      : apiRequest<InventoryItem>(`/api/inventory/${id}/`)),
-  getByBarcode: (barcode: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.barcode === barcode) || null)
-                                                   : apiRequest<InventoryItem | null>(`/api/inventory/barcode/${barcode}/`)),
+                                     
+  // 🚀 CORREÇÃO CRÍTICA 1: Busca o inventário todo e filtra localmente para evitar 404
+  getByBarcode: async (barcode: string) => {
+    if (isDemoMode()) return DEMO_INVENTORY.find(i => i.barcode === barcode) || null;
+    
+    const items = await apiRequest<InventoryItem[]>("/api/inventory/");
+    return items.find(i => i.product?.bar_code === barcode || i.barcode === barcode) || null;
+  },
 
   update: (id: string, data: Partial<InventoryItem>) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
@@ -164,22 +182,20 @@ export const inventoryApi = {
     }),
   delete: (id: string) => apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" }),
 };
+
 // ── Inventory Batches ──
 export interface InventoryBatch {
   id: string;
   inventory_item_id: string;
   quantity: number;
   cost_price: number;
-  
-  // 🚀 ADICIONE ESTES DOIS CAMPOS (Nomes exatos do Django):
   batch_code?: string;
   expiration_date?: string | null;
-  
-  // Mantemos os antigos como opcionais para não quebrar outras telas
   expiry_date?: string | null;
   expiry_photo_url?: string | null;
   created_at: string;
 }
+
 export const batchApi = {
   listByItem: (itemId: string) => {
     if (isDemoMode()) return Promise.resolve(DEMO_BATCHES[itemId] || []);
@@ -190,12 +206,13 @@ export const batchApi = {
     return apiRequest<InventoryBatch>(`/api/inventory/${itemId}/batches/`, { method: "POST", body: JSON.stringify(data) });
   },
 };
+
 // ── Movements ──
 export type TransactionType = "venda" | "uso_proprio" | "presente" | "brinde" | "perda";
 export interface Movement {
   id: string | number;
   transaction_type?: string; 
-  description?: string | null; // 🚀 ADICIONE ESTA LINHA AQUI
+  description?: string | null; 
   unit_cost?: number | null;
   batch_code?: string | null;
   product_id?: string | null;
@@ -210,22 +227,21 @@ export interface Movement {
   profit?: number | null;
   created_at: string;
 }
+
 export const movementsApi = {
   list: () => {
     if (isDemoMode()) return Promise.resolve(DEMO_MOVEMENTS);
-    // ✅ Corrigido
     return apiRequest<Movement[]>("/api/transactions/");
   },
   create: (data: Omit<Movement, "id" | "created_at" | "profit">) => {
     if (isDemoMode()) return Promise.resolve({ id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement);
-    // ✅ Corrigido
     return apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
   },
 };
 
+// ── Admin ──
 export const adminApi = {
   listUsers: () => {
-    // 🚀 Bate na API real do Django
     return apiRequest<any[]>("/api/admin/users/");
   },
   updatePlan: (id: string | number, plan: "free" | "pro") => {
@@ -241,6 +257,7 @@ export const adminApi = {
     });
   }
 };
+
 // ── Profile ──
 export interface Profile {
   id: string;
@@ -250,6 +267,7 @@ export interface Profile {
   store_slug: string | null;
   plan: "free" | "pro";
 }
+
 export const profileApi = {
   get: () => {
     if (isDemoMode()) return Promise.resolve(DEMO_PROFILE);
@@ -260,6 +278,7 @@ export const profileApi = {
     return apiRequest<Profile>("/api/profile/", { method: "PATCH", body: JSON.stringify(data) });
   },
 };
+
 // ── Storefront (public) ──
 export interface StorefrontItem {
   id: string;
@@ -276,6 +295,7 @@ export interface StorefrontItem {
   image_url: string | null;
   store_slug: string | null;
 }
+
 export const storefrontApi = {
   list: (sellerId?: string) => {
     if (isDemoMode() || sellerId === "demo") {
@@ -291,7 +311,6 @@ export const storefrontApi = {
         .filter((i) => i.is_available_storefront && (i.quantity ?? 0) > 0)
         .map((i) => ({
           id: i.id,
-          // 🚀 Fallbacks adicionados para satisfazer a interface StorefrontItem
           product_name: i.product?.name || i.product_name || "Produto Demo",
           display_name: i.custom_name || i.product?.name || i.product_name || "Produto Demo",
           custom_name: i.custom_name || null,
@@ -307,17 +326,19 @@ export const storefrontApi = {
         }));
       return Promise.resolve(demoItems);
     }
-    // Support both slug and ID
     const params = sellerId ? `?seller=${sellerId}` : "";
     return apiRequest<StorefrontItem[]>(`/api/storefront/${params}`);
   },
   listBySlug: (slug: string) => {
     if (slug === "demo") return storefrontApi.list("demo");
-    return apiRequest<StorefrontItem[]>(`/api/storefront/${slug}`);
+    // 🚀 CORREÇÃO CRÍTICA 2: Barra "/" no final evita erros 301 ou 404
+    return apiRequest<StorefrontItem[]>(`/api/storefront/${slug}/`);
   },
 };
+
 // ── Products (Django legacy) ──
 export { productService } from "./productService";
+
 // ── OCR (file upload) ──
 export const ocrApi = {
   uploadAndExtract: async (file: File): Promise<{ expiry_date?: string; photo_url?: string }> => {
@@ -333,11 +354,13 @@ export const ocrApi = {
     return response.json();
   },
 };
+
 // ── Helpers ──
 export function formatMoney(value: number | null | undefined): string {
   if (value == null || isNaN(value)) return "—";
   return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
 export const salesApi = {
   checkout: (payload: any) =>
     apiRequest<{ message: string; total: number }>("/api/sales/checkout/", {
