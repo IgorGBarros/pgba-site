@@ -17,13 +17,12 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // 🚀 LÓGICA DE EXTRAÇÃO SEGURA (COMPATÍVEL COM O NOVO BACKEND)
+  // 🚀 LÓGICA DE EXTRAÇÃO SEGURA
   const systemQty = item?.total_quantity ?? item?.quantity ?? 0;
   const productName = item?.product?.name || item?.product_name || "Produto Desconhecido";
   const barcode = item?.product?.bar_code || item?.barcode || "";
   const productId = item?.product?.id || item?.id;
 
-  // Atualiza o estado inicial sempre que o modal abrir ou o item mudar
   useEffect(() => {
     if (isOpen && item) {
       setRealQty(systemQty);
@@ -43,27 +42,29 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
 
     setLoading(true);
     try {
-      // 1. Atualiza a quantidade do inventário da loja (suportando novo e velho padrão)
+      // 1. Atualiza a quantidade do inventário da loja
       await inventoryApi.update(item.id, { 
-        total_quantity: realQty, 
+        total_quantity: realQty,
         quantity: realQty 
       });
 
-      // 2. Registra o histórico com a diferença (Entrada ou Saída)
+      // 2. Registra o histórico com a diferença
       await movementsApi.create({
-        // 🚀 CORREÇÃO AQUI: Enviando os nomes exatos que o Django espera
-        transaction_type: diff > 0 ? "ENTRADA" : "SAIDA",
+        // 🚀 CORREÇÃO 1: Usando as chaves exatas que o Django espera
+        product: productId, 
+        product_id: productId as string,
+        
+        // 🚀 CORREÇÃO 2: "SAIDA" não é válido. O Django espera "AJUSTE" ou "ENTRADA"
+        transaction_type: diff > 0 ? "ENTRADA" : "AJUSTE",
+        
         description: notes.trim() || (diff < 0 ? "Ajuste de saldo (Perda/Saída)" : "Ajuste manual de saldo (Entrada)"),
         unit_cost: item.cost_price || 0,
         unit_price: 0,
-
-        // Mantendo os campos antigos para o TypeScript não reclamar
-        product_id: productId as string,
         batch_id: null,
         product_name: productName,
         barcode: barcode,
         movement_type: diff > 0 ? "entrada" : "saida",
-        quantity: Math.abs(diff), // Math.abs garante que só enviamos números absolutos
+        quantity: Math.abs(diff), 
         sale_type: diff < 0 ? "perda" : null, 
         notes: notes.trim(),
       } as any);
