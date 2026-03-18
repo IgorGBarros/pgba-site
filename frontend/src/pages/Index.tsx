@@ -163,7 +163,7 @@ export default function Index() {
           <ActionBtn
             onClick={() => {
               if (storeSlug) {
-                window.open(`https://gestao-estoque-one.vercel.app/store/${storeSlug}`, "_blank");
+                window.open(`https://gestao-estoque-one.vercel.app/vitrine/${storeSlug}`, "_blank");
               } else {
                 navigate("/settings");
               }
