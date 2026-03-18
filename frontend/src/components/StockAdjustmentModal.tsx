@@ -21,7 +21,9 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
   const systemQty = item?.total_quantity ?? item?.quantity ?? 0;
   const productName = item?.product?.name || item?.product_name || "Produto Desconhecido";
   const barcode = item?.product?.bar_code || item?.barcode || "";
-  const productId = item?.product?.id || item?.id;
+  
+  // 🚀 CORREÇÃO: Força pegar o ID do Catálogo, nunca o ID do Estoque local!
+  const productId = item?.product?.id || item?.product_id; 
 
   useEffect(() => {
     if (isOpen && item) {

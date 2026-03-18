@@ -110,7 +110,8 @@ export default function WithdrawProduct() {
 
       setData((p) => ({
         ...p,
-        product_id: item.id,
+        // 🚀 CORREÇÃO: Pega o ID real do produto no catálogo global!
+        product_id: item.product?.id || item.product_id, 
         product_name: item.product?.name || item.product_name || "Produto sem nome",
         category: item.product?.category || item.category || "Geral",
         current_quantity: qty,
