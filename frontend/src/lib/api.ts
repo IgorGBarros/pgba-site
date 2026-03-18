@@ -118,6 +118,7 @@ export const productLookupApi = {
 
 // ── Inventory (user_inventory) ──
 export interface InventoryItem {
+  product_id: string | number | undefined;
   id: string;
   total_quantity?: number;
   min_quantity?: number;

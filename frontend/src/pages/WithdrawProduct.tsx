@@ -101,7 +101,6 @@ export default function WithdrawProduct() {
         ? batches.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0].cost_price
         : item.cost_price;
 
-      // 🚀 ORDENAÇÃO FIFO AUTOMÁTICA: Pega o lote que vence primeiro
       const sortedBatches = batches.sort((a, b) => {
         if (!a.expiration_date) return 1;
         if (!b.expiration_date) return -1;
@@ -110,15 +109,14 @@ export default function WithdrawProduct() {
 
       setData((p) => ({
         ...p,
-        // 🚀 CORREÇÃO: Pega o ID real do produto no catálogo global!
-        product_id: item.product?.id || item.product_id, 
+        product_id: String(item.product?.id || item.product_id || item.id),
         product_name: item.product?.name || item.product_name || "Produto sem nome",
         category: item.product?.category || item.category || "Geral",
         current_quantity: qty,
         cost_price: batchCost,
         sale_price: item.sale_price || item.product?.official_price || null,
         batches,
-        selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null, // Já seleciona o mais velho
+        selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null,
       }));
 
       if (batches.length > 1) {
@@ -152,7 +150,6 @@ export default function WithdrawProduct() {
     : null;
   const currentSaleType = SALE_TYPES.find((t) => t.value === data.sale_type)!;
 
-  // 🚀 LÓGICA DE ALERTA DE VALIDADE E FIFO
   const oldestBatch = data.batches?.length > 0 
     ? [...data.batches].sort((a, b) => {
         if (!a.expiration_date) return 1;
@@ -182,7 +179,9 @@ export default function WithdrawProduct() {
       const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
       
       await movementsApi.create({
+        // 🚀 CORREÇÃO 1: Campo exato que o Django espera para a chave estrangeira
         product: data.product_id,
+        // 🚀 CORREÇÃO 2: Formato exato do tipo de transação pro Django
         transaction_type: data.sale_type ? data.sale_type.toUpperCase() : "SAIDA",
         
         product_id: data.product_id,
@@ -194,7 +193,7 @@ export default function WithdrawProduct() {
         sale_type: data.sale_type,
         unit_price: unitPrice,
         
-        // 🚀 CORREÇÃO AQUI: Substituído 'null' por '""' (string vazia)
+        // 🚀 CORREÇÃO 3: Enviando string vazia em vez de null para não quebrar o banco
         description: data.notes.trim() || "", 
         notes: data.notes.trim() || "",
       } as any);
@@ -321,7 +320,6 @@ export default function WithdrawProduct() {
                     )}
                   </div>
                   
-                  {/* 🚀 ALERTAS DE VALIDADE E FIFO */}
                   {isExpired && (
                     <div className="mt-2 flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-destructive border border-destructive/20">
                       <AlertIcon className="h-4 w-4 shrink-0 mt-0.5" />
