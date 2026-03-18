@@ -181,6 +181,11 @@ export default function WithdrawProduct() {
       const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
       
       await movementsApi.create({
+        // 🚀 CORREÇÃO AQUI: Campos exatos que o Django exige
+        product: data.product_id,
+        transaction_type: data.sale_type ? data.sale_type.toUpperCase() : "SAIDA",
+        
+        // Campos legados para o TypeScript/Frontend não quebrar
         product_id: data.product_id,
         batch_id: data.selected_batch?.id || null,
         product_name: data.product_name,
@@ -191,7 +196,7 @@ export default function WithdrawProduct() {
         unit_price: unitPrice,
         description: data.notes.trim() || null, 
         notes: data.notes.trim() || null,
-      } as any); // 🚀 'as any' resolve o erro do Typescript para a propriedade description!
+      } as any); // O 'as any' permite mesclar os formatos
 
       setIsSuccess(true);
       setTimeout(() => {
