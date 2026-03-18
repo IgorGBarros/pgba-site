@@ -30,7 +30,7 @@ const SALE_TYPES: { value: TransactionType; label: string; emoji: string; icon: 
 
 interface WithdrawData {
   barcode: string;
-  product_id: string;
+  product_id: string; // Garantido como string
   product_name: string;
   category: string;
   current_quantity: number;
@@ -40,7 +40,7 @@ interface WithdrawData {
   sale_type: TransactionType;
   selected_batch: InventoryBatch | null;
   batches: InventoryBatch[];
-  notes: string;
+  notes: string; 
 }
 
 export default function WithdrawProduct() {
@@ -109,7 +109,8 @@ export default function WithdrawProduct() {
 
       setData((p) => ({
         ...p,
-        product_id: String(item.product?.id || item.product_id || item.id),
+        // 🚀 CORREÇÃO: Envolvendo o ID com String() para evitar o erro do TypeScript
+        product_id: String(item.product?.id || item.id), 
         product_name: item.product?.name || item.product_name || "Produto sem nome",
         category: item.product?.category || item.category || "Geral",
         current_quantity: qty,
@@ -170,7 +171,7 @@ export default function WithdrawProduct() {
     setLoading(true);
     try {
       const newQty = data.current_quantity - data.withdraw_qty;
-      await inventoryApi.update(data.product_id, {
+      await inventoryApi.update(data.product_id, { // Atualiza o estoque 
         quantity: newQty,
         sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
         sale_type: data.sale_type,
@@ -179,11 +180,8 @@ export default function WithdrawProduct() {
       const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
       
       await movementsApi.create({
-        // 🚀 CORREÇÃO 1: Campo exato que o Django espera para a chave estrangeira
-        product: data.product_id,
-        // 🚀 CORREÇÃO 2: Formato exato do tipo de transação pro Django
+        product: data.product_id, // Enviando exato como o Django espera
         transaction_type: data.sale_type ? data.sale_type.toUpperCase() : "SAIDA",
-        
         product_id: data.product_id,
         batch_id: data.selected_batch?.id || null,
         product_name: data.product_name,
@@ -192,8 +190,6 @@ export default function WithdrawProduct() {
         quantity: data.withdraw_qty,
         sale_type: data.sale_type,
         unit_price: unitPrice,
-        
-        // 🚀 CORREÇÃO 3: Enviando string vazia em vez de null para não quebrar o banco
         description: data.notes.trim() || "", 
         notes: data.notes.trim() || "",
       } as any);
@@ -202,7 +198,6 @@ export default function WithdrawProduct() {
       setTimeout(() => {
         navigate("/");
       }, 2000);
-
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -320,6 +315,7 @@ export default function WithdrawProduct() {
                     )}
                   </div>
                   
+                  {/* ALERTAS DE VALIDADE E FIFO */}
                   {isExpired && (
                     <div className="mt-2 flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-destructive border border-destructive/20">
                       <AlertIcon className="h-4 w-4 shrink-0 mt-0.5" />
