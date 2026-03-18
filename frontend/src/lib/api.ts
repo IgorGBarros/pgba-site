@@ -2,12 +2,10 @@ import {
   isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
   DEMO_PROFILE, DEMO_BATCHES
 } from "./demoData";
-
 // limpa barra final da base URL antes de usar
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
     .replace(/\/$/, "");
-
 // 🔑 token helpers
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
@@ -18,7 +16,6 @@ export function setToken(token: string) {
 export function clearToken() {
   localStorage.removeItem("auth_token");
 }
-
 // 🔧 request helper
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -27,24 +24,19 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     ...(options.headers as Record<string, string>),
   };
 if (token) headers["Authorization"] = `Bearer ${token}`;
-
   const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-
   if (response.status === 401) {
     clearToken();
     window.location.href = "/auth";
     throw new Error("Sessão expirada");
   }
-
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail || body.error || `Erro ${response.status}`);
   }
-
   if (response.status === 204) return null as T;
   return response.json();
 }
-
 // ── Auth ──
 export interface AuthUser {
   id: number | string;
@@ -82,7 +74,6 @@ export interface GlobalProduct {
   brand: string | null;
   description: string | null;
 }
-
 export interface LookupResult {
   found: boolean;
   source:
@@ -98,7 +89,6 @@ export interface LookupResult {
   data?: any;                     // opcional, cobre payloads diferentes
   message?: string | null; // opcional, para mensagens de erro ou status
 }
-
 export const productLookupApi = {
   lookup: (barcodeOrName: string | null) => {
     const query = barcodeOrName ?? "";
@@ -112,7 +102,6 @@ export const productLookupApi = {
       body: JSON.stringify({ barcode, product_id: productId }),
     }),
 };
-
 // ── Inventory (user_inventory) ──
 // ── Inventory (user_inventory) ──
 export interface InventoryItem {
@@ -132,10 +121,8 @@ export interface InventoryItem {
     image_url: string;
     official_price: number;
   };
-
   // 🚀 CORREÇÃO AQUI: Adicionando o array de lotes para resolver o erro
   batches?: InventoryBatch[];
-
   // Mantemos os campos legados como opcionais para não quebrar a base de demonstração
   quantity?: number;
   barcode?: string;
@@ -162,28 +149,21 @@ export const stockApi = {
           body: JSON.stringify(data),
         }),
       }
-
 export const inventoryApi = {
   list: () => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY)
                             : apiRequest<InventoryItem[]>("/api/inventory/")),
-
   get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
                                      : apiRequest<InventoryItem>(`/api/inventory/${id}/`)),
-
   getByBarcode: (barcode: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.barcode === barcode) || null)
                                                    : apiRequest<InventoryItem | null>(`/api/inventory/barcode/${barcode}/`)),
-
-
 
   update: (id: string, data: Partial<InventoryItem>) =>
     apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-
   delete: (id: string) => apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" }),
 };
-
 // ── Inventory Batches ──
 export interface InventoryBatch {
   id: string;
@@ -200,22 +180,18 @@ export interface InventoryBatch {
   expiry_photo_url?: string | null;
   created_at: string;
 }
-
 export const batchApi = {
   listByItem: (itemId: string) => {
     if (isDemoMode()) return Promise.resolve(DEMO_BATCHES[itemId] || []);
     return apiRequest<InventoryBatch[]>(`/api/inventory/${itemId}/batches/`);
   },
-
   create: (itemId: string, data: Omit<InventoryBatch, "id" | "inventory_item_id" | "created_at">) => {
     if (isDemoMode()) return Promise.resolve({ id: "b-new", inventory_item_id: itemId, created_at: new Date().toISOString(), ...data } as InventoryBatch);
     return apiRequest<InventoryBatch>(`/api/inventory/${itemId}/batches/`, { method: "POST", body: JSON.stringify(data) });
   },
 };
-
 // ── Movements ──
 export type TransactionType = "venda" | "uso_proprio" | "presente" | "brinde" | "perda";
-
 export interface Movement {
   id: string | number;
   transaction_type?: string; 
@@ -234,7 +210,6 @@ export interface Movement {
   profit?: number | null;
   created_at: string;
 }
-
 export const movementsApi = {
   list: () => {
     if (isDemoMode()) return Promise.resolve(DEMO_MOVEMENTS);
@@ -247,8 +222,6 @@ export const movementsApi = {
     return apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
   },
 };
-
-
 
 export const adminApi = {
   listUsers: () => {
@@ -277,19 +250,16 @@ export interface Profile {
   store_slug: string | null;
   plan: "free" | "pro";
 }
-
 export const profileApi = {
   get: () => {
     if (isDemoMode()) return Promise.resolve(DEMO_PROFILE);
     return apiRequest<Profile>("/api/profile/");
   },
-
   update: (data: Partial<Profile>) => {
     if (isDemoMode()) return Promise.resolve({ ...DEMO_PROFILE, ...data } as Profile);
     return apiRequest<Profile>("/api/profile/", { method: "PATCH", body: JSON.stringify(data) });
   },
 };
-
 // ── Storefront (public) ──
 export interface StorefrontItem {
   id: string;
@@ -306,7 +276,6 @@ export interface StorefrontItem {
   image_url: string | null;
   store_slug: string | null;
 }
-
 export const storefrontApi = {
   list: (sellerId?: string) => {
     if (isDemoMode() || sellerId === "demo") {
@@ -338,39 +307,32 @@ export const storefrontApi = {
         }));
       return Promise.resolve(demoItems);
     }
-
     // Support both slug and ID
     const params = sellerId ? `?seller=${sellerId}` : "";
     return apiRequest<StorefrontItem[]>(`/api/storefront/${params}`);
   },
-
   listBySlug: (slug: string) => {
     if (slug === "demo") return storefrontApi.list("demo");
     return apiRequest<StorefrontItem[]>(`/api/storefront/${slug}`);
   },
 };
-
 // ── Products (Django legacy) ──
 export { productService } from "./productService";
-
 // ── OCR (file upload) ──
 export const ocrApi = {
   uploadAndExtract: async (file: File): Promise<{ expiry_date?: string; photo_url?: string }> => {
     const token = getToken();
     const formData = new FormData();
     formData.append("image", file);
-
     const response = await fetch(`${API_BASE_URL}/api/ocr-expiry/`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
-
     if (!response.ok) throw new Error("Erro ao processar imagem");
     return response.json();
   },
 };
-
 // ── Helpers ──
 export function formatMoney(value: number | null | undefined): string {
   if (value == null || isNaN(value)) return "—";
