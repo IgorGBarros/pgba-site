@@ -173,7 +173,7 @@ export default function WithdrawProduct() {
     setLoading(true);
     try {
       const newQty = data.current_quantity - data.withdraw_qty;
-      await inventoryApi.update(data.product_id, { // Atualiza o estoque 
+      await inventoryApi.update(data.inventory_id,  { // Atualiza o estoque 
         total_quantity: newQty, // Força o formato novo do backend
         quantity: newQty,       // Força o formato antigo
         sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
