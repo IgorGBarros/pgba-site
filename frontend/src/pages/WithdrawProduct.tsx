@@ -30,7 +30,7 @@ const SALE_TYPES: { value: TransactionType; label: string; emoji: string; icon: 
 
 interface WithdrawData {
   barcode: string;
-  product_id: string;
+  product_id: string; // Garantido como string
   product_name: string;
   category: string;
   current_quantity: number;
@@ -40,7 +40,7 @@ interface WithdrawData {
   sale_type: TransactionType;
   selected_batch: InventoryBatch | null;
   batches: InventoryBatch[];
-  notes: string;
+  notes: string; 
 }
 
 export default function WithdrawProduct() {
@@ -109,6 +109,7 @@ export default function WithdrawProduct() {
 
       setData((p) => ({
         ...p,
+        // 🚀 CORREÇÃO: Envolvendo o ID com String() para evitar o erro do TypeScript
         product_id: String(item.product?.id || item.id), 
         product_name: item.product?.name || item.product_name || "Produto sem nome",
         category: item.product?.category || item.category || "Geral",
@@ -179,7 +180,7 @@ export default function WithdrawProduct() {
       const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
       
       await movementsApi.create({
-        product: data.product_id,
+        product: data.product_id, // Enviando exato como o Django espera
         transaction_type: data.sale_type ? data.sale_type.toUpperCase() : "SAIDA",
         product_id: data.product_id,
         batch_id: data.selected_batch?.id || null,
@@ -188,12 +189,7 @@ export default function WithdrawProduct() {
         movement_type: "saida",
         quantity: data.withdraw_qty,
         sale_type: data.sale_type,
-        
-        // 🚀 CORREÇÃO AQUI: Enviando o Preço de Venda, Preço de Custo e Lucro para o Banco!
         unit_price: unitPrice,
-        unit_cost: data.cost_price || 0,
-        profit: profit || 0,
-
         description: data.notes.trim() || "", 
         notes: data.notes.trim() || "",
       } as any);
