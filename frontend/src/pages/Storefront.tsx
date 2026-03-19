@@ -6,6 +6,7 @@ import { storefrontApi, StorefrontItem } from "../lib/api";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../components/ui/sheet";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
+import { toast } from "../hooks/use-toast";
 
 type PaymentMethod = "pix" | "cartao";
 
@@ -39,27 +40,50 @@ export default function Storefront() {
   const [items, setItems] = useState<StorefrontItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  
   const [sellerName, setSellerName] = useState("");
   const [sellerWhatsapp, setSellerWhatsapp] = useState("");
+  
   const [bag, setBag] = useState<BagItem[]>(loadCart);
   const [bagOpen, setBagOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(loadPayment);
 
-  // Persist cart to localStorage on every change
+  // Persiste a sacola e a forma de pagamento localmente
   useEffect(() => { saveCart(bag); }, [bag]);
   useEffect(() => { localStorage.setItem(CART_PAYMENT_KEY, paymentMethod); }, [paymentMethod]);
 
+  // 🚀 CORREÇÃO CRÍTICA: Leitura correta do formato do Django { store: {...}, items: [...] }
   useEffect(() => {
     const fetchItems = slug
       ? storefrontApi.listBySlug(slug)
       : storefrontApi.list(sellerIdParam || undefined);
       
-    fetchItems.then((results) => {
-      setItems(results);
-      if (results.length > 0) {
-        setSellerName(results[0].seller_name || "Consultor(a)");
-        setSellerWhatsapp(results[0].seller_whatsapp || "");
+    fetchItems.then((res: any) => {
+      // O Django retorna res.items e res.store. O Demo retorna um Array direto.
+      const productsList = res.items ? res.items : (Array.isArray(res) ? res : []);
+      
+      // Mapeia os dados aninhados do Django para o formato plano da Vitrine
+      const mappedItems = productsList.map((item: any) => ({
+        id: item.id,
+        product_name: item.product?.name || item.product_name || "Produto",
+        display_name: item.product?.name || item.display_name || item.product_name || "Produto",
+        category: item.product?.category || item.category || "Geral",
+        sale_price: item.sale_price || item.product?.official_price || 0,
+        total_quantity: item.total_quantity || item.qty || 0,
+        image_url: item.product?.image_url || item.image_url || null,
+      }));
+
+      setItems(mappedItems);
+
+      // Define os dados do lojista
+      if (res.store) {
+        setSellerName(res.store.name || "Consultor(a)");
+        setSellerWhatsapp(res.store.whatsapp || "");
+      } else if (mappedItems.length > 0) {
+        setSellerName(mappedItems[0].seller_name || "Consultor(a)");
+        setSellerWhatsapp(mappedItems[0].seller_whatsapp || "");
       }
+      
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [slug, sellerIdParam]);
@@ -97,16 +121,20 @@ export default function Storefront() {
   const paymentLabel = paymentMethod === "pix" ? "PIX" : "Cartão / Link de Pagamento";
   const getDisplayName = (item: StorefrontItem | BagItem) => item.display_name || item.product_name;
 
-  // 🚀 LÓGICA DO WHATSAPP SEGURA
+  // 🚀 LÓGICA DO WHATSAPP SEGURA E CODIFICADA CORRETAMENTE
   const buildWhatsappLink = (itemsList: BagItem[]) => {
-    const phone = sellerWhatsapp?.replace(/\D/g, ""); // Remove tudo que não é número
+    // Remove qualquer formatação, garantindo que o número fique limpo
+    const rawPhone = sellerWhatsapp?.replace(/\D/g, "") || "";
+    // Adiciona o DDI (55) caso a consultora não tenha digitado
+    const phone = rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`;
     
     if (itemsList.length === 1 && itemsList[0].qty === 1) {
       const name = getDisplayName(itemsList[0]);
       const priceText = itemsList[0].sale_price ? ` — R$ ${itemsList[0].sale_price.toFixed(2).replace('.', ',')}` : "";
       
       const msg = `Olá ${sellerName}! 😊\n\nTenho interesse no produto:\n• ${name}${priceText}\n\n💳 Forma de pagamento: *${paymentLabel}*\n\nEstá disponível?`;
-      return `https://api.whatsapp.com/send/?phone=55${phone}&text=${encodeURIComponent(msg)}`;
+      // encodeURIComponent converte os \n e espaços em códigos que a URL entende perfeitamente
+      return `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(msg)}`;
     }
     
     const lines = itemsList.map(
@@ -115,11 +143,14 @@ export default function Storefront() {
     
     const msg = `Olá ${sellerName}! 😊\n\nGostaria de solicitar os seguintes produtos:\n\n${lines.join("\n")}\n\n💰 Total estimado: *R$ ${bagTotal.toFixed(2).replace('.', ',')}*\n💳 Forma de pagamento: *${paymentLabel}*\n\nPode verificar a disponibilidade e me retornar? Obrigada!`;
     
-    return `https://api.whatsapp.com/send/?phone=55${phone}&text=${encodeURIComponent(msg)}`;
+    return `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(msg)}`;
   };
 
   const handleDirectBuy = (item: StorefrontItem) => {
-    if (!sellerWhatsapp) return;
+    if (!sellerWhatsapp) {
+      toast({ title: "Aviso", description: "O lojista não configurou o número de WhatsApp.", variant: "destructive" });
+      return;
+    }
     addToBag(item);
     setBagOpen(true);
   };
@@ -278,16 +309,14 @@ export default function Storefront() {
                         <Plus className="h-3.5 w-3.5 mr-1" /> Sacola
                       </Button>
                       
-                      {sellerWhatsapp && (
-                        <Button
-                          size="sm"
-                          className="rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm transition-all h-9 w-9 p-0 shrink-0"
-                          onClick={() => handleDirectBuy(item)}
-                          title="Pedir pelo WhatsApp"
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        className="rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm transition-all h-9 w-9 p-0 shrink-0"
+                        onClick={() => handleDirectBuy(item)}
+                        title="Pedir pelo WhatsApp"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </motion.div>
@@ -435,7 +464,6 @@ export default function Storefront() {
               <div className="space-y-2 pt-2">
                 <Button
                   onClick={handleSendOrder}
-                  disabled={!sellerWhatsapp}
                   className="w-full h-14 gap-2 rounded-xl bg-[#25D366] text-base font-bold text-white shadow-lg hover:bg-[#128C7E] transition-all hover:scale-[1.02]"
                 >
                   <Send className="h-5 w-5" />
