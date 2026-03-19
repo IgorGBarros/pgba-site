@@ -1,27 +1,25 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
-  Package, TrendingDown, DollarSign, BarChart3, Plus, ScanBarcode, List,
-  ArrowDownCircle, Settings, PieChart, Store, History, User
+  Package, TrendingDown, DollarSign, BarChart3, ScanBarcode, List,
+  ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2
 } from "lucide-react";
-import { inventoryApi, movementsApi, profileApi } from "../lib/api"; 
+import { AnimatePresence, motion } from "framer-motion";
+import { inventoryApi, movementsApi, profileApi } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
 import { useFeatureGates } from "../hooks/useFeatureGates";
-import { useExpiryAlerts } from "../hooks/useExpiryAlerts";
 import { ChatAssistant } from "../components/ChatAssistant";
-import NotificationBell from "../components/NotificationBell";
 import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
 import ProfileCompletionBanner from "../components/ProfileCompletionBanner";
 
 interface Stats {
-  totalProducts: number;
-  lowStockCount: number;
-  totalValue: number;
+  investedValue: number;
+  potentialValue: number;
+  projectedProfit: number;
   monthSales: number;
   monthProfit: number;
-  lowStockItems: { name: string; qty: number; min: number }[];
 }
 
 export default function Index() {
@@ -30,18 +28,20 @@ export default function Index() {
   const { isLocked } = useFeatureGates();
   
   const [stats, setStats] = useState<Stats>({
-    totalProducts: 0,
-    lowStockCount: 0,
-    totalValue: 0,
+    investedValue: 0,
+    potentialValue: 0,
+    projectedProfit: 0,
     monthSales: 0,
     monthProfit: 0,
-    lowStockItems: [],
   });
   
   const [loading, setLoading] = useState(true);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
+  
+  // 🚀 ESTADO PARA O MODAL DO SINO DE NOTIFICAÇÕES
+  const [showNotif, setShowNotif] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -53,50 +53,43 @@ export default function Index() {
       
     Promise.all([inventoryApi.list(), movementsApi.list()])
       .then(([items, movements]) => {
-        // 🚀 CORREÇÃO 1: Extração segura do Estoque Baixo
-        const lowItems = items.filter((i) => {
-          const qty = i.total_quantity ?? i.quantity ?? 0;
-          const min = i.min_quantity ?? 5;
-          return qty <= min && qty > 0;
-        });
-
         const now = new Date();
         
-        // 🚀 CORREÇÃO 2: Normalização dos Movimentos
+        // Movimentos do mês
         const monthMovements = movements.filter((m) => {
           const d = new Date(m.created_at);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         }).map(m => ({
           ...m,
-          // Garante que a checagem funciona independente da serialização do backend
           movement_type: (m as any).transaction_type?.toLowerCase() || m.movement_type || "saida"
         }));
 
         const salesMovements = monthMovements.filter((m) => m.movement_type === "saida" && m.sale_type === "venda");
-
-        const monthSales = salesMovements.reduce((s, m) => s + (m.unit_price || 0) * Math.abs(m.quantity), 0);
+        const monthSales = salesMovements.reduce((s, m) => s + (Number(m.unit_price) || 0) * Math.abs(m.quantity), 0);
         
         const monthCost = salesMovements.reduce((s, m) => {
-          // Busca o item no array pelo código de barras aninhado ou legado
           const item = items.find((i) => (i.product?.bar_code || i.barcode) === m.barcode);
           return s + (item ? item.cost_price : 0) * Math.abs(m.quantity);
         }, 0);
 
+        // 🚀 CÁLCULO DOS NOVOS INDICADORES FINANCEIROS
+        const totalInvested = items.reduce((s, i) => {
+          const qty = i.total_quantity ?? i.quantity ?? 0;
+          return s + (qty * i.cost_price);
+        }, 0);
+
+        const totalPotential = items.reduce((s, i) => {
+          const qty = i.total_quantity ?? i.quantity ?? 0;
+          const salePrice = i.sale_price || i.product?.official_price || 0;
+          return s + (qty * salePrice);
+        }, 0);
+
         setStats({
-          totalProducts: items.length,
-          lowStockCount: lowItems.length,
-          totalValue: items.reduce((s, i) => {
-            const qty = i.total_quantity ?? i.quantity ?? 0;
-            return s + qty * i.cost_price;
-          }, 0),
+          investedValue: totalInvested,
+          potentialValue: totalPotential,
+          projectedProfit: totalPotential - totalInvested,
           monthSales,
           monthProfit: monthSales - monthCost,
-          // 🚀 CORREÇÃO 3: Fallback obrigatório para string/number garantindo a tipagem Stats
-          lowStockItems: lowItems.slice(0, 5).map((i) => ({
-            name: i.product?.name || i.product_name || "Produto sem nome",
-            qty: i.total_quantity ?? i.quantity ?? 0,
-            min: i.min_quantity ?? 5,
-          })),
         });
         
         setLoading(false);
@@ -106,20 +99,20 @@ export default function Index() {
 
   const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   
+  // 🚀 CARDS RENOMEADOS FOCADOS EM DINHEIRO E LUCRO
   const statCards = [
-    { label: "Total Produtos", value: String(stats.totalProducts), icon: Package },
-    { label: "Estoque Baixo", value: String(stats.lowStockCount), icon: TrendingDown },
-    { label: "Vendas do Mês", value: fmt(stats.monthSales), icon: DollarSign },
-    { label: "Lucro Estimado", value: fmt(stats.monthProfit), icon: BarChart3 },
-    { label: "Valor Total", value: fmt(stats.totalValue), icon: DollarSign },
+    { label: "Valor Investido", value: fmt(stats.investedValue), icon: Package, color: "text-muted-foreground" },
+    { label: "Potencial de Venda", value: fmt(stats.potentialValue), icon: DollarSign, color: "text-primary" },
+    { label: "Lucro Projetado", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-emerald-600" },
+    { label: "Vendas do Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
               <Package className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
@@ -127,61 +120,100 @@ export default function Index() {
               <p className="text-xs text-muted-foreground">Gestão inteligente de inventário</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <NotificationBell />
-            <button onClick={() => navigate("/profile")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
+          
+          <div className="flex items-center gap-1 relative">
+            {/* 🚀 MODAL DO SINO ADICIONADO AQUI */}
+            <button 
+              onClick={() => setShowNotif(!showNotif)} 
+              className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              <Bell className="h-5 w-5" />
+            </button>
+
+            <AnimatePresence>
+              {showNotif && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 top-12 mt-2 w-72 bg-card border border-border rounded-xl shadow-xl p-4 z-50"
+                >
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Tudo tranquilo por aqui!</p>
+                      <p className="text-xs text-muted-foreground mt-1">Você não possui nenhum alerta de estoque baixo ou validade no momento.</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button onClick={() => navigate("/profile")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
               <User className="h-5 w-5" />
             </button>
-            <button onClick={() => navigate("/settings")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <button onClick={() => navigate("/settings")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
               <Settings className="h-5 w-5" />
             </button>
           </div>
         </div>
       </header>
+
       <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
         <ProfileCompletionBanner />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        
+        {/* CARDS COM SKELETON LOADING PARA EVITAR ANSIEDADE */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {statCards.map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-md">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{stat.label}</span>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
+            <div key={stat.label} className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase text-muted-foreground">{stat.label}</span>
+                <stat.icon className={`h-4 w-4 ${stat.color} opacity-70`} />
               </div>
-              <p className="mt-1 font-display text-xl font-bold text-foreground">
-                {loading ? "…" : stat.value}
+              <p className={`font-display text-2xl font-bold ${stat.color}`}>
+                {loading ? <span className="animate-pulse text-muted-foreground/50">R$ ...</span> : stat.value}
               </p>
             </div>
           ))}
         </div>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+
+        {/* 🚀 BOTÕES: "Manual" removido e "Vitrine" ajustado */}
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <ActionBtn onClick={() => navigate("/add")} icon={ScanBarcode} label="Cadastrar" desc="Escanear e cadastrar" primary />
           <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Saída de produto" />
           <ActionBtn onClick={() => navigate("/products")} icon={List} label="Estoque" desc="Lista completa" />
           <ActionBtn onClick={() => navigate("/history")} icon={History} label="Histórico" desc="Movimentações" />
-          <ActionBtn onClick={() => navigate("/dashboard")} icon={PieChart} label="Dashboard" desc="Gráficos e análises" proBadge={isLocked("dashboard_charts")} />
-          <ActionBtn onClick={() => navigate("/products/new")} icon={Plus} label="Manual" desc="Cadastro sem scanner" />
+          
+          {/* 🚀 VITRINE INTELIGENTE */}
           <ActionBtn
             onClick={() => {
-              if (storeSlug) {
-                window.open(`https://gestao-estoque-one.vercel.app/vitrine/${storeSlug}`, "_blank");
+              if (isLocked("storefront")) {
+                setUpgradeCtx({ feature: "Vitrine Digital", description: "Crie sua loja online e venda pelo WhatsApp." });
+                setShowUpgrade(true);
+              } else if (storeSlug) {
+                // Abre em nova aba direto se tiver o slug configurado
+                window.open(`${window.location.origin}/vitrine/${storeSlug}`, "_blank");
               } else {
-                navigate("/settings");
+                // Vai pro perfil pedir pra configurar o slug
+                navigate("/profile");
               }
             }}
             icon={Store}
             label="Vitrine"
-            desc="Loja digital"
+            desc="Sua loja online"
             proBadge={isLocked("storefront")}
           />
         </div>
 
-        <p className="mt-8 text-center text-sm text-muted-foreground">
+        <p className="mt-10 text-center text-sm text-muted-foreground bg-secondary/30 p-4 rounded-xl border border-border/50">
           {!isLocked("chat_assistant")
-            ? "💬 Clique no botão no canto inferior direito para conversar com o assistente IA"
-            : "🔒 Assistente IA exclusivo do plano PRO"}
+            ? "💬 Clique no botão no canto inferior direito para conversar com a nossa Inteligência Artificial"
+            : "🔒 A Assistente de IA é uma funcionalidade exclusiva do plano PRO"}
         </p>
       </main>
+
       {!isLocked("chat_assistant") && <ChatAssistant />}
+      
       <UpgradeModal
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
@@ -210,19 +242,21 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-3 rounded-xl p-4 text-left transition-shadow hover:shadow-md ${
-        primary ? "border-2 border-primary bg-primary/5" : "border border-border bg-card"
+      className={`flex items-center gap-3 rounded-xl p-4 text-left transition-all hover:scale-[1.02] hover:shadow-md ${
+        primary ? "border-2 border-primary bg-primary shadow-sm" : "border border-border bg-card hover:bg-secondary/50"
       }`}
     >
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${primary ? "bg-primary" : "bg-primary/10"}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${primary ? "bg-white/20" : "bg-primary/10"}`}>
         <Icon className={`h-5 w-5 ${primary ? "text-primary-foreground" : "text-primary"}`} />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+        <p className={`text-sm font-bold flex items-center gap-1.5 ${primary ? "text-primary-foreground" : "text-foreground"}`}>
           {label}
           {proBadge && <ProBadge />}
         </p>
-        <p className="text-xs text-muted-foreground truncate">{desc}</p>
+        <p className={`text-xs truncate mt-0.5 ${primary ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+          {desc}
+        </p>
       </div>
     </button>
   );
