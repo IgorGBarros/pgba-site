@@ -31,6 +31,7 @@ const SALE_TYPES: { value: TransactionType; label: string; emoji: string; icon: 
 interface WithdrawData {
   barcode: string;
   product_id: string; // Garantido como string
+  inventory_id: string;
   product_name: string;
   category: string;
   current_quantity: number;
@@ -54,7 +55,7 @@ export default function WithdrawProduct() {
   const [isSuccess, setIsSuccess] = useState(false); 
   
   const [data, setData] = useState<WithdrawData>({
-    barcode: "", product_id: "", product_name: "", category: "",
+    barcode: "", product_id: "", inventory_id: "", product_name: "", category: "",
     current_quantity: 0, cost_price: 0, withdraw_qty: 1, sale_price: null,
     sale_type: "venda", selected_batch: null, batches: [],
     notes: "", 
@@ -111,6 +112,7 @@ export default function WithdrawProduct() {
         ...p,
         // 🚀 CORREÇÃO: Envolvendo o ID com String() para evitar o erro do TypeScript
         product_id: String(item.product?.id || item.id), 
+        inventory_id: item.id,
         product_name: item.product?.name || item.product_name || "Produto sem nome",
         category: item.product?.category || item.category || "Geral",
         current_quantity: qty,
@@ -172,7 +174,8 @@ export default function WithdrawProduct() {
     try {
       const newQty = data.current_quantity - data.withdraw_qty;
       await inventoryApi.update(data.product_id, { // Atualiza o estoque 
-        quantity: newQty,
+        total_quantity: newQty, // Força o formato novo do backend
+        quantity: newQty,       // Força o formato antigo
         sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
         sale_type: data.sale_type,
       });
