@@ -3,23 +3,22 @@ import {
   DEMO_PROFILE, DEMO_BATCHES
 } from "./demoData";
 
-// limpa barra final da base URL antes de usar
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
     .replace(/\/$/, "");
 
-// 🔑 token helpers
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
+
 export function setToken(token: string) {
   localStorage.setItem("auth_token", token);
 }
+
 export function clearToken() {
   localStorage.removeItem("auth_token");
 }
 
-// 🔧 request helper
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -52,7 +51,6 @@ export interface AuthUser {
   email: string;
   name?: string;
 }
-
 export const authApi = {
   login: (email: string, password: string) =>
     apiRequest<{ access: string; refresh: string }>("/api/auth/login/", {
@@ -85,23 +83,14 @@ export interface GlobalProduct {
   brand: string | null;
   description: string | null;
 }
-
 export interface LookupResult {
   found: boolean;
-  source:
-    | "local"
-    | "remote"
-    | "remote_learned"
-    | "remote_partial"
-    | "suggestion"
-    | "fuzzy"          
-    | "none";
+  source: "local" | "remote" | "remote_learned" | "remote_partial" | "suggestion" | "fuzzy" | "none";
   product?: GlobalProduct | null; 
   suggestions?: GlobalProduct[];  
   data?: any;                     
   message?: string | null; 
 }
-
 export const productLookupApi = {
   lookup: (barcodeOrName: string | null) => {
     const query = barcodeOrName ?? "";
@@ -116,6 +105,15 @@ export const productLookupApi = {
     }),
 };
 
+// 🚀 1. SISTEMA DE CACHE DE MEMÓRIA (STANDBY)
+let inventoryCache: InventoryItem[] | null = null;
+let movementsCache: Movement[] | null = null;
+
+export const clearAppCache = () => {
+  inventoryCache = null;
+  movementsCache = null;
+};
+
 // ── Inventory (user_inventory) ──
 export interface InventoryItem {
   product_id: string | number | undefined;
@@ -124,7 +122,6 @@ export interface InventoryItem {
   min_quantity?: number;
   cost_price: number;
   sale_price: number | null;
-  
   product?: {
     id: number | string;
     name: string;
@@ -134,7 +131,6 @@ export interface InventoryItem {
     image_url: string;
     official_price: number;
   };
-  
   batches?: InventoryBatch[];
   quantity?: number;
   barcode?: string;
@@ -153,35 +149,56 @@ export interface InventoryItem {
 }
 
 export const stockApi = {
-  create: (data: Record<string, any>) => 
-    isDemoMode()
-      ? Promise.resolve({ ...DEMO_INVENTORY[0], ...data } as InventoryItem)
-      : apiRequest<InventoryItem>("/api/stock/entry/", {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
+  create: async (data: Record<string, any>) => {
+    if (isDemoMode()) return { ...DEMO_INVENTORY[0], ...data } as InventoryItem;
+    const res = await apiRequest<InventoryItem>("/api/stock/entry/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    clearAppCache(); // 🧹 Limpa cache ao dar entrada
+    return res;
+  }
 };
 
 export const inventoryApi = {
-  list: () => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY)
-                            : apiRequest<InventoryItem[]>("/api/inventory/")),
+  // 🚀 2. USO DE CACHE NA LISTAGEM DE INVENTÁRIO
+  list: async (forceRefresh = false) => {
+    if (isDemoMode()) return DEMO_INVENTORY;
+    
+    // Se o cache já existe e não fomos forçados a atualizar, retorna instantâneo
+    if (!forceRefresh && inventoryCache) {
+      return inventoryCache;
+    }
+
+    const data = await apiRequest<InventoryItem[]>("/api/inventory/");
+    inventoryCache = data; // Guarda em Standby
+    return data;
+  },
+
   get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
                                      : apiRequest<InventoryItem>(`/api/inventory/${id}/`)),
                                      
-  // 🚀 CORREÇÃO CRÍTICA 1: Busca o inventário todo e filtra localmente para evitar 404
   getByBarcode: async (barcode: string) => {
     if (isDemoMode()) return DEMO_INVENTORY.find(i => i.barcode === barcode) || null;
     
-    const items = await apiRequest<InventoryItem[]>("/api/inventory/");
+    // Usa o cache (muito mais rápido na hora do PDV)
+    const items = await inventoryApi.list();
     return items.find(i => i.product?.bar_code === barcode || i.barcode === barcode) || null;
   },
 
-  update: (id: string, data: Partial<InventoryItem>) =>
-    apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
+  update: async (id: string, data: Partial<InventoryItem>) => {
+    const res = await apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
-    }),
-  delete: (id: string) => apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" }),
+    });
+    clearAppCache(); // 🧹 Limpa cache ao alterar
+    return res;
+  },
+
+  delete: async (id: string) => {
+    await apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" });
+    clearAppCache(); // 🧹 Limpa cache ao deletar
+  },
 };
 
 // ── Inventory Batches ──
@@ -202,9 +219,11 @@ export const batchApi = {
     if (isDemoMode()) return Promise.resolve(DEMO_BATCHES[itemId] || []);
     return apiRequest<InventoryBatch[]>(`/api/inventory/${itemId}/batches/`);
   },
-  create: (itemId: string, data: Omit<InventoryBatch, "id" | "inventory_item_id" | "created_at">) => {
-    if (isDemoMode()) return Promise.resolve({ id: "b-new", inventory_item_id: itemId, created_at: new Date().toISOString(), ...data } as InventoryBatch);
-    return apiRequest<InventoryBatch>(`/api/inventory/${itemId}/batches/`, { method: "POST", body: JSON.stringify(data) });
+  create: async (itemId: string, data: Omit<InventoryBatch, "id" | "inventory_item_id" | "created_at">) => {
+    if (isDemoMode()) return { id: "b-new", inventory_item_id: itemId, created_at: new Date().toISOString(), ...data } as InventoryBatch;
+    const res = await apiRequest<InventoryBatch>(`/api/inventory/${itemId}/batches/`, { method: "POST", body: JSON.stringify(data) });
+    clearAppCache(); // 🧹 Limpa cache se adicionar lote manual
+    return res;
   },
 };
 
@@ -230,33 +249,41 @@ export interface Movement {
 }
 
 export const movementsApi = {
-  list: () => {
-    if (isDemoMode()) return Promise.resolve(DEMO_MOVEMENTS);
-    return apiRequest<Movement[]>("/api/transactions/");
+  // 🚀 3. USO DE CACHE NO EXTRATO DE MOVIMENTAÇÕES
+  list: async (forceRefresh = false) => {
+    if (isDemoMode()) return DEMO_MOVEMENTS;
+    
+    // Devolve o histórico na hora se já estiver na memória
+    if (!forceRefresh && movementsCache) {
+      return movementsCache;
+    }
+
+    const data = await apiRequest<Movement[]>("/api/transactions/");
+    movementsCache = data; // Guarda em Standby
+    return data;
   },
-  create: (data: Omit<Movement, "id" | "created_at" | "profit">) => {
-    if (isDemoMode()) return Promise.resolve({ id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement);
-    return apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
+
+  create: async (data: Omit<Movement, "id" | "created_at" | "profit">) => {
+    if (isDemoMode()) return { id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement;
+    const res = await apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
+    clearAppCache(); // 🧹 Força atualização do Extrato e Estoque após venda/baixa
+    return res;
   },
 };
 
 // ── Admin ──
 export const adminApi = {
-  listUsers: () => {
-    return apiRequest<any[]>("/api/admin/users/");
-  },
-  updatePlan: (id: string | number, plan: "free" | "pro") => {
-    return apiRequest<{ message: string; plan: string }>(`/api/admin/users/${id}/plan/`, {
+  listUsers: () => apiRequest<any[]>("/api/admin/users/"),
+  updatePlan: (id: string | number, plan: "free" | "pro") =>
+    apiRequest<{ message: string; plan: string }>(`/api/admin/users/${id}/plan/`, {
       method: "PATCH",
       body: JSON.stringify({ plan }),
-    });
-  },
-  updateSubscription: (id: string | number, data: any) => {
-    return apiRequest<{ message: string }>(`/api/admin/users/${id}/subscription/`, {
+    }),
+  updateSubscription: (id: string | number, data: any) =>
+    apiRequest<{ message: string }>(`/api/admin/users/${id}/subscription/`, {
       method: "PATCH",
       body: JSON.stringify(data),
-    });
-  }
+    }),
 };
 
 // ── Profile ──
@@ -270,14 +297,8 @@ export interface Profile {
 }
 
 export const profileApi = {
-  get: () => {
-    if (isDemoMode()) return Promise.resolve(DEMO_PROFILE);
-    return apiRequest<Profile>("/api/profile/");
-  },
-  update: (data: Partial<Profile>) => {
-    if (isDemoMode()) return Promise.resolve({ ...DEMO_PROFILE, ...data } as Profile);
-    return apiRequest<Profile>("/api/profile/", { method: "PATCH", body: JSON.stringify(data) });
-  },
+  get: () => (isDemoMode() ? Promise.resolve(DEMO_PROFILE) : apiRequest<Profile>("/api/profile/")),
+  update: (data: Partial<Profile>) => (isDemoMode() ? Promise.resolve({ ...DEMO_PROFILE, ...data } as Profile) : apiRequest<Profile>("/api/profile/", { method: "PATCH", body: JSON.stringify(data) })),
 };
 
 // ── Storefront (public) ──
@@ -301,29 +322,19 @@ export const storefrontApi = {
   list: (sellerId?: string) => {
     if (isDemoMode() || sellerId === "demo") {
       const imageMap: Record<string, string> = {
-        d1: "/products/kaiak.jpg",
-        d2: "/products/luna.jpg",
-        d3: "/products/tododia.jpg",
-        d4: "/products/chronos.jpg",
-        d6: "/products/batom.jpg",
-        d7: "/products/ekos.jpg",
+        d1: "/products/kaiak.jpg", d2: "/products/luna.jpg", d3: "/products/tododia.jpg",
+        d4: "/products/chronos.jpg", d6: "/products/batom.jpg", d7: "/products/ekos.jpg",
       };
       const demoItems: StorefrontItem[] = DEMO_INVENTORY
         .filter((i) => i.is_available_storefront && (i.quantity ?? 0) > 0)
         .map((i) => ({
-          id: i.id,
-          product_name: i.product?.name || i.product_name || "Produto Demo",
+          id: i.id, product_name: i.product?.name || i.product_name || "Produto Demo",
           display_name: i.custom_name || i.product?.name || i.product_name || "Produto Demo",
-          custom_name: i.custom_name || null,
-          category: i.product?.category || i.category || "Geral",
-          sale_price: i.sale_price ?? null,
-          barcode: i.product?.bar_code || i.barcode || "0000000000000",
-          expiry_date: i.expiry_date ?? null,
-          seller_name: DEMO_PROFILE.display_name,
-          seller_whatsapp: DEMO_PROFILE.whatsapp_number,
-          user_id: "demo",
-          image_url: imageMap[i.id] || i.product?.image_url || i.image_url || null,
-          store_slug: DEMO_PROFILE.store_slug,
+          custom_name: i.custom_name || null, category: i.product?.category || i.category || "Geral",
+          sale_price: i.sale_price ?? null, barcode: i.product?.bar_code || i.barcode || "0000000000000",
+          expiry_date: i.expiry_date ?? null, seller_name: DEMO_PROFILE.display_name,
+          seller_whatsapp: DEMO_PROFILE.whatsapp_number, user_id: "demo",
+          image_url: imageMap[i.id] || i.product?.image_url || i.image_url || null, store_slug: DEMO_PROFILE.store_slug,
         }));
       return Promise.resolve(demoItems);
     }
@@ -332,7 +343,6 @@ export const storefrontApi = {
   },
   listBySlug: (slug: string) => {
     if (slug === "demo") return storefrontApi.list("demo");
-    // 🚀 CORREÇÃO CRÍTICA 2: Barra "/" no final evita erros 301 ou 404
     return apiRequest<StorefrontItem[]>(`/api/storefront/${slug}/`);
   },
 };
