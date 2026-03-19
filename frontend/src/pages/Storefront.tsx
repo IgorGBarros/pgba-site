@@ -53,7 +53,7 @@ export default function Storefront() {
     const fetchItems = slug
       ? storefrontApi.listBySlug(slug)
       : storefrontApi.list(sellerIdParam || undefined);
-
+      
     fetchItems.then((results) => {
       setItems(results);
       if (results.length > 0) {
@@ -94,29 +94,28 @@ export default function Storefront() {
 
   const bagTotal = bag.reduce((sum, b) => sum + (b.sale_price || 0) * b.qty, 0);
   const bagCount = bag.reduce((sum, b) => sum + b.qty, 0);
-
   const paymentLabel = paymentMethod === "pix" ? "PIX" : "Cartão / Link de Pagamento";
-
   const getDisplayName = (item: StorefrontItem | BagItem) => item.display_name || item.product_name;
 
+  // 🚀 LÓGICA DO WHATSAPP SEGURA
   const buildWhatsappLink = (itemsList: BagItem[]) => {
-    const phone = sellerWhatsapp?.replace(/\D/g, "");
+    const phone = sellerWhatsapp?.replace(/\D/g, ""); // Remove tudo que não é número
+    
     if (itemsList.length === 1 && itemsList[0].qty === 1) {
       const name = getDisplayName(itemsList[0]);
-      const msg = encodeURIComponent(
-        `Olá ${sellerName}! 😊\n\nTenho interesse no produto:\n• ${name}${itemsList[0].sale_price ? ` — R$ ${itemsList[0].sale_price.toFixed(2)}` : ""}\n\n💳 Forma de pagamento: *${paymentLabel}*\n\nEstá disponível?`
-      );
-      return `https://api.whatsapp.com/send/?phone=${phone}&text=${msg}`;
+      const priceText = itemsList[0].sale_price ? ` — R$ ${itemsList[0].sale_price.toFixed(2).replace('.', ',')}` : "";
+      
+      const msg = `Olá ${sellerName}! 😊\n\nTenho interesse no produto:\n• ${name}${priceText}\n\n💳 Forma de pagamento: *${paymentLabel}*\n\nEstá disponível?`;
+      return `https://api.whatsapp.com/send/?phone=55${phone}&text=${encodeURIComponent(msg)}`;
     }
-
+    
     const lines = itemsList.map(
-      (b) =>
-        `• ${b.qty}x ${getDisplayName(b)}${b.sale_price ? ` — R$ ${(b.sale_price * b.qty).toFixed(2)}` : ""}`
+      (b) => `• ${b.qty}x ${getDisplayName(b)}${b.sale_price ? ` — R$ ${(b.sale_price * b.qty).toFixed(2).replace('.', ',')}` : ""}`
     );
-    const msg = encodeURIComponent(
-      `Olá ${sellerName}! 😊\n\nGostaria de solicitar os seguintes produtos:\n\n${lines.join("\n")}\n\n💰 Total estimado: R$ ${bagTotal.toFixed(2)}\n💳 Forma de pagamento: *${paymentLabel}*\n\nPode verificar a disponibilidade e me retornar? Obrigada!`
-    );
-    return `https://api.whatsapp.com/send/?phone=${phone}&text=${msg}`;
+    
+    const msg = `Olá ${sellerName}! 😊\n\nGostaria de solicitar os seguintes produtos:\n\n${lines.join("\n")}\n\n💰 Total estimado: *R$ ${bagTotal.toFixed(2).replace('.', ',')}*\n💳 Forma de pagamento: *${paymentLabel}*\n\nPode verificar a disponibilidade e me retornar? Obrigada!`;
+    
+    return `https://api.whatsapp.com/send/?phone=55${phone}&text=${encodeURIComponent(msg)}`;
   };
 
   const handleDirectBuy = (item: StorefrontItem) => {
@@ -165,13 +164,13 @@ export default function Storefront() {
             transition={{ delay: 0.1 }}
             className="mt-4 text-2xl font-bold text-primary-foreground tracking-tight"
           >
-            {sellerName ? `Vitrine de ${sellerName}` : "Vitrine Natura"}
+            {sellerName ? `Vitrine de ${sellerName}` : "Vitrine Online"}
           </motion.h1>
           <motion.p
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="mt-1 text-sm text-primary-foreground/70"
+            className="mt-1 text-sm text-primary-foreground/80"
           >
             Produtos disponíveis para pronta entrega
           </motion.p>
@@ -186,7 +185,7 @@ export default function Storefront() {
           transition={{ delay: 0.25 }}
           className="-mt-6 relative z-10 mb-6"
         >
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-xl shadow-black/8 ring-1 ring-black/[0.03] focus-within:ring-2 focus-within:ring-primary/40 transition-all">
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 shadow-xl shadow-black/5 ring-1 ring-black/[0.03] focus-within:ring-2 focus-within:ring-primary/40 transition-all">
             <Search className="h-5 w-5 text-primary shrink-0" />
             <input
               type="text"
@@ -205,7 +204,7 @@ export default function Storefront() {
             )}
           </div>
         </motion.div>
-
+        
         {search && filtered.length > 0 && (
           <p className="mb-4 text-xs font-medium text-muted-foreground">
             {filtered.length} produto{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
@@ -217,12 +216,14 @@ export default function Storefront() {
           <div className="flex flex-col items-center py-20 text-muted-foreground">
             <Package className="mb-3 h-14 w-14 opacity-20" />
             <p className="text-sm font-medium">Nenhum produto disponível</p>
+            <p className="text-xs mt-1">A loja está sem estoque no momento.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {filtered.map((item, i) => {
               const qtyInBag = getItemQtyInBag(item.id);
               const name = getDisplayName(item);
+              
               return (
                 <motion.div
                   key={item.id}
@@ -236,9 +237,8 @@ export default function Storefront() {
                       {qtyInBag}
                     </div>
                   )}
-
                   {/* Product Image */}
-                  <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
+                  <div className="relative aspect-square w-full overflow-hidden bg-secondary/30">
                     {item.image_url ? (
                       <img
                         src={item.image_url}
@@ -252,37 +252,42 @@ export default function Storefront() {
                       </div>
                     )}
                   </div>
-
-                  {/* Product Info — uses display_name (override or original) */}
-                  <div className="flex flex-1 flex-col p-3">
-                    <p className="text-xs font-semibold text-foreground leading-snug line-clamp-2">{name}</p>
-                    <p className="mt-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{item.category}</p>
-
-                    {item.sale_price && (
-                      <p className="mt-auto pt-2 text-lg font-extrabold text-primary">
-                        R$ {item.sale_price.toFixed(2)}
-                      </p>
-                    )}
-
-                    <div className="mt-2 flex gap-1.5">
-                      {sellerWhatsapp && (
-                        <Button
-                          size="sm"
-                          className="flex-1 rounded-xl bg-[hsl(142,70%,45%)] text-[11px] text-white shadow-sm hover:bg-[hsl(142,70%,38%)] hover:shadow-md transition-all h-8"
-                          onClick={() => handleDirectBuy(item)}
-                        >
-                          <Send className="h-3 w-3" />
-                          Pedir
-                        </Button>
+                  {/* Product Info */}
+                  <div className="flex flex-1 flex-col p-3 border-t border-border/50">
+                    <p className="text-xs font-bold text-foreground leading-snug line-clamp-2">{name}</p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{item.category}</p>
+                    
+                    <div className="mt-auto pt-3">
+                      {item.sale_price ? (
+                        <p className="text-base font-extrabold text-primary">
+                          R$ {item.sale_price.toFixed(2).replace('.', ',')}
+                        </p>
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">Preço sob consulta</p>
                       )}
+                    </div>
+
+                    {/* 🚀 BOTÕES DE AÇÃO DO PRODUTO */}
+                    <div className="mt-3 flex gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-xl h-8 w-8 p-0"
+                        className="rounded-xl h-9 flex-1 bg-secondary/50 border-transparent hover:border-primary/30 hover:bg-primary/10 hover:text-primary transition-all text-xs font-semibold"
                         onClick={() => addToBag(item)}
                       >
-                        <ShoppingBag className="h-3.5 w-3.5" />
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Sacola
                       </Button>
+                      
+                      {sellerWhatsapp && (
+                        <Button
+                          size="sm"
+                          className="rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm transition-all h-9 w-9 p-0 shrink-0"
+                          onClick={() => handleDirectBuy(item)}
+                          title="Pedir pelo WhatsApp"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -299,19 +304,25 @@ export default function Storefront() {
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2"
+            className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 w-full max-w-[90%] sm:max-w-md px-4"
           >
             <Button
               onClick={() => setBagOpen(true)}
-              className="flex items-center gap-3 rounded-2xl bg-primary px-6 py-6 text-primary-foreground shadow-xl shadow-primary/25 hover:bg-primary/90 hover:shadow-2xl transition-all"
+              className="w-full flex items-center justify-between rounded-2xl bg-foreground px-5 py-7 text-background shadow-2xl hover:bg-foreground/90 hover:scale-[1.02] transition-all"
             >
-              <ShoppingBag className="h-5 w-5" />
-              <span className="font-semibold">
-                Sacola ({bagCount} {bagCount === 1 ? "item" : "itens"})
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <ShoppingBag className="h-5 w-5" />
+                  <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
+                    {bagCount}
+                  </span>
+                </div>
+                <span className="font-semibold text-sm">Ver Sacola</span>
+              </div>
+              
               {bagTotal > 0 && (
-                <span className="rounded-full bg-primary-foreground/20 px-2.5 py-0.5 text-sm font-bold">
-                  R$ {bagTotal.toFixed(2)}
+                <span className="text-base font-black">
+                  R$ {bagTotal.toFixed(2).replace('.', ',')}
                 </span>
               )}
             </Button>
@@ -321,9 +332,9 @@ export default function Storefront() {
 
       {/* Bag Sheet */}
       <Sheet open={bagOpen} onOpenChange={setBagOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] rounded-t-3xl">
+        <SheetContent side="bottom" className="max-h-[85vh] rounded-t-3xl sm:max-w-md sm:mx-auto px-4">
           <SheetHeader className="pb-4">
-            <SheetTitle className="flex items-center gap-2 text-foreground">
+            <SheetTitle className="flex items-center gap-2 text-foreground text-lg">
               <ShoppingBag className="h-5 w-5 text-primary" />
               Sua Sacola
             </SheetTitle>
@@ -333,114 +344,111 @@ export default function Storefront() {
                 : `${bagCount} ${bagCount === 1 ? "item" : "itens"} selecionado${bagCount === 1 ? "" : "s"}`}
             </SheetDescription>
           </SheetHeader>
-
+          
           {bag.length === 0 ? (
             <div className="flex flex-col items-center py-10 text-muted-foreground">
-              <ShoppingBag className="mb-3 h-10 w-10 opacity-30" />
-              <p className="text-sm">Adicione produtos da vitrine</p>
+              <ShoppingBag className="mb-3 h-10 w-10 opacity-20" />
+              <p className="text-sm font-medium">Adicione produtos da vitrine</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              <div className="max-h-[30vh] space-y-2.5 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-5 mt-2">
+              <div className="max-h-[40vh] space-y-3 overflow-y-auto pr-2 scrollbar-thin">
                 {bag.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-2.5"
+                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 shadow-sm"
                   >
                     {/* Thumbnail */}
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted/50">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border/50 bg-secondary/30">
                       {item.image_url ? (
                         <img src={item.image_url} alt={getDisplayName(item)} className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">
-                          <Package className="h-5 w-5 text-muted-foreground/30" />
+                          <Package className="h-6 w-6 text-muted-foreground/30" />
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{getDisplayName(item)}</p>
+                      <p className="truncate text-xs font-bold text-foreground">{getDisplayName(item)}</p>
                       {item.sale_price && (
-                        <p className="mt-0.5 text-xs font-semibold text-primary">
-                          R$ {(item.sale_price * item.qty).toFixed(2)}
+                        <p className="mt-1 text-sm font-extrabold text-primary">
+                          R$ {(item.sale_price * item.qty).toFixed(2).replace('.', ',')}
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Button size="icon" variant="outline" className="h-7 w-7 rounded-lg" onClick={() => updateQty(item.id, -1)}>
+                    
+                    {/* Controles de Qtd */}
+                    <div className="flex items-center gap-1 bg-secondary rounded-lg p-1 border border-border/50">
+                      <button className="flex h-6 w-6 items-center justify-center rounded bg-background shadow-sm text-muted-foreground hover:text-foreground" onClick={() => updateQty(item.id, -1)}>
                         <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-6 text-center text-sm font-bold text-foreground">{item.qty}</span>
-                      <Button size="icon" variant="outline" className="h-7 w-7 rounded-lg" onClick={() => updateQty(item.id, 1)}>
+                      </button>
+                      <span className="w-6 text-center text-xs font-bold text-foreground">{item.qty}</span>
+                      <button className="flex h-6 w-6 items-center justify-center rounded bg-background shadow-sm text-muted-foreground hover:text-foreground" onClick={() => updateQty(item.id, 1)}>
                         <Plus className="h-3 w-3" />
-                      </Button>
+                      </button>
                     </div>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeFromBag(item.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <button className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10" onClick={() => removeFromBag(item.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
               </div>
-
+              
               <Separator />
-
+              
               {/* Payment Method */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Forma de pagamento</p>
-                <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Como deseja pagar?</p>
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setPaymentMethod("pix")}
-                    className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all ${
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-all ${
                       paymentMethod === "pix"
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/30"
+                        ? "border-primary bg-primary/5 text-primary shadow-sm"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-secondary/50"
                     }`}
                   >
-                    <QrCode className="h-4 w-4" />
-                    PIX
+                    <QrCode className="h-5 w-5" />
+                    <span className="text-xs font-bold">PIX</span>
                   </button>
                   <button
                     onClick={() => setPaymentMethod("cartao")}
-                    className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all ${
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-all ${
                       paymentMethod === "cartao"
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/30"
+                        ? "border-primary bg-primary/5 text-primary shadow-sm"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-secondary/50"
                     }`}
                   >
-                    <CreditCard className="h-4 w-4" />
-                    Cartão / Link
+                    <CreditCard className="h-5 w-5" />
+                    <span className="text-xs font-bold">Cartão ou Link</span>
                   </button>
                 </div>
               </div>
-
+              
               <Separator />
-
+              
               <div className="flex items-center justify-between px-1">
-                <span className="text-sm font-medium text-muted-foreground">Total estimado</span>
-                <span className="text-xl font-bold text-foreground">R$ {bagTotal.toFixed(2)}</span>
+                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Total do Pedido</span>
+                <span className="text-2xl font-black text-foreground">R$ {bagTotal.toFixed(2).replace('.', ',')}</span>
               </div>
-
-              <Button
-                onClick={handleSendOrder}
-                disabled={!sellerWhatsapp}
-                className="w-full gap-2 rounded-2xl bg-[hsl(142,70%,45%)] py-6 text-base font-semibold text-white shadow-lg hover:bg-[hsl(142,70%,38%)]"
-              >
-                <Send className="h-4 w-4" />
-                Enviar pedido para {sellerName}
-              </Button>
-
-              <Button variant="ghost" className="w-full text-sm text-muted-foreground" onClick={clearBag}>
-                <Trash2 className="h-3.5 w-3.5" />
-                Limpar sacola
-              </Button>
+              
+              <div className="space-y-2 pt-2">
+                <Button
+                  onClick={handleSendOrder}
+                  disabled={!sellerWhatsapp}
+                  className="w-full h-14 gap-2 rounded-xl bg-[#25D366] text-base font-bold text-white shadow-lg hover:bg-[#128C7E] transition-all hover:scale-[1.02]"
+                >
+                  <Send className="h-5 w-5" />
+                  Enviar pedido pelo WhatsApp
+                </Button>
+                <Button variant="ghost" className="w-full text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors" onClick={clearBag}>
+                  Esvaziar sacola
+                </Button>
+              </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
-
-      {/* Footer */}
-      <footer className="mt-12 border-t border-border/50 bg-card/50 py-5 text-center text-xs text-muted-foreground/60">
-        Vitrine digital • Estoque Natura
-      </footer>
     </div>
   );
 }

@@ -5,10 +5,11 @@ import {
   ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { inventoryApi, movementsApi, profileApi } from "../lib/api";
+import { inventoryApi, movementsApi, profileApi } from "../lib/api"; 
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../hooks/usePlan";
 import { useFeatureGates } from "../hooks/useFeatureGates";
+import { useExpiryAlerts } from "../hooks/useExpiryAlerts";
 import { ChatAssistant } from "../components/ChatAssistant";
 import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
@@ -40,7 +41,7 @@ export default function Index() {
   const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
   
-  // 🚀 ESTADO PARA O MODAL DO SINO DE NOTIFICAÇÕES
+  // Estado para o Popover do Sino de Notificações
   const [showNotif, setShowNotif] = useState(false);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function Index() {
       .then(([items, movements]) => {
         const now = new Date();
         
-        // Movimentos do mês
+        // Normalização dos Movimentos
         const monthMovements = movements.filter((m) => {
           const d = new Date(m.created_at);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -65,14 +66,14 @@ export default function Index() {
         }));
 
         const salesMovements = monthMovements.filter((m) => m.movement_type === "saida" && m.sale_type === "venda");
-        const monthSales = salesMovements.reduce((s, m) => s + (Number(m.unit_price) || 0) * Math.abs(m.quantity), 0);
+        const monthSales = salesMovements.reduce((s, m) => s + (m.unit_price || 0) * Math.abs(m.quantity), 0);
         
         const monthCost = salesMovements.reduce((s, m) => {
           const item = items.find((i) => (i.product?.bar_code || i.barcode) === m.barcode);
           return s + (item ? item.cost_price : 0) * Math.abs(m.quantity);
         }, 0);
 
-        // 🚀 CÁLCULO DOS NOVOS INDICADORES FINANCEIROS
+        // 🚀 CÁLCULO DOS NOVOS INDICADORES DE VALOR (Custo x Venda)
         const totalInvested = items.reduce((s, i) => {
           const qty = i.total_quantity ?? i.quantity ?? 0;
           return s + (qty * i.cost_price);
@@ -99,17 +100,17 @@ export default function Index() {
 
   const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   
-  // 🚀 CARDS RENOMEADOS FOCADOS EM DINHEIRO E LUCRO
+  // 🚀 CARDS RENOMEADOS FOCADOS NO FINANCEIRO
   const statCards = [
     { label: "Valor Investido", value: fmt(stats.investedValue), icon: Package, color: "text-muted-foreground" },
     { label: "Potencial de Venda", value: fmt(stats.potentialValue), icon: DollarSign, color: "text-primary" },
-    { label: "Lucro Projetado", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-emerald-600" },
+    { label: "Lucro Projetado", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-green-600" },
     { label: "Vendas do Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
   ];
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="border-b border-border bg-card">
+      <header className="sticky top-0 z-20 border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
@@ -122,7 +123,7 @@ export default function Index() {
           </div>
           
           <div className="flex items-center gap-1 relative">
-            {/* 🚀 MODAL DO SINO ADICIONADO AQUI */}
+            {/* 🚀 MODAL DO SINO IMPLEMENTADO AQUI */}
             <button 
               onClick={() => setShowNotif(!showNotif)} 
               className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -162,7 +163,7 @@ export default function Index() {
       <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
         <ProfileCompletionBanner />
         
-        {/* CARDS COM SKELETON LOADING PARA EVITAR ANSIEDADE */}
+        {/* CARDS FINANCEIROS (Com Skeleton Loading para evitar ansiedade) */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {statCards.map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md">
@@ -177,24 +178,24 @@ export default function Index() {
           ))}
         </div>
 
-        {/* 🚀 BOTÕES: "Manual" removido e "Vitrine" ajustado */}
+        {/* BOTÕES DE AÇÃO (Botão Manual removido) */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <ActionBtn onClick={() => navigate("/add")} icon={ScanBarcode} label="Cadastrar" desc="Escanear e cadastrar" primary />
-          <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Saída de produto" />
-          <ActionBtn onClick={() => navigate("/products")} icon={List} label="Estoque" desc="Lista completa" />
-          <ActionBtn onClick={() => navigate("/history")} icon={History} label="Histórico" desc="Movimentações" />
+          <ActionBtn onClick={() => navigate("/add")} icon={ScanBarcode} label="Cadastrar" desc="Escanear entrada" primary />
+          <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Registrar saída" />
+          <ActionBtn onClick={() => navigate("/products")} icon={List} label="Meu Estoque" desc="Lista completa" />
+          <ActionBtn onClick={() => navigate("/history")} icon={History} label="Extrato" desc="Movimentações" />
           
-          {/* 🚀 VITRINE INTELIGENTE */}
+          {/* 🚀 BOTÃO VITRINE INTELIGENTE */}
           <ActionBtn
             onClick={() => {
               if (isLocked("storefront")) {
-                setUpgradeCtx({ feature: "Vitrine Digital", description: "Crie sua loja online e venda pelo WhatsApp." });
+                setUpgradeCtx({ feature: "Vitrine Digital", description: "Crie sua loja online e venda pelo WhatsApp automaticamente." });
                 setShowUpgrade(true);
               } else if (storeSlug) {
-                // Abre em nova aba direto se tiver o slug configurado
+                // Abre direto em uma nova aba se tiver slug
                 window.open(`${window.location.origin}/vitrine/${storeSlug}`, "_blank");
               } else {
-                // Vai pro perfil pedir pra configurar o slug
+                // Manda pro perfil pra ela criar o slug
                 navigate("/profile");
               }
             }}
