@@ -9,7 +9,6 @@ on:
 jobs:
   run-crawler:
     runs-on: ubuntu-latest
-
     steps:
       - name: 📥 Checkout código
         uses: actions/checkout@v4
@@ -21,8 +20,8 @@ jobs:
 
       - name: 📦 Instalar Dependências
         run: |
-          cd backend/core
-          pip install -r backend/requirements.txt
+          cd backend # 🚀 CORREÇÃO: Entra apenas na pasta 'backend' para achar o requirements.txt
+          pip install -r requirements.txt
           pip install seleniumbase
           sbase install chromedriver  # Baixa driver do Chrome
 
@@ -32,7 +31,7 @@ jobs:
             SECRET_KEY: ${{ secrets.SECRET_KEY }}
             DEBUG: "False"
         run: |
-          cd backend/core
+          cd backend/core # Mantém a entrada no core aqui porque o manage.py está lá
           python manage.py crawl_update
 
       - name: ✅ Notificar Sucesso (Opcional)
