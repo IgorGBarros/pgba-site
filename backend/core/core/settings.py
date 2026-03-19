@@ -129,7 +129,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 CORS_ALLOW_HEADERS = ["content-type", "authorization"]
 CORS_ALLOW_CREDENTIALS = True
-
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 # --------------------------------------------------------------------------
 # Django REST Framework
 # --------------------------------------------------------------------------
@@ -178,3 +178,4 @@ if firebase_json_str:
         print(f"❌ Falha ao inicializar Firebase Admin: {e}")
 else:
     print("⚠️ Variável FIREBASE_CREDENTIALS não encontrada. Login do Google não funcionará.")
+
