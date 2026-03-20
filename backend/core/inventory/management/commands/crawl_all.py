@@ -1,12 +1,30 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from inventory.models import Product, PriceHistory
-from inventory.scraper import detect_category # Certifique-se de que a função existe
 from seleniumbase import SB
 from bs4 import BeautifulSoup
 import re
 from decimal import Decimal
 import random
+
+# 🚀 FUNÇÃO DE INTELIGÊNCIA: Define a categoria para QUALQUER marca
+def detect_category(name):
+    """
+    Define a categoria baseada em palavras-chave no nome do produto.
+    """
+    if not name:
+        return "Geral"
+        
+    name_lower = name.lower()
+    
+    if any(x in name_lower for x in ['colônia', 'parfum', 'toilette', 'deo corporal', 'perfume']): return "Perfumaria"
+    if any(x in name_lower for x in ['shampoo', 'condicionador', 'máscara', 'cabelo']): return "Cabelos"
+    if any(x in name_lower for x in ['sabonete', 'hidratante', 'creme', 'óleo', 'desodorante', 'polpa']): return "Corpo e Banho"
+    if any(x in name_lower for x in ['batom', 'base', 'corretivo', 'pó', 'rimel', 'delineador', 'palette', 'paleta']): return "Maquiagem"
+    if any(x in name_lower for x in ['mamãe', 'bebê', 'infantil', 'criança', 'baby']): return "Infantil"
+    if any(x in name_lower for x in ['barba', 'homem', 'masculino', 'men']): return "Homem"
+        
+    return "Geral"
 
 class Command(BaseCommand):
     help = 'Super Crawler Intercalado: Natura, Avon, O Boticário, Eudora e Quem Disse Berenice'
@@ -48,11 +66,11 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.WARNING("🕷️ Iniciando Super Crawler Intercalado (Anti-Bloqueio)..."))
 
+        # Controle de páginas vazias independente por marca
         empty_pages = {store["brand"]: 0 for store in STORES}
 
         with SB(uc=True, headless=True) as sb:
             page = 1
-
             while True:
                 self.stdout.write(self.style.WARNING(f"\n--- 📂 LENDO PÁGINA {page} DE TODAS AS MARCAS ---"))
                 discovered_links = []
@@ -63,7 +81,7 @@ class Command(BaseCommand):
                 for store in STORES:
                     if empty_pages[store['brand']] >= 3:
                         continue
-
+                    
                     url = f"{store['list_url']}?page={page}"
                     self.stdout.write(f"🔍 Vasculhando: {store['brand']}...")
                     
@@ -143,38 +161,30 @@ class Command(BaseCommand):
                         if brand in ["Natura", "Avon"]:
                             prefix = item.get("prefix")
                             
-                            # SKU
                             sku_match = re.search(rf'{prefix}-(\d+)', product_url)
                             if sku_match: sku = sku_match.group(1)
                             
-                            # Nome
                             title_tag = soup.find('h1')
                             if not title_tag:
-                                # Fallback da sua imagem (procurando no texto "cod. AVNBRA-...")
                                 p_tag = soup.find(string=re.compile(rf'cod\. {prefix}-', re.I))
                                 if p_tag and p_tag.parent.find_previous_sibling('p'):
                                     name = p_tag.parent.find_previous_sibling('p').text.strip()
                             else:
                                 name = title_tag.text.strip()
                             
-                            # Preço (Baseado na sua imagem da Avon)
                             price_tag = soup.find(['div', 'span'], id="product-price")
                             if price_tag:
-                                # Tenta pegar do aria-label primeiro (Preço: R$&nbsp;41,94)
                                 aria_label = price_tag.get('aria-label', '')
                                 match = re.search(r'(\d{1,3}(\.\d{3})*,\d{2})', aria_label)
                                 if not match:
                                     match = re.search(r'(\d{1,3}(\.\d{3})*,\d{2})', price_tag.text)
-                                    
                                 if match: 
                                     price = Decimal(match.group(1).replace('.', '').replace(',', '.'))
                                 
-                            # Imagem
                             img_tag = soup.find('img', src=re.compile(r'production\.na01\.natura\.com|avon'))
                             if img_tag and img_tag.has_attr('src'):
                                 image_url = img_tag.get('src').split('?')[0]
                                 
-                            # Descrição
                             desc_tag = soup.find('div', id=re.compile(r'description', re.I)) or soup.find('div', class_=re.compile(r'description', re.I))
                             if desc_tag: description_text = desc_tag.get_text(separator='\n', strip=True)
 
@@ -182,30 +192,25 @@ class Command(BaseCommand):
                         # LÓGICA DE EXTRAÇÃO: GRUPO BOTICÁRIO (Boti, Eudora, QDB)
                         # ----------------------------------------------------
                         else:
-                            # SKU
                             sku_div = soup.find('div', class_=re.compile(r'product-sku'))
                             if sku_div:
                                 raw_sku = sku_div.text.replace('Cod:', '').replace('"', '').strip()
                                 if raw_sku: sku = raw_sku
                                 
-                            # Nome
                             name_tag = soup.find('h1')
                             if name_tag: name = name_tag.text.strip()
                             
-                            # Preço
                             price_div = soup.find('div', class_=re.compile(r'nproduct-price-value'))
                             if price_div and price_div.has_attr('content'):
                                 try: price = Decimal(price_div['content'])
                                 except: pass
                                 
-                            # Imagem
                             img_tag = soup.find('img', class_=re.compile(r'product-image'))
                             if img_tag:
                                 raw_img = img_tag.get('data-zoom-image') or img_tag.get('data-src') or img_tag.get('src')
                                 if raw_img and not raw_img.startswith('data:image'):
                                     image_url = raw_img
                                     
-                            # Descrição
                             desc_tag = soup.find('div', class_=re.compile(r'product-description'))
                             if desc_tag: description_text = desc_tag.get_text(separator='\n', strip=True)
 
@@ -217,15 +222,19 @@ class Command(BaseCommand):
                         if not name:
                             name = f"Produto {brand} - {sku}"
 
+                        # 🚀 PREPARA A CATEGORIA INTELIGENTE
+                        smart_category = detect_category(name)
+
                         product, created = Product.objects.get_or_create(
                             natura_sku=str(sku),
                             defaults={
                                 'name': name[:255],
-                                'category': brand if brand not in ["Natura", "Avon"] else detect_category(name),
+                                'brand': brand,                 # 🚀 SALVA A MARCA AQUI
+                                'category': smart_category,     # 🚀 SALVA A CATEGORIA AQUI
                                 'official_price': price,
-                                'bar_code': None, # Nasce protegido e nulo
+                                'bar_code': None, 
                                 'image_url': image_url,
-                                'description': description_text or f"Descoberto no site {brand}",
+                                'description': description_text or f"Descoberto no site {brand} (Pág {page})",
                                 'last_checked_at': timezone.now(),
                                 'last_checked_price': price
                             }
@@ -233,6 +242,8 @@ class Command(BaseCommand):
 
                         if not created:
                             product.name = name[:255]
+                            product.brand = brand               # 🚀 ATUALIZA A MARCA AQUI
+                            product.category = smart_category   # 🚀 ATUALIZA A CATEGORIA AQUI
                             product.official_price = price
                             product.last_checked_at = timezone.now()
                             product.last_checked_price = price
@@ -245,7 +256,7 @@ class Command(BaseCommand):
 
                         status = "✨" if created else "🔄"
                         img_status = "🖼️" if image_url else "❌"
-                        self.stdout.write(self.style.SUCCESS(f"{status} [{brand}] {sku} - {name[:30]}... | R$ {price} | {img_status}"))
+                        self.stdout.write(self.style.SUCCESS(f"{status} [{brand}] {sku} ({product.category}) - {name[:25]}... | R$ {price} | {img_status}"))
 
                     except Exception as e:
                         self.stdout.write(self.style.ERROR(f"❌ Erro ao ler {brand} - {product_url}: {e}"))
