@@ -18,7 +18,8 @@ import firebase_admin
 
 class Product(models.Model):
     name = models.CharField(max_length=255, verbose_name="Nome do Produto")
-    
+        # 🚀 ADICIONE ESTA LINHA:
+    brand = models.CharField(max_length=100, null=True, blank=True, verbose_name="Marca")
     # Identificadores
     bar_code = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="Código de Barras")
     natura_sku = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="SKU Natura")

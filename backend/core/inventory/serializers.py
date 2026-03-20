@@ -64,7 +64,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'name', 'bar_code', 'natura_sku', 'image_url', 
-            'category', 'description', 'official_price', 'min_quantity'
+            'category','brand', 'description', 'official_price', 'min_quantity'
         ]
 
 class InventoryBatchSerializer(serializers.ModelSerializer):
