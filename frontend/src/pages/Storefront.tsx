@@ -52,17 +52,16 @@ export default function Storefront() {
   useEffect(() => { saveCart(bag); }, [bag]);
   useEffect(() => { localStorage.setItem(CART_PAYMENT_KEY, paymentMethod); }, [paymentMethod]);
 
-  // 🚀 CORREÇÃO CRÍTICA: Leitura correta do formato do Django { store: {...}, items: [...] }
-  useEffect(() => {
+   useEffect(() => {
     const fetchItems = slug
       ? storefrontApi.listBySlug(slug)
       : storefrontApi.list(sellerIdParam || undefined);
       
     fetchItems.then((res: any) => {
-      // O Django retorna res.items e res.store. O Demo retorna um Array direto.
+      // 1. O Django retorna { store: {...}, items: [...] }. O Demo retorna um Array direto [1].
       const productsList = res.items ? res.items : (Array.isArray(res) ? res : []);
       
-      // Mapeia os dados aninhados do Django para o formato plano da Vitrine
+      // 2. Mapeia os dados exatamente como o Django envia para a interface da Vitrine [1]
       const mappedItems = productsList.map((item: any) => ({
         id: item.id,
         product_name: item.product?.name || item.product_name || "Produto",
@@ -75,17 +74,21 @@ export default function Storefront() {
 
       setItems(mappedItems);
 
-      // Define os dados do lojista
+      // 3. Define os dados do lojista (Nome e WhatsApp) vindos do backend [1]
       if (res.store) {
         setSellerName(res.store.name || "Consultor(a)");
         setSellerWhatsapp(res.store.whatsapp || "");
       } else if (mappedItems.length > 0) {
+        // Fallback para o modo Demo
         setSellerName(mappedItems[0].seller_name || "Consultor(a)");
         setSellerWhatsapp(mappedItems[0].seller_whatsapp || "");
       }
       
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      console.error("Erro ao carregar vitrine:", err);
+      setLoading(false);
+    });
   }, [slug, sellerIdParam]);
 
   const filtered = items.filter(
