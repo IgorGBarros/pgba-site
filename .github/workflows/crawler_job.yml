@@ -32,7 +32,7 @@ jobs:
             DEBUG: "False"
         run: |
           cd backend/core # Mantém a entrada no core aqui porque o manage.py está lá
-          python manage.py crawl_update
+          python manage.py crawl_all
 
       - name: ✅ Notificar Sucesso (Opcional)
         if: success()
