@@ -1,146 +1,310 @@
-Perfeito 👌  
-Agora vamos ao **Capítulo 7 — Criação de usuários e configuração do acesso ao banco de dados PostgreSQL**,  
-essencial para dar permissões ao Django (via `DATABASE_URL`) e para o agente AI acessar o banco em modo **read‑only** com segurança.
+
 
 ---
 
-# 📘 CAPÍTULO 7 — Criação de usuário PostgreSQL (`createuser`)
+# DATABASE.md
 
-> ⚙️ **Objetivo:** criar usuários e permissões no PostgreSQL de forma segura,  
-> garantindo que o Django tenha acesso total e a IA apenas leitura.
+## Visão Geral
+
+O banco de dados sustenta um **SaaS multi-tenant de gestão de estoque para consultoras**, com:
+
+- Catálogo global compartilhado
+- Estoque isolado por loja
+- Controle por lote e validade
+- Histórico completo de movimentações
+- Vendas e baixas auditáveis
+- Autenticação e permissões desacopladas (Supabase/Auth)
+
+O design prioriza:
+
+- **Integridade referencial**
+- **Isolamento por loja**
+- **Auditabilidade**
+- **Escalabilidade**
 
 ---
 
-## 🧾 1. Abrir o cliente PostgreSQL (Windows 11)
+## Diagrama Conceitual Simplificado
 
-Se o PostgreSQL estiver instalado, abra o terminal **PowerShell** ou **CMD** e inicie o cliente:
-
-```powershell
-psql -U postgres
+```text
+CustomUser
+   │
+   └── Store
+         │
+         ├── InventoryItem ─── Product
+         │         │
+         │         └── InventoryBatch
+         │
+         ├── Sale ─── SaleItem ─── Product
+         │                     └── InventoryBatch
+         │
+         └── StockTransaction ─── Product
+                               └── InventoryBatch
 ```
 
-> 🔐 O usuário `postgres` é o superusuário padrão.  
-> Digite a senha configurada na instalação (ou use pgAdmin se preferir interface GUI).
+---
 
-📘 **Documentação:**
-> **Passo 33:** Acesso ao console PSQL utilizando o superusuário, pré‑requisito para criar novos usuários.
+## 1. Usuários
+
+### Tabela: `inventory_customuser`
+
+Representa o **usuário da aplicação** (consultora ou admin).
+
+Campos principais:
+- `email` (único)
+- `name`
+- Flags: `is_active`, `is_staff`, `is_superuser`
+
+Regra de negócio:
+- Um usuário **pode ter apenas uma loja**
+- Autenticação pode vir de senha tradicional ou Firebase
 
 ---
 
-## 🧱 2. Criar o banco de dados do projeto
+## 2. Loja (Tenant)
 
-Dentro do console `psql`:
+### Tabela: `inventory_store`
 
-```sql
-CREATE DATABASE natura_inventory;
-```
+Representa o **negócio da consultora**.
 
-📘 **Documentação:**
-> **Passo 34:** Cria banco de dados principal `natura_inventory` para armazenar produtos, estoque e histórico de IA.
+Campos:
+- `user_id` → vínculo 1:1 com usuário
+- `name`, `slug`
+- `plan` (`free` / `pro`)
+- `storefront_enabled`
+- Dados de assinatura (gateway, datas)
 
----
-
-## 👤 3. Criar o usuário do Django (aplicação principal)
-
-```sql
-CREATE USER natura_admin WITH PASSWORD 'senha_segura';
-GRANT ALL PRIVILEGES ON DATABASE natura_inventory TO natura_admin;
-```
-
-📘 **Documentação:**
-> **Passo 35:** Cria o usuário `natura_admin`, usado pelo Django, com privilégios completos.  
-> A senha deve ser forte (alfa‑numérica + símbolos).
+Regras:
+- Isolamento total dos dados por loja
+- Todas as entidades privadas dependem de `store_id`
+- Exclusão em cascata ao remover usuário [1]
 
 ---
 
-## 🙈 4. Criar o usuário Read‑Only (IA)
+## 3. Catálogo Global
 
-```sql
-CREATE USER natura_ai WITH PASSWORD 'leitura_segura';
-GRANT CONNECT ON DATABASE natura_inventory TO natura_ai;
-```
+### Tabela: `inventory_product`
 
-Depois, acesse o banco e dê permissão de leitura em todas as tabelas:
+É o **catálogo oficial compartilhado** entre todas as lojas.
 
-```sql
-\c natura_inventory
-GRANT USAGE ON SCHEMA public TO natura_ai;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO natura_ai;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO natura_ai;
-```
+Campos-chave:
+- `bar_code` (EAN, único)
+- `natura_sku` (único)
+- `name`, `brand`, `category`
+- `official_price`
+- `image_url`, `description`
+- `min_quantity`
 
-📘 **Documentação:**
-> **Passo 36:** Criação de usuário `natura_ai` com permissão `SELECT` para segurança da IA, garantindo que não execute `INSERT/UPDATE/DELETE`.
+Regras de negócio:
+- Produtos oficiais **não pertencem a uma loja**
+- Servem como base para qualquer estoque
+- Protegidos contra alterações indevidas
+- Alimentados por robôs e busca inteligente
 
----
-
-## ⚙️ 5. Atualizar `settings.py` para Django
-
-Abra o arquivo `backend/core/settings.py` e adicione a configuração do banco:
-
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'natura_inventory',
-        'USER': 'natura_admin',
-        'PASSWORD': 'senha_segura',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-
-# URL completa (para LangChain)
-DATABASE_URL = "postgresql+psycopg2://natura_ai:leitura_segura@localhost:5432/natura_inventory"
-```
-
-📘 **Documentação:**
-> **Passo 37:** Aponta o Django para o banco utilizando o usuário administrador,  
-> e configura `DATABASE_URL` para que o módulo IA use o usuário restrito `natura_ai`.
+Constraints importantes:
+- Unicidade de `bar_code` e `natura_sku` [1]
 
 ---
 
-## 🧪 6. Testar conexão
+## 4. Histórico de Preços (Crawler)
 
-Com o ambiente virtual ativo:
+### Tabela: `inventory_pricehistory`
 
-```powershell
-python manage.py migrate
-python manage.py runserver
-```
+Registra **cada preço coletado pelos robôs**.
 
-Se as migrações forem aplicadas sem erro, o acesso do Django ao banco está funcional.
+Campos:
+- `product_id`
+- `price`
+- `captured_at`
 
-📘 **Documentação:**
-> **Passo 38:** Testa a conexão entre Django e PostgreSQL via usuário configurado.
+Função:
+- Auditoria de variação de preços
+- Base futura para análises e alertas
 
----
-
-## ☑️ Status Atual do Banco de Dados
-
-| Usuário | Função | Permissão | Utilizado por |
-|----------|---------|-----------|---------------|
-| **natura_admin** | Principal do app | ALL PRIVILEGES | Django ORM / Admin |
-| **natura_ai** | Assistente IA | Read‑Only (SELECT) | LangChain SQL Agent |
+Relacionamento:
+- N:1 com `inventory_product` [1]
 
 ---
 
-## 🧾 Adição à Documentação
+## 5. Estoque da Loja
 
-Gravar todas as etapas acima em `docs/DATABASE.md`:
+### Tabela: `inventory_inventoryitem`
 
-```powershell
-echo. > docs/DATABASE.md
-notepad docs/DATABASE.md
-```
+Representa o **estoque consolidado de um produto dentro de uma loja**.
 
-Incluir os passos 33 → 38.
+Campos:
+- `store_id`
+- `product_id`
+- `cost_price`
+- `sale_price`
+- `total_quantity`
+- `min_quantity`
 
-📘 **Documentação:**
-> Arquivo `DATABASE.md` contém procedimentos de criação de usuários, permissões e configuração para integração Django + LangChain com PostgreSQL.
+Regra crítica:
+> Uma loja só pode ter **um InventoryItem por produto**
+
+Constraint:
+- `unique (store_id, product_id)` [1]
 
 ---
 
-✅ **Tudo pronto para o banco!**
+## 6. Lotes e Validade
 
-Quer que o próximo passo seja o **Capítulo 8 — Integração Frontend ↔ Backend** (React ChatAssistant chamando `/api/chat/ask/` com loading, erros e salvando histórico)?
+### Tabela: `inventory_inventorybatch`
+
+Representa **lotes físicos reais**.
+
+Campos:
+- `item_id`
+- `quantity`
+- `batch_code`
+- `expiration_date`
+- `entry_date`
+
+Regras de negócio:
+- Cada entrada gera ao menos um lote
+- Vendas usam FIFO por validade
+- Permite controle sanitário e perdas
+
+Relacionamento:
+- N:1 com `inventory_inventoryitem` [1]
+
+---
+
+## 7. Movimentações de Estoque (Extrato)
+
+### Tabela: `inventory_stocktransaction`
+
+É o **livro razão do estoque**.
+
+Campos:
+- `store_id`
+- `product_id`
+- `batch_id` (opcional)
+- `transaction_type`
+- `quantity` (positivo = entrada, negativo = saída)
+- `unit_cost`, `unit_price`
+- `description`
+- `created_at`
+
+Tipos:
+- ENTRADA
+- VENDA
+- PERDA
+- BRINDE
+- USO_PROPRIO
+- AJUSTE
+
+Regra de ouro:
+> **Nada altera estoque sem gerar uma StockTransaction**
+
+Relacionamentos protegidos por FKs [1]
+
+---
+
+## 8. Vendas e Saídas
+
+### Tabela: `inventory_sale`
+
+Representa uma **operação de saída agrupada**.
+
+Campos:
+- `store_id`
+- `transaction_type`
+- `total_amount`
+- `client_name`
+- `payment_method`
+- `notes`
+- `created_at`
+
+Tipos de venda:
+- VENDA
+- PRESENTE
+- BRINDE
+- PERDA
+- USO_PROPRIO
+
+---
+
+### Tabela: `inventory_saleitem`
+
+Itens individuais da venda.
+
+Campos:
+- `sale_id`
+- `product_id`
+- `batch_id`
+- `quantity`
+- `unit_price_sold`
+- `unit_cost_at_time`
+
+Regras:
+- Sempre vinculado a uma `Sale`
+- Sempre gera uma `StockTransaction`
+- Mantém snapshot financeiro para relatórios
+
+---
+
+## 9. Logs de Robô
+
+### Tabela: `inventory_crawlerlog`
+
+Registra falhas e tentativas do crawler.
+
+Campos:
+- `sku`
+- `status_code`
+- `error_message`
+- `retry_count`
+- `created_at`
+
+Uso:
+- Debug
+- Monitoramento
+- Retentativas automáticas
+
+---
+
+## 10. Integridade e Segurança
+
+### Foreign Keys
+
+O banco é **fortemente normalizado**:
+
+- Nenhuma venda sem loja
+- Nenhum lote sem item
+- Nenhuma movimentação sem produto
+- Cascatas bem definidas [1]
+
+### Identidades
+
+- Todas as tabelas usam `IDENTITY / SEQUENCE`
+- Compatível com PostgreSQL e Supabase
+
+---
+
+## 11. Multi-Tenant na Prática
+
+Como o isolamento acontece:
+
+- Todas as tabelas privadas têm `store_id`
+- Queries sempre filtram por loja
+- FK impede cruzamento de dados
+- Base pronta para RLS (Row Level Security)
+
+---
+
+## Conclusão
+
+O banco de dados foi modelado para:
+
+✅ Suportar crescimento  
+✅ Garantir integridade  
+✅ Refletir regras reais de negócio  
+✅ Permitir auditoria completa  
+✅ Servir tanto backend quanto BI  
+
+Ele não é apenas técnico — **ele codifica o negócio**.
+
+---
+

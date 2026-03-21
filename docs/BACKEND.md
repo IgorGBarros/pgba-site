@@ -1,513 +1,322 @@
-Excelente 🔥 — agora que temos toda a **estrutura do projeto criada e organizada**, o próximo passo lógico é **configurar o módulo de IA no backend Django**, para que o endpoint `/api/chat/ask/` funcione e gere respostas inteligentes baseadas em dados SQL (Text-to-SQL).
+Excelente contexto — obrigado por colar **todo o backend real**.  
+Dá para ver claramente que o seu `BACKEND.md` antigo ficou **muito técnico** e **não explica o negócio**, enquanto o código hoje já está **bem maduro como produto SaaS**.
+
+Abaixo eu te entrego **um BACKEND.md atualizado**, **100% alinhado ao código atual**, unindo:
+
+✅ Arquitetura técnica  
+✅ Lógica de negócio  
+✅ Regras invisíveis (proteções, curas automáticas, multi-tenant)  
+✅ Fluxos reais (crawler → catálogo → estoque → venda → dashboard)  
+✅ Linguagem clara (para devs e para você no futuro)
+
+Você pode **copiar e colar direto como `BACKEND.md`**.
 
 ---
 
-# 📘 CAPÍTULO 5 — Backend AI Integration (LangChain + PostgreSQL)
+# BACKEND.md
 
-> ⚙️ **Objetivo:** Implementar e documentar toda a integração da camada de IA, incluindo  
-> configuração segura, prompt de sistema, serviço de execução e view API.
+## Visão Geral do Produto
+
+Este backend sustenta um **SaaS de gestão de estoque inteligente para consultoras de beleza (Natura, Avon, Grupo Boticário)**.
+
+O sistema combina:
+
+- **Catálogo global automatizado** (alimentado por robôs)
+- **Estoque privado por loja (multi-tenant)**
+- **Controle por lote e validade**
+- **Entrada por scanner (EAN / SKU)**
+- **Venda, baixa, perdas e uso próprio**
+- **Aprendizado automático via scraping**
+- **Dashboard financeiro e operacional**
+- **Planos Free / Pro com feature gates**
 
 ---
 
-## 🧠 1. Instalar Dependências Adicionais (Windows 11)
+## Arquitetura de Negócio (Camadas)
 
-Abra o terminal (PowerShell dentro da pasta `backend`):
-
-```powershell
-pip install sqlalchemy psycopg2-binary langchain langchain-community langchain-experimental
+```text
+Robôs (Crawler)
+        ↓
+Catálogo Global (Product)
+        ↓
+Estoque da Loja (InventoryItem + Batches)
+        ↓
+Movimentações (StockTransaction)
+        ↓
+Vendas / Saídas (Sale, SaleItem)
+        ↓
+Dashboard / Vitrine / Admin
 ```
 
-📘 **Documentação:**
-> **Passo 16:** Instala bibliotecas complementares do LangChain e SQLAlchemy (necessárias para agentes SQL com PostgreSQL).
+---
+
+## 1. Catálogo Global (Camada Pública)
+
+### Objetivo
+Manter uma **base única e protegida de produtos oficiais**, compartilhada entre todas as lojas.
+
+### Modelo: `Product`
+
+Responsabilidades:
+- Representa o **produto oficial** (Natura, Avon, Boticário…)
+- Armazena preços de referência
+- Centraliza imagens, descrições e categorias
+- Serve como base para todas as lojas
+
+Proteções importantes:
+- `bar_code` e `natura_sku` são **únicos**
+- Produtos oficiais podem ser **protegidos contra edição**
+- Lojas **não podem “sujar”** o catálogo global
 
 ---
 
-## 🗂️ 2. Estrutura e Arquivos Envolvidos
-```
-backend/
-├── ai/
-│   ├── services.py     # Core da IA
-│   ├── prompts.py      # System Prompt (contexto das tabelas)
-│   ├── views.py        # Endpoint API
-│   ├── urls.py         # Rota /api/chat/ask/
-```
+## 2. Robôs de Coleta (Crawler)
 
-📘 **Documentação:**
-> **Passo 17:** O módulo `ai` concentra toda a lógica de integração LLM → SQL (via LangChain).
+### Objetivo
+Popular e manter atualizado o catálogo global automaticamente.
+
+### Estratégia
+- SeleniumBase com anti-bloqueio
+- Navegação intercalada entre marcas
+- Extração por padrões específicos de cada site
+- Coleta de:
+  - SKU
+  - Nome
+  - Preço
+  - Imagem
+  - Descrição
+  - Categoria inteligente (`detect_category`)
+
+### Regras de Negócio
+- Nunca cria produto sem SKU válido
+- Atualiza preço e histórico (`PriceHistory`)
+- Evita páginas vazias e bloqueios
+- Limita páginas para não estourar CI/CD
 
 ---
 
-## 🧩 3. Criar Prompt de Sistema (`ai/prompts.py`)
+## 3. Multi-Tenant (Lojas)
 
-Abra e adicione:
+### Modelo: `Store`
 
-```python
-SYSTEM_PROMPT = """
-Você é um assistente de IA do sistema de gestão de estoque Natura.
-Seu papel é responder perguntas sobre produtos e estoque com base em consultas SQL.
-
-Tabelas disponíveis:
-
-1. Products
-   - id (int, PK)
-   - name (text)
-   - category (text)
-   - price (decimal)
-
-2. Inventory
-   - id (int, PK)
-   - product_id (FK -> Products)
-   - quantity (int)
-   - location (text)
+Cada usuário possui **uma loja isolada**.
 
 Regras:
-- Apenas consultas SELECT são permitidas.
-- Nunca use INSERT, UPDATE, DELETE ou DROP.
-- Se a pergunta for fora do contexto de estoque, responda:
-  "Desculpe, só posso responder sobre dados de estoque e produtos."
-- Retorne respostas em português natural, resumidas e educadas.
-"""
-```
+- Um usuário → uma loja
+- Todos os dados privados são filtrados pela loja
+- Nenhuma loja acessa dados de outra
 
-📘 **Documentação:**
-> **Passo 18:** O prompt de sistema define o papel do modelo, o schema e regras de segurança para consulta SQL.
-
----
-
-## 🔮 4. Criar Serviço de IA (`ai/services.py`)
-
-Este serviço irá:
-
-- Receber pergunta do usuário.
-- Gerar query SQL segura via LangChain.
-- Executar resultado e retornar resposta conversacional.
-
+Mixin-chave:
 ```python
-from langchain_community.llms import Ollama
-from langchain_community.utilities.sql_database import SQLDatabase
-from langchain_experimental.sql import SQLDatabaseChain
-from django.conf import settings
-from .prompts import SYSTEM_PROMPT
-
-def query_database_with_llm(user_question: str) -> str:
-    """
-    Interpreta pergunta em linguagem natural e retorna resposta SQL gerada por IA (read-only).
-    """
-    # Conexão read-only com banco
-    database_url = getattr(settings, "DATABASE_URL", "postgresql+psycopg2://postgres:postgres@localhost:5432/natura_inventory")
-    db = SQLDatabase.from_uri(database_url)
-
-    llm = Ollama(model="qwen:latest", temperature=0)
-
-    chain = SQLDatabaseChain.from_llm(llm, db, verbose=True)
-
-    # Proteção inicial contra consultas fora do contexto
-    keywords = ["estoque", "produto", "quantidade", "valor", "preço"]
-    if not any(k in user_question.lower() for k in keywords):
-        return "Desculpe, só posso responder sobre dados de estoque e produtos."
-
-    # Execução segura
-    try:
-        prompt = f"{SYSTEM_PROMPT}\n\nPergunta do usuário: {user_question}"
-        result = chain.run(prompt)
-        return result.strip()
-    except Exception as e:
-        return f"Ocorreu um erro ao processar sua pergunta: {str(e)}"
+TenantModelMixin
 ```
 
-📘 **Documentação:**
-> **Passo 19:** Implementa função `query_database_with_llm` que utiliza LangChain SQL Agent + Ollama para gerar e executar consultas seguras.
+Ele garante:
+- Filtro automático por loja
+- Criação sempre vinculada à loja correta
 
 ---
 
-## 🌐 5. Criar View API (`ai/views.py`)
+## 4. Estoque da Loja
 
-```python
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .services import query_database_with_llm
+### Modelo: `InventoryItem`
 
-class ChatAskView(APIView):
-    """
-    Endpoint do chat inteligente /api/chat/ask/
-    """
-    def post(self, request):
-        question = request.data.get("question", "").strip()
-        if not question:
-            return Response({"error": "Pergunta inválida."}, status=status.HTTP_400_BAD_REQUEST)
+Representa **o vínculo entre a loja e o produto global**.
 
-        answer = query_database_with_llm(question)
-        return Response({"response": answer}, status=status.HTTP_200_OK)
-```
+Responsabilidades:
+- Preço de custo da consultora
+- Preço de venda
+- Quantidade consolidada
+- Estoque mínimo
 
-📘 **Documentação:**
-> **Passo 20:** Cria view REST que recebe `question`, processa via LangChain, e retorna resposta textual.
+Regra crítica:
+> Uma loja só pode ter **um InventoryItem por produto**
 
 ---
 
-## 🛣️ 6. Definir Rota (`ai/urls.py`)
+## 5. Controle por Lote e Validade
 
-```python
-from django.urls import path
-from .views import ChatAskView
+### Modelo: `InventoryBatch`
 
-urlpatterns = [
-    path("ask/", ChatAskView.as_view(), name="chat-ask"),
-]
-```
+Cada entrada gera um lote:
 
-E no `core/urls.py`:
+- Quantidade própria
+- Código do lote (opcional)
+- Data de validade
 
-```python
-from django.urls import include, path
-
-urlpatterns = [
-    path("api/chat/", include("ai.urls")),
-]
-```
-
-📘 **Documentação:**
-> **Passo 21:** Define rota `/api/chat/ask/` exposta ao frontend para perguntas em linguagem natural.
+Benefícios:
+- Controle de vencimento
+- FIFO automático na venda
+- Relatórios precisos
 
 ---
 
-## 🧪 7. Testar Endpoint Localmente
+## 6. Entrada de Estoque (Scanner / Formulário)
 
-```powershell
-python manage.py runserver
+### Endpoint
+```
+POST /stock/entry/
 ```
 
-Teste manual via `curl` ou Postman:
+### Fluxo de Negócio
 
-```powershell
-curl -X POST http://127.0.0.1:8000/api/chat/ask/ -H "Content-Type: application/json" -d "{\"question\":\"Quantos Kaiak eu tenho?\"}"
+1. Usuário escaneia código ou informa dados
+2. Sistema tenta identificar produto:
+   - EAN → Produto existente
+   - SKU → Produto existente
+3. Se existir:
+   - Produto protegido → só vincula
+   - Produto local → pode enriquecer dados
+4. Se não existir:
+   - Cria produto local mínimo
+5. Cria lote
+6. Atualiza estoque consolidado
+7. Registra transação (`ENTRADA`)
+
+### Proteções Inteligentes
+- Strings vazias → `NULL`
+- Cura automática de nomes genéricos
+- Evita violação de unicidade
+- Tudo dentro de `transaction.atomic()`
+
+---
+
+## 7. Saídas / Vendas / Baixas
+
+### Modelo: `Sale`
+
+Tipos de operação:
+- VENDA
+- BRINDE
+- PRESENTE
+- PERDA
+- USO_PROPRIO
+
+### Regra de Baixa
+- Primeiro lote a vencer (FIFO)
+- Ou lote específico, se informado
+
+### Registro Duplo
+- `SaleItem` → histórico da venda
+- `StockTransaction` → extrato contábil
+
+---
+
+## 8. Extrato de Movimentações
+
+### Modelo: `StockTransaction`
+
+É o **livro razão do estoque**.
+
+Registra:
+- Entrada
+- Saída
+- Ajuste
+- Perda
+- Uso próprio
+
+Regra:
+- Quantidade positiva = entrada
+- Quantidade negativa = saída
+
+---
+
+## 9. Busca Inteligente de Produtos
+
+### Endpoint
+```
+GET /products/lookup/
 ```
 
-📘 **Documentação:**
-> **Passo 22:** Endpoint `/api/chat/ask/` validado com pergunta sobre estoque e resposta gerada por IA.
+### Estratégia
+1. Busca local (nome, EAN, SKU)
+2. Se não achar:
+   - Scraper Google Shopping
+   - Natura
+3. Aprende automaticamente:
+   - Vincula EAN ↔ SKU
+   - Cria produtos novos
+
+Resultado:
+> O sistema **fica mais inteligente a cada uso**
 
 ---
 
-## 📊 8. Resumo das Integrações AI
+## 10. Vitrine Pública
 
-| Componente | Função | Pontos críticos |
-|-------------|--------|----------------|
-| `prompts.py` | Define regras e schema SQL | Garante que o modelo entenda o domínio |
-| `services.py` | Executa LangChain Agent | Protege contra SQL injection e queries destrutivas |
-| `views.py` | Exposição via API REST | Ponte entre usuário e agente |
-| `urls.py` | Mapeamento Django REST | Endpoint `/api/chat/ask/` disponível |
-
----
-
-## 📘 Inserção na Documentação
-
-Criar arquivo `docs/BACKEND_AI.md` e copiar todo conteúdo deste capítulo.
-
-```powershell
-mkdir docs
-echo. > docs/BACKEND_AI.md
-notepad docs/BACKEND_AI.md
+### Endpoint
+```
+GET /public/{slug}
 ```
 
-📘 **Documentação:**
-> **Passo 23:** Todas as configurações de integração da IA foram registradas em `docs/BACKEND_AI.md` para rastreabilidade futura.
+Exibe:
+- Produtos disponíveis
+- Preço correto (loja > oficial)
+- Próxima validade
+- WhatsApp da loja
 
 ---
 
-## ✅ Status Atual
+## 11. Dashboard
 
-| Módulo | Status | Próximo Passo |
-|--------|--------|---------------|
-| **Backend/AI** | Configurado e testado | Ajustar conexão real com PostgreSQL e modelo Ollama local |
-| **Frontend** | Estrutura concluída | Integrar o chat com `/api/chat/ask/` e armazenar histórico |
-| **Documentação** | Atualizada até etapa AI | Criar capítulo de integração frontend↔backend |
-
----
-
-Deseja que o próximo passo seja **implementar e documentar a integração completa do frontend com o backend (ChatAssistant → /api/chat/ask/)**, incluindo tratamento de loading, erros e histórico de conversa?
-
-💡 Boa!  
-Mas há um pequeno detalhe no comando — o pacote oficial do Django REST Framework não se chama `rest_framework`, e sim **`djangorestframework`**.
+Fornece:
+- Capital investido
+- Receita potencial
+- Margem estimada
+- Estoque baixo
+- Distribuição por categoria
 
 ---
 
-## ✅ Correto:
+## 12. Autenticação
 
-```powershell
-pip install djangorestframework
-```
+Suporta:
+- Email + senha (JWT)
+- Firebase (Google / Social)
 
----
-
-📘 **Documentação:**
-> **Passo 24:** Instalação do framework REST da comunidade Django.  
-> Pacote: `djangorestframework`  
-> Utilizado para construir endpoints HTTP (APIView, Serializers, Routers) que servem dados para o frontend React.
+Tokens:
+- Access
+- Refresh
 
 ---
 
-Depois da instalação, precisamos:
+## 13. Planos e Feature Gates
 
-### 🔧 Adicionar o app ao `settings.py`
-
-Abra `backend/core/settings.py` e dentro da lista `INSTALLED_APPS`, adicione:
-
-```python
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-
-    # Apps do projeto
-    'inventory',
-    'ai',
-
-    # 🔹 Django REST Framework
-    'rest_framework',
-]
-```
-
-📘 **Documentação:**
-> **Passo 25:** Registro do app `rest_framework` nas configurações `INSTALLED_APPS` do Django.
-
----
-
-### 🧪 Testar instalação
-
-Agora podemos rodar o servidor novamente para verificar se tudo está OK:
-
-```powershell
-python manage.py runserver
-```
-
-Se o servidor iniciar sem erros, o DRF está corretamente instalado e pronto para ser usado nas views `APIView` (como já utilizamos em `ChatAskView`).
-
----
-
-Tudo pronto 🔒  
-Quer que eu documente e implemente agora a **serialização e endpoints REST do módulo `inventory` (Products e Inventory)** para que o LangChain consiga consultar dados reais da base PostgreSQL?
-
-Perfeito 👌  
-Agora vamos para a próxima etapa **(Capítulo 6)** — preparar o **módulo de estoque `inventory`** no backend Django.  
-Isso inclui:
-
-1. Criar as **tabelas Products e Inventory** no banco PostgreSQL.  
-2. Criar **Serializers, Views e URLs** do app `inventory`.  
-3. Testar os endpoints REST com Django Rest Framework.  
-4. Adicionar tudo à **documentação oficial**.
-
----
-
-# 📘 CAPÍTULO 6 — Módulo Inventory (Products + Estoque)
-
-> ⚙️ **Objetivo:** Estruturar o backend de produtos e estoque para alimentar o agente AI e permitir queries reais no PostgreSQL.
-
----
-
-## 🧱 1. Modelos Django (`inventory/models.py`)
-
-Vamos modelar as duas tabelas que o LLM usará: **Products** e **Inventory**, com relacionamento 1‑N.
-
-```python
-from django.db import models
-
-class Product(models.Model):
-    name = models.CharField(max_length=150)
-    category = models.CharField(max_length=100)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def __str__(self):
-        return self.name
-
-
-class Inventory(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="inventories")
-    quantity = models.PositiveIntegerField(default=0)
-    location = models.CharField(max_length=100)
-
-    def __str__(self):
-        return f"{self.product.name} - {self.quantity} unidades"
-```
-
-📘 **Documentação:**
-> **Passo 26:** Criação dos modelos `Product` e `Inventory` representando entidades centrais do controle de estoque.  
-> O campo `related_name="inventories"` permite fácil acesso `product.inventories` em consultas ORM.
-
----
-
-## 📦 2. Serializers (`inventory/serializers.py`)
-
-Transformam os objetos ORM em JSON para APIs e vice-versa.
-
-```python
-from rest_framework import serializers
-from .models import Product, Inventory
-
-class ProductSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        fields = ['id', 'name', 'category', 'price']
-
-
-class InventorySerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
-
-    class Meta:
-        model = Inventory
-        fields = ['id', 'product', 'quantity', 'location']
-```
-
-📘 **Documentação:**
-> **Passo 27:** Define `ProductSerializer` e `InventorySerializer` para conversão dos dados em formato JSON.
-
----
-
-## 🌐 3. Views Django REST (`inventory/views.py`)
-
-Endpoints para listar e cadastrar produtos e itens de estoque.
-
-```python
-from rest_framework import viewsets
-from .models import Product, Inventory
-from .serializers import ProductSerializer, InventorySerializer
-
-class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-
-
-class InventoryViewSet(viewsets.ModelViewSet):
-    queryset = Inventory.objects.select_related('product').all()
-    serializer_class = InventorySerializer
-```
-
-📘 **Documentação:**
-> **Passo 28:** Cria dois `ViewSet`s para exposição de dados via endpoints REST `/api/products/` e `/api/inventory/`.
-
----
-
-## 🛣️ 4. URLs (`inventory/urls.py`)
-
-```python
-from rest_framework.routers import DefaultRouter
-from .views import ProductViewSet, InventoryViewSet
-
-router = DefaultRouter()
-router.register(r"products", ProductViewSet)
-router.register(r"inventory", InventoryViewSet)
-
-urlpatterns = router.urls
-```
-
-E referencie no arquivo `core/urls.py`:
-
-```python
-from django.urls import include, path
-
-urlpatterns = [
-    path("api/chat/", include("ai.urls")),
-    path("api/", include("inventory.urls")),   # 🔹 Adiciona endpoints REST do estoque
-]
-```
-
-📘 **Documentação:**
-> **Passo 29:** Cria rotas REST automáticas usando `DefaultRouter`, expondo `/api/products/` e `/api/inventory/`.
-
----
-
-## 💾 5. Migrações e Banco
-
-Migre os modelos para o banco PostgreSQL (ou SQLite, se ainda não configurou Postgres):
-
-```powershell
-python manage.py makemigrations
-python manage.py migrate
-```
-
-Em seguida, crie alguns registros de exemplo:
-
-```powershell
-python manage.py shell
-```
-
-```python
-from inventory.models import Product, Inventory
-
-p = Product.objects.create(name="Kaiak", category="Perfume", price=89.90)
-Inventory.objects.create(product=p, quantity=42, location="CD São Paulo")
-
-exit()
-```
-
-📘 **Documentação:**
-> **Passo 30:** Aplica migrações e cria registros iniciais de produtos e estoque para testes do agente IA.
-
----
-
-## 🧪 6. Testar endpoints
-
-Teste via browser ou PowerShell usando `curl`:
-
-```powershell
-curl http://127.0.0.1:8000/api/products/
-curl http://127.0.0.1:8000/api/inventory/
-```
-
-Você deve ver os dados JSON dos produtos e do inventário.
+### Conceito
+O backend informa ao frontend **o que está liberado**.
 
 Exemplo:
-```json
-[
-  {
-    "id": 1,
-    "product": {
-      "id": 1,
-      "name": "Kaiak",
-      "category": "Perfume",
-      "price": "89.90"
-    },
-    "quantity": 42,
-    "location": "CD São Paulo"
-  }
-]
-```
+- Scanner
+- OCR de validade
+- IA
+- Vitrine
+- Produtos ilimitados
 
-📘 **Documentação:**
-> **Passo 31:** Testa funcionamento dos endpoints REST `/api/products/` e `/api/inventory/`.  
-> Estes dados servirão como base para perguntas do agente IA.
+Isso permite:
+- Evolução sem refatoração
+- Monetização clara
 
 ---
 
-## 🔐 7. Registrar no Django Admin (opcional)
+## 14. Painel Admin
 
-Se quiser visualizar e editar manualmente os dados via painel:
-
-```python
-# inventory/admin.py
-from django.contrib import admin
-from .models import Product, Inventory
-
-admin.site.register(Product)
-admin.site.register(Inventory)
-```
-
-📘 **Documentação:**
-> **Passo 32:** Registro das models no painel Admin para gerenciamento visual de dados.
+Admins podem:
+- Listar usuários
+- Ver dados das lojas
+- Alterar plano
+- Gerenciar assinatura
 
 ---
 
-## ✅ STATUS ATUAL
+## Conclusão
 
-| Módulo | Status | Próximo Passo |
-|---------|--------|---------------|
-| **Inventory (DB)** | ✅ Estruturado e migrado | Integrar com LLM para consultas reais via LangChain |
-| **AI Chat** | ✅ Setup feito | Testar conversas com dados reais do inventário |
-| **Documentação** | 🧾 Atualizada com passos 26 → 32 | Pronta para exportar futura versão markdown (`docs/INVENTORY.md`) |
+Este backend não é apenas técnico.  
+Ele implementa **regras reais de negócio**, com:
+
+✅ Proteções de dados  
+✅ Multi-tenant real  
+✅ Aprendizado automático  
+✅ Controle fiscal e operacional  
+✅ Base pronta para escalar  
 
 ---
-
-Quer que eu avance agora para o **Capítulo 7 — Integração Frontend ↔ Backend (React ChatAssistant chamando /api/chat/ask)**, com código, tratamento de erros, loading e documentação correspondente?
