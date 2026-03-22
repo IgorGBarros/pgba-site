@@ -5,11 +5,9 @@ import {
   ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { inventoryApi, movementsApi, profileApi } from "../lib/api"; 
+import { inventoryApi, movementsApi, profileApi } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
-import { usePlan } from "../hooks/usePlan";
 import { useFeatureGates } from "../hooks/useFeatureGates";
-import { useExpiryAlerts } from "../hooks/useExpiryAlerts";
 import { ChatAssistant } from "../components/ChatAssistant";
 import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
@@ -41,7 +39,6 @@ export default function Index() {
   const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
   
-  // Estado para o Popover do Sino de Notificações
   const [showNotif, setShowNotif] = useState(false);
 
   useEffect(() => {
@@ -56,24 +53,30 @@ export default function Index() {
       .then(([items, movements]) => {
         const now = new Date();
         
-        // Normalização dos Movimentos
+        // 🚀 LÓGICA DE MOVIMENTAÇÕES IDÊNTICA AO DO HISTÓRICO PARA PRECISÃO MÁXIMA
         const monthMovements = movements.filter((m) => {
           const d = new Date(m.created_at);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }).map(m => ({
-          ...m,
-          movement_type: (m as any).transaction_type?.toLowerCase() || m.movement_type || "saida"
-        }));
+        }).map(m => {
+          const rawType = (m.transaction_type || m.movement_type || "").toUpperCase();
+          const uiType = rawType === "ENTRADA" ? "entrada" : "saida"; 
+          return {
+            ...m,
+            raw_type: rawType,
+            ui_type: uiType
+          };
+        });
 
-        const salesMovements = monthMovements.filter((m) => m.movement_type === "saida" && m.sale_type === "venda");
-        const monthSales = salesMovements.reduce((s, m) => s + (m.unit_price || 0) * Math.abs(m.quantity), 0);
+        // Pega apenas as VENDAS REAIS (Saídas do tipo VENDA) deste mês
+        const salesMovements = monthMovements.filter((m) => m.ui_type === "saida" && m.raw_type === "VENDA");
         
-        const monthCost = salesMovements.reduce((s, m) => {
-          const item = items.find((i) => (i.product?.bar_code || i.barcode) === m.barcode);
-          return s + (item ? item.cost_price : 0) * Math.abs(m.quantity);
-        }, 0);
+        // Receita Real do Mês (soma o preço unitário de venda * quantidade)
+        const monthSales = salesMovements.reduce((s, m) => s + (Number(m.unit_price) || 0) * Math.abs(m.quantity), 0);
+        
+        // Lucro Real do Mês (soma o lucro já calculado e salvo pelo backend na hora da baixa)
+        const monthProfit = salesMovements.reduce((s, m) => s + (m.profit || 0), 0);
 
-        // 🚀 CÁLCULO DOS NOVOS INDICADORES DE VALOR (Custo x Venda)
+        // 🚀 CÁLCULO DE INVESTIMENTO (Baseado no saldo de estoque atual)
         const totalInvested = items.reduce((s, i) => {
           const qty = i.total_quantity ?? i.quantity ?? 0;
           return s + (qty * i.cost_price);
@@ -90,7 +93,7 @@ export default function Index() {
           potentialValue: totalPotential,
           projectedProfit: totalPotential - totalInvested,
           monthSales,
-          monthProfit: monthSales - monthCost,
+          monthProfit,
         });
         
         setLoading(false);
@@ -100,12 +103,13 @@ export default function Index() {
 
   const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   
-  // 🚀 CARDS RENOMEADOS FOCADOS NO FINANCEIRO
+  // 🚀 CARDS RENOMEADOS FOCADOS NO FINANCEIRO E LUCRO REAL DO MÊS
   const statCards = [
     { label: "Valor Investido", value: fmt(stats.investedValue), icon: Package, color: "text-muted-foreground" },
     { label: "Potencial de Venda", value: fmt(stats.potentialValue), icon: DollarSign, color: "text-primary" },
-    { label: "Lucro Projetado", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-green-600" },
-    { label: "Vendas do Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
+    { label: "Lucro Estimado Geral", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-green-600" },
+    { label: "Vendas deste Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
+    { label: "Lucro Real do Mês", value: fmt(stats.monthProfit), icon: BarChart3, color: "text-emerald-600" }, // Novo Card de Lucro do Mês!
   ];
 
   return (
@@ -121,19 +125,17 @@ export default function Index() {
               <p className="text-xs text-muted-foreground">Gestão inteligente de inventário</p>
             </div>
           </div>
-          
           <div className="flex items-center gap-1 relative">
-            {/* 🚀 MODAL DO SINO IMPLEMENTADO AQUI */}
-            <button 
-              onClick={() => setShowNotif(!showNotif)} 
+            {/* MODAL DO SINO IMPLEMENTADO AQUI */}
+            <button
+              onClick={() => setShowNotif(!showNotif)}
               className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
             >
               <Bell className="h-5 w-5" />
             </button>
-
             <AnimatePresence>
               {showNotif && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -149,7 +151,6 @@ export default function Index() {
                 </motion.div>
               )}
             </AnimatePresence>
-
             <button onClick={() => navigate("/profile")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
               <User className="h-5 w-5" />
             </button>
@@ -159,12 +160,12 @@ export default function Index() {
           </div>
         </div>
       </header>
-
+      
       <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
         <ProfileCompletionBanner />
         
         {/* CARDS FINANCEIROS (Com Skeleton Loading para evitar ansiedade) */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {statCards.map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between mb-2">
@@ -177,14 +178,13 @@ export default function Index() {
             </div>
           ))}
         </div>
-
+        
         {/* BOTÕES DE AÇÃO (Botão Manual removido) */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <ActionBtn onClick={() => navigate("/add")} icon={ScanBarcode} label="Cadastrar" desc="Escanear entrada" primary />
           <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Registrar saída" />
           <ActionBtn onClick={() => navigate("/products")} icon={List} label="Meu Estoque" desc="Lista completa" />
           <ActionBtn onClick={() => navigate("/history")} icon={History} label="Extrato" desc="Movimentações" />
-          <ActionBtn onClick={() => navigate("/dashboard")} icon={PieChart} label="Dashboard" desc="Gráficos e análises" proBadge={isLocked("dashboard_charts")} />
           
           {/* 🚀 BOTÃO VITRINE INTELIGENTE */}
           <ActionBtn
@@ -206,7 +206,6 @@ export default function Index() {
             proBadge={isLocked("storefront")}
           />
         </div>
-
         <p className="mt-10 text-center text-sm text-muted-foreground bg-secondary/30 p-4 rounded-xl border border-border/50">
           {!isLocked("chat_assistant")
             ? "💬 Clique no botão no canto inferior direito para conversar com a nossa Inteligência Artificial"
