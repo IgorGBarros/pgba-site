@@ -1,4 +1,4 @@
-// src/components/pgba/PGBACanvas.tsx - Mantém o canvas como fundo completo
+// src/components/pgba/PGBACanvas.tsx - Ajustado para canto esquerdo
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -26,22 +26,29 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Canvas apenas no canto esquerdo - 40% da largura
+    const canvasWidth = window.innerWidth * 0.4;
+    const canvasHeight = window.innerHeight;
+    
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
     const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const newWidth = window.innerWidth * 0.4;
+      const newHeight = window.innerHeight;
+      canvas.width = newWidth;
+      canvas.height = newHeight;
     };
 
-    resizeCanvas();
-
-    // Initialize particles
-    const numParticles = 80;
-    const connectionDistance = 140;
+    // Menos partículas já que a área é menor
+    const numParticles = 50;
+    const connectionDistance = 120;
     
     particlesRef.current = Array.from({ length: numParticles }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 1.0,
-      vy: (Math.random() - 0.5) * 1.0,
+      x: Math.random() * canvasWidth,
+      y: Math.random() * canvasHeight,
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: (Math.random() - 0.5) * 0.8,
       radius: Math.random() * 2 + 1,
       type: Math.random() > 0.5 ? 1 : 2,
     }));
@@ -69,7 +76,7 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         ctx.fillStyle = getParticleColor(particle.type);
-        ctx.shadowBlur = isDarkMode ? 12 : 2; // Brilha mais no escuro
+        ctx.shadowBlur = isDarkMode ? 12 : 2;
         ctx.shadowColor = getParticleColor(particle.type);
         ctx.fill();
 
@@ -82,7 +89,6 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
           if (distance < connectionDistance) {
             ctx.beginPath();
             const opacity = 1 - (distance / connectionDistance);
-            // Linha muda de cor também
             const rgbLine = isDarkMode ? '139, 92, 246' : '71, 85, 105';
             ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * (isDarkMode ? 0.4 : 0.2)})`;
             ctx.lineWidth = 1;
@@ -111,7 +117,8 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute top-0 left-0 w-full h-full z-[1]"
+      className="absolute top-0 left-0 z-[1]"
+      style={{ width: '40%', height: '100%' }}
     />
   );
 };

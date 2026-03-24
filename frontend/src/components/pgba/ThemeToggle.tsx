@@ -1,4 +1,4 @@
-// src/components/pgba/ThemeToggle.tsx - Botão posicionado no canto
+// src/components/pgba/ThemeToggle.tsx - Mantém o mesmo
 import React from 'react';
 import { Moon, Sun } from 'lucide-react';
 

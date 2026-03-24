@@ -1,4 +1,4 @@
-// src/pages/PGBANeural.tsx - Versão corrigida com layout original
+// src/pages/PGBANeural.tsx - Layout correto mantendo nomes anteriores
 import React from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { PGBACanvas } from '../../components/pgba/PGBACanvas';
@@ -15,13 +15,13 @@ const PGBANeural: React.FC = () => {
 
   return (
     <div className="flex justify-center items-center h-screen bg-slate-50 dark:bg-slate-950 font-outfit overflow-hidden transition-colors duration-500" style={{ perspective: '1000px' }}>
-      {/* Fundo Neural - Tela inteira */}
+      {/* Neural Canvas - Apenas canto esquerdo */}
       <PGBACanvas isDarkMode={isDarkMode} />
       
-      {/* Botão de tema - Posição absoluta */}
+      {/* Botão de tema - Canto superior direito */}
       <ThemeToggle isDarkMode={isDarkMode} onToggle={toggleTheme} />
       
-      {/* Logo centralizado - Como no HTML original */}
+      {/* Logo centralizado - Versão simples */}
       <PGBALogo isDarkMode={isDarkMode} />
     </div>
   );

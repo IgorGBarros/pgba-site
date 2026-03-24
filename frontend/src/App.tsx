@@ -29,7 +29,7 @@ import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
 // Nova página PGBA Neural Canvas
-import PGBANeural from "./pages/pgba/PGBANeural";
+import PGBANeural from "./pages/PGBANeural";
 
 const queryClient = new QueryClient();
 
