@@ -277,7 +277,7 @@
 
 /* Tema claro com efeitos neon extremos */
 :root:not([data-theme="dark"]) {
-  --canvas-glow-intensity: 50px;
+  --canvas-glow-intensity: 25px;
   --particle-glow-layers: 4;
   --line-glow-intensity: 25px;
 }
