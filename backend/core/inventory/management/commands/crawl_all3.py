@@ -49,7 +49,7 @@ class Command(BaseCommand):
         
         empty_pages = {store["brand"]: 0 for store in STORES}
         
-        MAX_PAGES = 3 
+        MAX_PAGES = 10
         with SB(uc=True, headless=True, page_load_strategy="eager") as sb:
             
             # 🚀 CORREÇÃO CRÍTICA DO TIMEOUT: Usando o atributo correto do WebDriver
