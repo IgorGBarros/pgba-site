@@ -46,6 +46,7 @@
     font-family: 'Outfit', sans-serif;
   }
 
+  /* Animações originais */
   @keyframes floating {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-8px); }
@@ -67,7 +68,6 @@
   @keyframes dash {
     to { stroke-dashoffset: -8; }
   }
-
   /* Novas animações de transferência de dados */
   @keyframes data-aura {
     0% { 
@@ -234,4 +234,36 @@
     50% { opacity: 1; }
     100% { opacity: 0.6; }
   }
+
+   /* Efeitos neon para tema claro */
+  .neon-glow-light {
+    filter: drop-shadow(0 0 10px currentColor) drop-shadow(0 0 20px currentColor);
+  }
+
+  .neon-text-light {
+    text-shadow: 
+      0 0 5px currentColor,
+      0 0 10px currentColor,
+      0 0 15px currentColor;
+  }
+}
+
+/* Variáveis CSS customizadas para cores neon */
+:root {
+  --neon-cyan: #00d4ff;
+  --neon-pink: #ff0080;
+  --neon-purple: #8b5cf6;
+  --neon-blue: #38bdf8;
+}
+
+/* Tema claro com cores mais vibrantes */
+:root:not([data-theme="dark"]) {
+  --primary-neon: var(--neon-cyan);
+  --secondary-neon: var(--neon-pink);
+}
+
+/* Tema escuro mantém as cores originais */
+[data-theme="dark"] {
+  --primary-neon: var(--neon-blue);
+  --secondary-neon: var(--neon-purple);
 }

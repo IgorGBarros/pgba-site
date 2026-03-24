@@ -1,4 +1,4 @@
-// src/components/pgba/PGBACanvas.tsx - Versão com mais conexões e movimento suave
+// src/components/pgba/PGBACanvas.tsx - Versão com mais neon no tema claro
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -47,15 +47,15 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
     };
 
     // Configurações ajustadas
-    const numParticles = 60; // Mais partículas para mais conexões
-    const connectionDistance = 180; // Distância maior para mais linhas conectadas
+    const numParticles = 60;
+    const connectionDistance = 180;
     
     particlesRef.current = Array.from({ length: numParticles }, () => ({
       x: Math.random() * canvasWidth,
       y: Math.random() * canvasHeight,
-      vx: (Math.random() - 0.5) * 0.3, // Movimento muito mais lento
-      vy: (Math.random() - 0.5) * 0.3, // Movimento muito mais lento
-      radius: Math.random() * 1.5 + 1, // Partículas um pouco menores
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      radius: Math.random() * 1.5 + 1,
       type: Math.random() > 0.5 ? 1 : 2,
     }));
 
@@ -63,7 +63,8 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
       if (isDarkMode) {
         return type === 1 ? '#38bdf8' : '#c026d3'; // Neon Ciano e Fuchsia
       } else {
-        return type === 1 ? '#0369a1' : '#6d28d9'; // Azul Escuro e Roxo Escuro
+        // Cores mais vibrantes e neon no tema claro
+        return type === 1 ? '#00d4ff' : '#ff0080'; // Ciano neon e Rosa neon
       }
     };
 
@@ -85,15 +86,27 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
           particle.y = Math.max(0, Math.min(canvas.height, particle.y));
         }
 
-        // Draw particle
+        // Draw particle com mais brilho no tema claro
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         ctx.fillStyle = getParticleColor(particle.type);
-        ctx.shadowBlur = isDarkMode ? 8 : 2; // Brilho mais suave
+        
+        // Brilho muito mais intenso no tema claro
+        ctx.shadowBlur = isDarkMode ? 8 : 20; // Brilho 2.5x maior no claro
         ctx.shadowColor = getParticleColor(particle.type);
         ctx.fill();
 
-        // Draw connections com mais densidade
+        // Adiciona um segundo layer de brilho no tema claro
+        if (!isDarkMode) {
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.radius * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = getParticleColor(particle.type);
+          ctx.fill();
+        }
+
+        // Draw connections com mais intensidade
         particlesRef.current.slice(i + 1).forEach((otherParticle) => {
           const dx = particle.x - otherParticle.x;
           const dy = particle.y - otherParticle.y;
@@ -102,19 +115,41 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
           if (distance < connectionDistance) {
             ctx.beginPath();
             const opacity = 1 - (distance / connectionDistance);
-            const rgbLine = isDarkMode ? '139, 92, 246' : '71, 85, 105';
             
-            // Linhas mais visíveis e suaves
-            ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * (isDarkMode ? 0.6 : 0.4)})`;
-            ctx.lineWidth = opacity > 0.7 ? 1.5 : 1; // Linhas mais próximas ficam mais grossas
+            let rgbLine, lineOpacity;
+            if (isDarkMode) {
+              rgbLine = '139, 92, 246';
+              lineOpacity = opacity * 0.6;
+            } else {
+              // Linhas mais vibrantes no tema claro
+              rgbLine = particle.type === 1 ? '0, 212, 255' : '255, 0, 128'; // Cores neon
+              lineOpacity = opacity * 0.8; // Mais opacas
+            }
+            
+            ctx.strokeStyle = `rgba(${rgbLine}, ${lineOpacity})`;
+            ctx.lineWidth = opacity > 0.7 ? 2 : 1.5; // Linhas mais grossas no claro
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(otherParticle.x, otherParticle.y);
+            
+            // Adiciona brilho nas linhas no tema claro
+            if (!isDarkMode) {
+              ctx.shadowBlur = 8;
+              ctx.shadowColor = `rgba(${rgbLine}, 0.6)`;
+            }
+            
             ctx.stroke();
             
-            // Adiciona um brilho sutil nas conexões mais fortes
-            if (opacity > 0.8 && isDarkMode) {
-              ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.2})`;
-              ctx.lineWidth = 2;
+            // Adiciona um brilho extra nas conexões mais fortes
+            if (opacity > 0.8) {
+              if (isDarkMode) {
+                ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.2})`;
+                ctx.lineWidth = 2;
+              } else {
+                // Brilho neon extra no tema claro
+                ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * 0.4})`;
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+              }
               ctx.stroke();
             }
           }
