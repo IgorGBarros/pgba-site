@@ -1,4 +1,4 @@
-// src/components/pgba/PGBACanvas.tsx - Versão com mais neon no tema claro
+// src/components/pgba/PGBACanvas.tsx - Versão com MUITO mais neon no tema claro
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -61,10 +61,10 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
 
     const getParticleColor = (type: number) => {
       if (isDarkMode) {
-        return type === 1 ? '#38bdf8' : '#c026d3'; // Neon Ciano e Fuchsia
+        return type === 1 ? '#38bdf8' : '#c026d3';
       } else {
-        // Cores mais vibrantes e neon no tema claro
-        return type === 1 ? '#00d4ff' : '#ff0080'; // Ciano neon e Rosa neon
+        // CORES NEON ULTRA SATURADAS para tema claro
+        return type === 1 ? '#00ffff' : '#ff0099'; // Ciano puro e Rosa choque
       }
     };
 
@@ -72,11 +72,10 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       particlesRef.current.forEach((particle, i) => {
-        // Update position com movimento mais suave
+        // Update position
         particle.x += particle.vx;
         particle.y += particle.vy;
         
-        // Bounce mais suave nas bordas
         if (particle.x < 0 || particle.x > canvas.width) {
           particle.vx *= -1;
           particle.x = Math.max(0, Math.min(canvas.width, particle.x));
@@ -86,71 +85,121 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
           particle.y = Math.max(0, Math.min(canvas.height, particle.y));
         }
 
-        // Draw particle com mais brilho no tema claro
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        ctx.fillStyle = getParticleColor(particle.type);
-        
-        // Brilho muito mais intenso no tema claro
-        ctx.shadowBlur = isDarkMode ? 8 : 20; // Brilho 2.5x maior no claro
-        ctx.shadowColor = getParticleColor(particle.type);
-        ctx.fill();
+        const particleColor = getParticleColor(particle.type);
 
-        // Adiciona um segundo layer de brilho no tema claro
         if (!isDarkMode) {
+          // TEMA CLARO: MÚLTIPLAS CAMADAS DE BRILHO NEON
+          
+          // Camada 1: Brilho externo gigante
           ctx.beginPath();
-          ctx.arc(particle.x, particle.y, particle.radius * 0.6, 0, Math.PI * 2);
+          ctx.arc(particle.x, particle.y, particle.radius * 4, 0, Math.PI * 2);
+          ctx.fillStyle = particleColor;
+          ctx.shadowBlur = 50;
+          ctx.shadowColor = particleColor;
+          ctx.globalAlpha = 0.1;
+          ctx.fill();
+          
+          // Camada 2: Brilho médio
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.radius * 2, 0, Math.PI * 2);
+          ctx.fillStyle = particleColor;
+          ctx.shadowBlur = 30;
+          ctx.shadowColor = particleColor;
+          ctx.globalAlpha = 0.3;
+          ctx.fill();
+          
+          // Camada 3: Brilho interno
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.radius * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = particleColor;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = particleColor;
+          ctx.globalAlpha = 0.6;
+          ctx.fill();
+          
+          // Camada 4: Núcleo ultra brilhante
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
           ctx.shadowBlur = 10;
-          ctx.shadowColor = getParticleColor(particle.type);
+          ctx.shadowColor = particleColor;
+          ctx.globalAlpha = 1;
+          ctx.fill();
+          
+          ctx.globalAlpha = 1; // Reset alpha
+        } else {
+          // TEMA ESCURO: Brilho normal
+          ctx.beginPath();
+          ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+          ctx.fillStyle = particleColor;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = particleColor;
           ctx.fill();
         }
 
-        // Draw connections com mais intensidade
+        // Draw connections
         particlesRef.current.slice(i + 1).forEach((otherParticle) => {
           const dx = particle.x - otherParticle.x;
           const dy = particle.y - otherParticle.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
           
           if (distance < connectionDistance) {
-            ctx.beginPath();
             const opacity = 1 - (distance / connectionDistance);
             
-            let rgbLine, lineOpacity;
-            if (isDarkMode) {
-              rgbLine = '139, 92, 246';
-              lineOpacity = opacity * 0.6;
-            } else {
-              // Linhas mais vibrantes no tema claro
-              rgbLine = particle.type === 1 ? '0, 212, 255' : '255, 0, 128'; // Cores neon
-              lineOpacity = opacity * 0.8; // Mais opacas
-            }
-            
-            ctx.strokeStyle = `rgba(${rgbLine}, ${lineOpacity})`;
-            ctx.lineWidth = opacity > 0.7 ? 2 : 1.5; // Linhas mais grossas no claro
-            ctx.moveTo(particle.x, particle.y);
-            ctx.lineTo(otherParticle.x, otherParticle.y);
-            
-            // Adiciona brilho nas linhas no tema claro
             if (!isDarkMode) {
-              ctx.shadowBlur = 8;
-              ctx.shadowColor = `rgba(${rgbLine}, 0.6)`;
-            }
-            
-            ctx.stroke();
-            
-            // Adiciona um brilho extra nas conexões mais fortes
-            if (opacity > 0.8) {
-              if (isDarkMode) {
-                ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.2})`;
-                ctx.lineWidth = 2;
-              } else {
-                // Brilho neon extra no tema claro
-                ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * 0.4})`;
-                ctx.lineWidth = 3;
-                ctx.shadowBlur = 15;
-              }
+              // TEMA CLARO: LINHAS NEON ULTRA BRILHANTES
+              
+              // Determina cor da linha baseada no tipo das partículas
+              const lineColor = particle.type === 1 ? '#00ffff' : '#ff0099';
+              
+              // Camada 1: Brilho externo da linha
+              ctx.beginPath();
+              ctx.moveTo(particle.x, particle.y);
+              ctx.lineTo(otherParticle.x, otherParticle.y);
+              ctx.strokeStyle = lineColor;
+              ctx.lineWidth = opacity > 0.7 ? 8 : 6;
+              ctx.shadowBlur = 25;
+              ctx.shadowColor = lineColor;
+              ctx.globalAlpha = opacity * 0.2;
               ctx.stroke();
+              
+              // Camada 2: Brilho médio da linha
+              ctx.beginPath();
+              ctx.moveTo(particle.x, particle.y);
+              ctx.lineTo(otherParticle.x, otherParticle.y);
+              ctx.strokeStyle = lineColor;
+              ctx.lineWidth = opacity > 0.7 ? 4 : 3;
+              ctx.shadowBlur = 15;
+              ctx.shadowColor = lineColor;
+              ctx.globalAlpha = opacity * 0.5;
+              ctx.stroke();
+              
+              // Camada 3: Núcleo da linha
+              ctx.beginPath();
+              ctx.moveTo(particle.x, particle.y);
+              ctx.lineTo(otherParticle.x, otherParticle.y);
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = opacity > 0.7 ? 2 : 1;
+              ctx.shadowBlur = 8;
+              ctx.shadowColor = lineColor;
+              ctx.globalAlpha = opacity * 0.8;
+              ctx.stroke();
+              
+              ctx.globalAlpha = 1; // Reset alpha
+            } else {
+              // TEMA ESCURO: Linhas normais
+              const rgbLine = '139, 92, 246';
+              ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * 0.6})`;
+              ctx.lineWidth = opacity > 0.7 ? 2 : 1.5;
+              ctx.moveTo(particle.x, particle.y);
+              ctx.lineTo(otherParticle.x, otherParticle.y);
+              ctx.stroke();
+              
+              if (opacity > 0.8) {
+                ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * 0.2})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+              }
             }
           }
         });

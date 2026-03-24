@@ -248,22 +248,43 @@
   }
 }
 
-/* Variáveis CSS customizadas para cores neon */
+  /* Classes utilitárias para neon extremo */
+  .neon-ultra-glow {
+    filter: 
+      drop-shadow(0 0 5px currentColor)
+      drop-shadow(0 0 10px currentColor)
+      drop-shadow(0 0 20px currentColor)
+      drop-shadow(0 0 40px currentColor);
+  }
+
+  .neon-text-ultra {
+    text-shadow: 
+      0 0 2px currentColor,
+      0 0 5px currentColor,
+      0 0 10px currentColor,
+      0 0 20px currentColor,
+      0 0 40px currentColor;
+  }
+
+
+/* Variáveis para cores neon ultra saturadas */
 :root {
-  --neon-cyan: #00d4ff;
-  --neon-pink: #ff0080;
+  --neon-cyan-ultra: #00ffff;
+  --neon-pink-ultra: #ff0099;
   --neon-purple: #8b5cf6;
   --neon-blue: #38bdf8;
 }
 
-/* Tema claro com cores mais vibrantes */
+/* Tema claro com efeitos neon extremos */
 :root:not([data-theme="dark"]) {
-  --primary-neon: var(--neon-cyan);
-  --secondary-neon: var(--neon-pink);
+  --canvas-glow-intensity: 50px;
+  --particle-glow-layers: 4;
+  --line-glow-intensity: 25px;
 }
 
-/* Tema escuro mantém as cores originais */
+/* Tema escuro com efeitos normais */
 [data-theme="dark"] {
-  --primary-neon: var(--neon-blue);
-  --secondary-neon: var(--neon-purple);
+  --canvas-glow-intensity: 8px;
+  --particle-glow-layers: 1;
+  --line-glow-intensity: 0px;
 }
