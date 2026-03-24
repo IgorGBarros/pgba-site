@@ -1,4 +1,4 @@
-// src/components/pgba/PGBACanvas.tsx - Ajustado para canto esquerdo
+// src/components/pgba/PGBACanvas.tsx - Versão com mais conexões e movimento suave
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -38,18 +38,24 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
       const newHeight = window.innerHeight;
       canvas.width = newWidth;
       canvas.height = newHeight;
+      
+      // Reposiciona partículas se necessário
+      particlesRef.current.forEach(particle => {
+        if (particle.x > newWidth) particle.x = newWidth - 50;
+        if (particle.y > newHeight) particle.y = newHeight - 50;
+      });
     };
 
-    // Menos partículas já que a área é menor
-    const numParticles = 50;
-    const connectionDistance = 120;
+    // Configurações ajustadas
+    const numParticles = 60; // Mais partículas para mais conexões
+    const connectionDistance = 180; // Distância maior para mais linhas conectadas
     
     particlesRef.current = Array.from({ length: numParticles }, () => ({
       x: Math.random() * canvasWidth,
       y: Math.random() * canvasHeight,
-      vx: (Math.random() - 0.5) * 0.8,
-      vy: (Math.random() - 0.5) * 0.8,
-      radius: Math.random() * 2 + 1,
+      vx: (Math.random() - 0.5) * 0.3, // Movimento muito mais lento
+      vy: (Math.random() - 0.5) * 0.3, // Movimento muito mais lento
+      radius: Math.random() * 1.5 + 1, // Partículas um pouco menores
       type: Math.random() > 0.5 ? 1 : 2,
     }));
 
@@ -65,22 +71,29 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       particlesRef.current.forEach((particle, i) => {
-        // Update position
+        // Update position com movimento mais suave
         particle.x += particle.vx;
         particle.y += particle.vy;
         
-        if (particle.x < 0 || particle.x > canvas.width) particle.vx *= -1;
-        if (particle.y < 0 || particle.y > canvas.height) particle.vy *= -1;
+        // Bounce mais suave nas bordas
+        if (particle.x < 0 || particle.x > canvas.width) {
+          particle.vx *= -1;
+          particle.x = Math.max(0, Math.min(canvas.width, particle.x));
+        }
+        if (particle.y < 0 || particle.y > canvas.height) {
+          particle.vy *= -1;
+          particle.y = Math.max(0, Math.min(canvas.height, particle.y));
+        }
 
         // Draw particle
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         ctx.fillStyle = getParticleColor(particle.type);
-        ctx.shadowBlur = isDarkMode ? 12 : 2;
+        ctx.shadowBlur = isDarkMode ? 8 : 2; // Brilho mais suave
         ctx.shadowColor = getParticleColor(particle.type);
         ctx.fill();
 
-        // Draw connections
+        // Draw connections com mais densidade
         particlesRef.current.slice(i + 1).forEach((otherParticle) => {
           const dx = particle.x - otherParticle.x;
           const dy = particle.y - otherParticle.y;
@@ -90,11 +103,20 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
             ctx.beginPath();
             const opacity = 1 - (distance / connectionDistance);
             const rgbLine = isDarkMode ? '139, 92, 246' : '71, 85, 105';
-            ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * (isDarkMode ? 0.4 : 0.2)})`;
-            ctx.lineWidth = 1;
+            
+            // Linhas mais visíveis e suaves
+            ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * (isDarkMode ? 0.6 : 0.4)})`;
+            ctx.lineWidth = opacity > 0.7 ? 1.5 : 1; // Linhas mais próximas ficam mais grossas
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(otherParticle.x, otherParticle.y);
             ctx.stroke();
+            
+            // Adiciona um brilho sutil nas conexões mais fortes
+            if (opacity > 0.8 && isDarkMode) {
+              ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.2})`;
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
           }
         });
       });
