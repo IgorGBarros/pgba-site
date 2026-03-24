@@ -1,4 +1,4 @@
-// components/PGBALogo.tsx
+// src/components/pgba/PGBALogo.tsx - Logo centralizado como cartão flutuante
 import React, { useState } from 'react';
 
 interface PGBALogoProps {

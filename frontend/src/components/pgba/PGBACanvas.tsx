@@ -1,4 +1,4 @@
-// components/PGBACanvas.tsx
+// src/components/pgba/PGBACanvas.tsx - Mantém o canvas como fundo completo
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -48,9 +48,9 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
 
     const getParticleColor = (type: number) => {
       if (isDarkMode) {
-        return type === 1 ? '#38bdf8' : '#c026d3';
+        return type === 1 ? '#38bdf8' : '#c026d3'; // Neon Ciano e Fuchsia
       } else {
-        return type === 1 ? '#0369a1' : '#6d28d9';
+        return type === 1 ? '#0369a1' : '#6d28d9'; // Azul Escuro e Roxo Escuro
       }
     };
 
@@ -69,7 +69,7 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         ctx.fillStyle = getParticleColor(particle.type);
-        ctx.shadowBlur = isDarkMode ? 12 : 2;
+        ctx.shadowBlur = isDarkMode ? 12 : 2; // Brilha mais no escuro
         ctx.shadowColor = getParticleColor(particle.type);
         ctx.fill();
 
@@ -82,6 +82,7 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
           if (distance < connectionDistance) {
             ctx.beginPath();
             const opacity = 1 - (distance / connectionDistance);
+            // Linha muda de cor também
             const rgbLine = isDarkMode ? '139, 92, 246' : '71, 85, 105';
             ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * (isDarkMode ? 0.4 : 0.2)})`;
             ctx.lineWidth = 1;
