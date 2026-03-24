@@ -46,7 +46,6 @@
     font-family: 'Outfit', sans-serif;
   }
 
-  /* Animações originais */
   @keyframes floating {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-8px); }
