@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { X, Zap, ZapOff, ImagePlus, Camera } from "lucide-react";
+import { X, Zap, ZapOff, ImagePlus } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface BarcodeScannerProps {
@@ -13,67 +13,17 @@ interface ExtendedCameraCapabilities {
   zoom?: { min: number; max: number; step: number };
 }
 
-// 🍎 Detecção de iOS
-const isIOS = (): boolean => {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-};
+// 🍎 Detectar iOS (simples)
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
 export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
   const [error, setError] = useState<string>("");
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<'checking' | 'granted' | 'denied' | 'prompt'>('checking');
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hasScannedRef = useRef(false);
-
-  const iOS = isIOS();
-
-  // 🔐 Verificar permissão de câmera ANTES de tentar usar
-  const checkCameraPermission = async (): Promise<boolean> => {
-    try {
-      // ✅ Método moderno (quando disponível)
-      if ('permissions' in navigator) {
-        const permission = await navigator.permissions.query({ name: 'camera' as PermissionName });
-        
-        if (permission.state === 'granted') {
-          setPermissionStatus('granted');
-          return true;
-        } else if (permission.state === 'denied') {
-          setPermissionStatus('denied');
-          return false;
-        }
-        // Se 'prompt', continua para teste direto
-      }
-
-      // ✅ Fallback: Teste direto (iOS sempre cai aqui)
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
-      
-      // Se chegou aqui, permissão foi concedida
-      stream.getTracks().forEach(track => track.stop()); // Libera câmera
-      setPermissionStatus('granted');
-      return true;
-
-    } catch (err: any) {
-      console.warn("Erro ao verificar permissão:", err);
-      
-      if (err.name === 'NotAllowedError') {
-        setPermissionStatus('denied');
-        return false;
-      } else if (err.name === 'NotFoundError') {
-        setError("Nenhuma câmera encontrada no dispositivo.");
-        return false;
-      }
-      
-      // Outros erros, assume que precisa perguntar
-      setPermissionStatus('prompt');
-      return false;
-    }
-  };
+  const hasScannedRef = useRef(false); // ✅ Evitar múltiplos scans
 
   useEffect(() => {
     const scannerId = "barcode-reader";
@@ -83,96 +33,80 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       try {
         setError("");
         hasScannedRef.current = false;
-        
-        // 🔐 PASSO 1: Verificar permissão primeiro
-        const hasPermission = await checkCameraPermission();
-        
-        if (!hasPermission) {
-          if (permissionStatus === 'denied') {
-            setError(iOS 
-              ? "Permissão de câmera negada. Vá em Configurações > Safari > Câmera e permita o acesso."
-              : "Permissão de câmera negada. Verifique as configurações do navegador."
-            );
-          }
+
+        // ✅ iOS: NÃO para scanner se já estiver rodando
+        if (isIOS && scannerRef.current?.isScanning) {
+          console.log("iOS: Reutilizando scanner ativo");
           return;
         }
 
-        // ✅ Reutilizar scanner se já estiver rodando (iOS-friendly)
-        if (scannerRef.current?.isScanning) {
-          console.log("Scanner já rodando, reutilizando...");
-          return;
-        }
-
-        // Para scanner anterior apenas se não estiver ativo
-        if (scannerRef.current && !scannerRef.current.isScanning) {
+        // Limpa instância anterior
+        if (scannerRef.current) {
           try { 
             await scannerRef.current.stop(); 
           } catch (e) {
-            console.warn("Erro ao parar scanner anterior:", e);
+            console.warn("Erro ao parar scanner:", e);
           }
         }
 
         const scanner = new Html5Qrcode(scannerId);
         scannerRef.current = scanner;
 
-        // Configuração otimizada
+        // ✅ Configuração otimizada para iOS
         const config = {
-          fps: iOS ? 10 : 15,
-          qrbox: iOS 
-            ? { width: 220, height: 140 }
+          fps: isIOS ? 10 : 15, // iOS: FPS menor = melhor foco
+          qrbox: isIOS 
+            ? { width: 200, height: 120 } // iOS: área menor
             : { width: 260, height: 180 },
           aspectRatio: 1.0,
-          disableFlip: iOS,
+          disableFlip: isIOS, // iOS: evita processamento extra
           formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_13, 
             Html5QrcodeSupportedFormats.EAN_8
           ]
         };
 
-        // 🔐 PASSO 2: Agora sim, iniciar scanner (permissão já verificada)
-        await scanner.start(
-          { 
-            facingMode: "environment",
-            ...(iOS && {
+        // ✅ Constraints específicos para iOS
+        const cameraConfig = isIOS 
+          ? { 
+              facingMode: "environment",
               width: { ideal: 1280 },
               height: { ideal: 720 }
-            })
-          },
+            }
+          : { facingMode: "environment" };
+
+        await scanner.start(
+          cameraConfig,
           config,
           (decodedText) => {
             if (!isMounted || hasScannedRef.current) return;
             
+            // Validação simples
             if (/^\d{8,14}$/.test(decodedText)) {
               hasScannedRef.current = true;
               
+              // ✅ iOS: Delay antes de parar scanner
+              const delay = isIOS ? 300 : 0;
               setTimeout(() => {
                 stopScanner();
                 onScan(decodedText);
-              }, iOS ? 500 : 0);
+              }, delay);
             }
           },
-          (errorMessage) => {
-            // Ignora erros normais de frame
-            if (!errorMessage.includes("No MultiFormat Readers")) {
-              console.warn("Scanner frame error:", errorMessage);
-            }
-          }
+          () => {} // Ignora erros de frame vazio
         );
 
-        setIsScanning(true);
-
-        // Detectar capacidades após inicializar
         if (isMounted) {
+          // ✅ iOS: Delay maior para detectar capacidades
+          const capabilityDelay = isIOS ? 1500 : 500;
           setTimeout(() => {
-            if (scanner.isScanning) {
-              try {
-                const capabilities = scanner.getRunningTrackCameraCapabilities() as unknown as ExtendedCameraCapabilities;
-                setHasTorch(!!capabilities?.torch);
-              } catch (e) {
-                console.warn("Erro ao detectar capacidades:", e);
-              }
+            try {
+              const capabilities = scanner.getRunningTrackCameraCapabilities() as unknown as ExtendedCameraCapabilities;
+              setHasTorch(!!capabilities?.torch);
+            } catch (e) {
+              console.warn("Erro ao detectar capacidades:", e);
             }
-          }, iOS ? 1000 : 500);
+          }, capabilityDelay);
         }
 
       } catch (err: any) {
@@ -181,21 +115,19 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         let msg = "Erro ao abrir câmera.";
         
         if (err?.name === "NotAllowedError") {
-          msg = iOS 
-            ? "Acesso à câmera foi negado. Recarregue a página e toque em 'Permitir'."
+          msg = isIOS 
+            ? "Permissão negada. Recarregue e toque 'Permitir'."
             : "Permissão de câmera negada.";
-          setPermissionStatus('denied');
         } else if (err?.name === "NotFoundError") {
           msg = "Nenhuma câmera encontrada.";
         } else if (err?.name === "NotReadableError") {
-          msg = iOS 
-            ? "Câmera em uso por outro app. Feche outros apps e tente novamente."
+          msg = isIOS 
+            ? "Câmera ocupada. Feche outros apps."
             : "Câmera não disponível.";
         }
         
         if (isMounted) {
           setError(`${msg} Tente 'Enviar Foto'.`);
-          setIsScanning(false);
         }
       }
     };
@@ -204,36 +136,22 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       if (scannerRef.current?.isScanning) {
         try { 
           await scannerRef.current.stop(); 
-          setIsScanning(false);
         } catch (e) {
           console.warn("Erro ao parar scanner:", e);
         }
       }
     };
 
-    // Delay para iOS
-    const timer = setTimeout(startScanner, iOS ? 300 : 100);
+    // ✅ iOS: Delay maior para garantir renderização
+    const initDelay = isIOS ? 300 : 100;
+    const timer = setTimeout(startScanner, initDelay);
 
-    return () => {
-      isMounted = false;
+    return () => { 
+      isMounted = false; 
       clearTimeout(timer);
-      stopScanner();
+      stopScanner(); 
     };
-  }, [onScan, iOS]);
-
-  // 🔄 Tentar novamente (quando permissão foi negada)
-  const retryPermission = async () => {
-    setPermissionStatus('checking');
-    setError("");
-    
-    // Força nova verificação
-    const hasPermission = await checkCameraPermission();
-    
-    if (hasPermission) {
-      // Reinicia o scanner
-      window.location.reload();
-    }
-  };
+  }, [onScan]);
 
   const toggleTorch = async () => {
     if (scannerRef.current && hasTorch) {
@@ -257,13 +175,14 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       const fileScanner = new Html5Qrcode("barcode-reader-file");
       const result = await fileScanner.scanFile(file, true);
       
+      // ✅ Validação também no upload
       if (/^\d{8,14}$/.test(result)) {
         onScan(result);
       } else {
         setError("Código não identificado na imagem.");
       }
     } catch (e) {
-      setError("Código não identificado na imagem. Tente uma foto mais nítida.");
+      setError("Código não identificado na imagem.");
     }
   };
 
@@ -278,8 +197,8 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       <div className="flex items-center justify-between px-4 py-4 bg-zinc-900 z-20">
         <div className="flex items-center gap-2">
           <h2 className="font-bold">Scanner</h2>
-          {iOS && <span className="text-xs bg-blue-600 px-2 py-1 rounded">iOS</span>}
-          {permissionStatus === 'checking' && <span className="text-xs bg-yellow-600 px-2 py-1 rounded">Verificando...</span>}
+          {/* ✅ Indicador iOS */}
+          {isIOS && <span className="text-xs bg-blue-600 px-2 py-1 rounded">iOS</span>}
         </div>
         
         <div className="flex gap-4">
@@ -301,12 +220,12 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       <div className="flex-1 relative overflow-hidden bg-black flex items-center justify-center">
         <div id="barcode-reader" className="w-full h-full" />
         
-        {/* Mira */}
+        {/* ✅ Mira otimizada por plataforma */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-          <div className={`${iOS ? 'w-[60%] aspect-[5/3]' : 'w-[70%] aspect-[3/2]'} border-2 border-red-500 rounded-xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]`}>
+          <div className={`${isIOS ? 'w-[60%] aspect-[5/3]' : 'w-[70%] aspect-[3/2]'} border-2 border-red-500 rounded-xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]`}>
             <div className="absolute top-1/2 w-full h-0.5 bg-red-500 animate-pulse shadow-[0_0_8px_red]" />
             
-            {/* Cantos da mira */}
+            {/* ✅ Cantos da mira (melhor visibilidade) */}
             <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white" />
             <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white" />
             <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-white" />
@@ -314,62 +233,43 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           </div>
         </div>
         
-        {/* Status de verificação de permissão */}
-        {permissionStatus === 'checking' && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-600/90 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-            <div className="w-2 h-2 bg-yellow-300 rounded-full animate-pulse" />
-            Verificando acesso à câmera...
-          </div>
-        )}
-
-        {/* Status de scanning */}
-        {isScanning && permissionStatus === 'granted' && !error && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600/90 px-3 py-1 rounded-full text-sm flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse" />
-            Procurando código...
-          </div>
-        )}
-
-        {/* Erro */}
-        {error && (
-          <div className="absolute bottom-20 left-4 right-4 bg-red-600/90 px-4 py-3 rounded-lg text-sm">
-            <div className="font-bold mb-2">⚠️ {iOS ? 'iPhone' : 'Câmera'}</div>
-            <p className="mb-3">{error}</p>
-            
-            {permissionStatus === 'denied' && (
-              <button 
-                onClick={retryPermission}
-                className="bg-white text-black px-3 py-1 rounded text-xs font-bold"
-              >
-                Tentar Novamente
-              </button>
-            )}
+        {/* ✅ Dica discreta para iOS */}
+        {isIOS && !error && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600/80 px-3 py-1 rounded-full text-xs">
+            💡 Aproxime devagar para focar
           </div>
         )}
         
-        {/* Dica iOS */}
-        {iOS && isScanning && (
-          <div className="absolute top-16 left-4 right-4 bg-blue-600/90 px-3 py-2 rounded-lg text-xs text-center">
-            💡 Mantenha o código bem iluminado e aproxime devagar
+        {error && (
+          <div className="absolute bottom-10 left-4 right-4 bg-red-600/90 px-4 py-2 rounded-lg text-sm font-bold text-center">
+            {error}
           </div>
         )}
       </div>
 
       {/* Rodapé Upload */}
       <div className="p-6 bg-zinc-900 z-20 pb-10">
-        <button
+        <button 
           onClick={() => fileInputRef.current?.click()}
           className="w-full bg-white text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
         >
           <ImagePlus size={20} />
-          {iOS ? 'Enviar Foto (Sempre Funciona)' : 'Enviar Foto (Melhor Foco)'}
+          {/* ✅ Texto específico por plataforma */}
+          {isIOS ? 'Enviar Foto (Recomendado iPhone)' : 'Enviar Foto (Melhor Foco)'}
         </button>
+        
+        {/* ✅ Dica específica iOS */}
+        {isIOS && (
+          <p className="text-xs text-zinc-400 text-center mt-2">
+            📱 Se a câmera não funcionar bem, use a foto
+          </p>
+        )}
         
         <input 
           ref={fileInputRef} 
           type="file" 
           accept="image/*" 
-          capture="environment"
+          capture="environment" // ✅ Força câmera traseira
           onChange={handleFileUpload} 
           className="hidden" 
         />
