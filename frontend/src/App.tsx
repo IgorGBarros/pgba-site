@@ -27,6 +27,7 @@ import Profile from "./pages/Profile";
 import Plans from "./pages/Plans";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
+import PGBA from "./pages/pgba/PGBA";
 
 // Nova página PGBA Neural Canvas
 import PGBANeural from "./pages/pgba/PGBANeural";
@@ -46,7 +47,7 @@ const App = () => (
                 <Routes>
                   {/* Rota pública para o PGBA Neural Canvas */}
                   <Route path="/neural" element={<PGBANeural />} />
-                  
+                  <Route path="/pgba" element={<PGBA />} />
                   {/* Suas rotas existentes */}
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
