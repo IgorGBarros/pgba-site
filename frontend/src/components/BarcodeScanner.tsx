@@ -123,6 +123,12 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           if (iOS && capabilities?.zoom && capabilities.zoom.max >= 2) {
             setTimeout(() => applyZoom(1.8), 1000);
           }
+          
+          // 🍎 Mostrar dica iOS após câmera inicializar com sucesso
+          if (iOS) {
+            setTimeout(() => setShowIOSHelper(true), 2000);
+          }
+          
         } catch (err) {
           console.warn("Erro ao detectar capacidades:", err);
         }
@@ -147,11 +153,6 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       
       if (isMountedRef.current) {
         setError(`${msg} ${iOS ? 'Use "Enviar Foto" como alternativa.' : 'Tente "Enviar Foto".'}`);
-        
-        // 🍎 Mostrar dica específica do iOS após erro
-        if (iOS) {
-          setShowIOSHelper(true);
-        }
       }
     }
   }, [iOS, onScan, stopScanner]);
@@ -209,7 +210,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
     isMountedRef.current = true;
     hasScannedRef.current = false;
     
-    // Delay maior no iOS para garantir renderização
+    // ✅ SEMPRE inicia a câmera, independente da plataforma
     const timer = setTimeout(startScanner, iOS ? 300 : 100);
     
     return () => {
@@ -314,23 +315,30 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           </div>
         )}
         
-        {/* Helper iOS */}
-        {showIOSHelper && iOS && (
-          <div className="absolute top-20 left-4 right-4 bg-blue-600/90 px-4 py-3 rounded-lg text-sm">
-            <div className="font-bold mb-2">💡 Dicas para iPhone:</div>
-            <ul className="text-xs space-y-1">
+        {/* ✅ Helper iOS - aparece APÓS câmera inicializar */}
+        {showIOSHelper && iOS && isScanning && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-16 left-4 right-4 bg-blue-600/95 px-4 py-3 rounded-lg text-sm backdrop-blur-sm"
+          >
+            <div className="font-bold mb-2 flex items-center gap-2">
+              <Smartphone size={16} />
+              💡 Dicas para iPhone
+            </div>
+            <ul className="text-xs space-y-1 mb-3">
               <li>• Mantenha o código bem iluminado</li>
               <li>• Aproxime devagar até focar</li>
-              <li>• Use o zoom 2x se disponível</li>
-              <li>• "Enviar Foto" funciona melhor</li>
+              <li>• Use zoom 2x se o código estiver pequeno</li>
+              <li>• Se não funcionar, use "Enviar Foto"</li>
             </ul>
             <button 
               onClick={() => setShowIOSHelper(false)}
-              className="mt-2 text-xs underline"
+              className="text-xs bg-white/20 px-2 py-1 rounded underline"
             >
-              Entendi
+              Entendi ✓
             </button>
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -341,12 +349,12 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           className="w-full bg-white text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all mb-2"
         >
           <ImagePlus size={20} />
-          {iOS ? 'Enviar Foto (Recomendado para iPhone)' : 'Enviar Foto (Melhor Foco)'}
+          {iOS ? 'Enviar Foto (Alternativa Confiável)' : 'Enviar Foto (Melhor Foco)'}
         </button>
         
         {iOS && (
           <p className="text-xs text-zinc-400 text-center">
-            📱 iPhones têm melhor resultado com foto do que scanner ao vivo
+            📱 Ambas as opções funcionam — escolha a que preferir
           </p>
         )}
         
