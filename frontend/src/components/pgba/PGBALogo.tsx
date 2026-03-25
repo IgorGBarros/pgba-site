@@ -1,4 +1,4 @@
-// src/components/pgba/PGBALogo.tsx - Cubo original simples do HTML
+// src/components/pgba/PGBALogo.tsx - Cubo isométrico profissional
 import React, { useState } from 'react';
 
 interface PGBALogoProps {
@@ -16,43 +16,148 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
   return (
     <div className="relative z-10 flex items-center gap-8 bg-white/85 dark:bg-slate-900/60 backdrop-blur-2xl border border-black/8 dark:border-white/10 px-16 py-12 rounded-3xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-500">
       <div 
-        className={`animate-[floating_6s_ease-in-out_infinite] filter drop-shadow-[0_0_20px_rgba(139,92,246,0.2)] cursor-pointer ${
+        className={`animate-[floating_6s_ease-in-out_infinite] cursor-pointer transition-transform duration-300 hover:scale-110 ${
           isSpinning ? 'animate-[spin360_1.2s_cubic-bezier(0.64,0.04,0.35,1)_forwards]' : ''
         }`}
         onClick={handleCubeClick}
       >
         <svg
-          viewBox="0 -5 50 70"
-          width="85"
-          height="100"
+          viewBox="0 0 100 100"
+          width="90"
+          height="90"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
+          className="drop-shadow-[0_8px_32px_rgba(59,130,246,0.3)]"
         >
           <defs>
-            <linearGradient id="pgba-blue" x1="5" y1="5" x2="25" y2="55" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#0EA5E9" />
-              <stop offset="1" stopColor="#1E3A8A" />
+            {/* Gradientes profissionais para cada face */}
+            <linearGradient id="face-top" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={isDarkMode ? "#60a5fa" : "#3b82f6"} />
+              <stop offset="100%" stopColor={isDarkMode ? "#3b82f6" : "#1d4ed8"} />
             </linearGradient>
-            <linearGradient id="pgba-ia" x1="25" y1="55" x2="45" y2="5" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#8B5CF6" />
-              <stop offset="1" stopColor="#D946EF" />
+            
+            <linearGradient id="face-left" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={isDarkMode ? "#a78bfa" : "#8b5cf6"} />
+              <stop offset="100%" stopColor={isDarkMode ? "#8b5cf6" : "#7c3aed"} />
             </linearGradient>
+            
+            <linearGradient id="face-right" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={isDarkMode ? "#34d399" : "#10b981"} />
+              <stop offset="100%" stopColor={isDarkMode ? "#10b981" : "#059669"} />
+            </linearGradient>
+
+            {/* Sombras internas para profundidade */}
+            <linearGradient id="shadow-top" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.1)" />
+            </linearGradient>
+
+            <linearGradient id="shadow-left" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+            </linearGradient>
+
+            <linearGradient id="shadow-right" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
+            </linearGradient>
+
+            {/* Filtro de brilho sutil */}
+            <filter id="subtle-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
           </defs>
           
-          {/* Faces do Cubo - Originais do HTML */}
-          <path d="M 25 5 L 5 16 L 5 44 L 25 55 L 25 30 Z" fill="url(#pgba-blue)" opacity="0.95" />
-          <path d="M 25 55 L 45 44 L 45 16 L 25 5 L 25 30 Z" fill="url(#pgba-ia)" style={{ mixBlendMode: 'multiply' }} opacity="0.85" />
-          <path d="M 5 16 L 25 5 L 45 16 L 25 27 Z" fill="#38BDF8" opacity="0.7" />
+          {/* CUBO ISOMÉTRICO PROFISSIONAL */}
           
-          {/* Conexões originais */}
-          <line x1="12" y1="19" x2="25" y2="27" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.9" strokeDasharray="4" className="animate-[dash_1.5s_linear_infinite]" />
-          <line x1="38" y1="40" x2="25" y2="27" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.9" strokeDasharray="4" className="animate-[dash_1.5s_linear_infinite]" />
-          <line x1="25" y1="27" x2="25" y2="48" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.6" strokeDasharray="2 3" />
+          {/* Face superior (azul) */}
+          <path 
+            d="M 20 35 L 50 20 L 80 35 L 50 50 Z" 
+            fill="url(#face-top)" 
+            stroke="rgba(255,255,255,0.2)" 
+            strokeWidth="0.5"
+          />
           
-          {/* Pontos originais */}
-          <circle cx="12" cy="19" r="2.5" fill="#FFFFFF" opacity="0.9" />
-          <circle cx="38" cy="40" r="2.5" fill="#FFFFFF" opacity="0.9" />
-          <circle cx="25" cy="27" r="3.5" fill="#FFFFFF" className="animate-[pulsing_2s_ease-in-out_infinite]" />
+          {/* Sombra interna da face superior */}
+          <path 
+            d="M 20 35 L 50 20 L 80 35 L 50 50 Z" 
+            fill="url(#shadow-top)" 
+          />
+          
+          {/* Face esquerda (roxa) */}
+          <path 
+            d="M 20 35 L 50 50 L 50 80 L 20 65 Z" 
+            fill="url(#face-left)" 
+            stroke="rgba(255,255,255,0.1)" 
+            strokeWidth="0.5"
+          />
+          
+          {/* Sombra interna da face esquerda */}
+          <path 
+            d="M 20 35 L 50 50 L 50 80 L 20 65 Z" 
+            fill="url(#shadow-left)" 
+          />
+          
+          {/* Face direita (verde) */}
+          <path 
+            d="M 50 50 L 80 35 L 80 65 L 50 80 Z" 
+            fill="url(#face-right)" 
+            stroke="rgba(255,255,255,0.1)" 
+            strokeWidth="0.5"
+          />
+          
+          {/* Sombra interna da face direita */}
+          <path 
+            d="M 50 50 L 80 35 L 80 65 L 50 80 Z" 
+            fill="url(#shadow-right)" 
+          />
+
+          {/* Bordas de destaque para dar definição */}
+          <line x1="20" y1="35" x2="50" y2="20" 
+                stroke="rgba(255,255,255,0.4)" 
+                strokeWidth="1" 
+                filter="url(#subtle-glow)" />
+          
+          <line x1="50" y1="20" x2="80" y2="35" 
+                stroke="rgba(255,255,255,0.4)" 
+                strokeWidth="1" 
+                filter="url(#subtle-glow)" />
+          
+          <line x1="50" y1="50" x2="50" y2="80" 
+                stroke="rgba(255,255,255,0.3)" 
+                strokeWidth="1" />
+
+          {/* Pontos de conexão sutis */}
+          <circle cx="50" cy="20" r="1.5" 
+                  fill="rgba(255,255,255,0.8)" 
+                  filter="url(#subtle-glow)" />
+          
+          <circle cx="20" cy="35" r="1.5" 
+                  fill="rgba(255,255,255,0.6)" />
+          
+          <circle cx="80" cy="35" r="1.5" 
+                  fill="rgba(255,255,255,0.6)" />
+
+          {/* Elemento central de dados (opcional) */}
+          <circle cx="50" cy="50" r="3" 
+                  fill="rgba(255,255,255,0.9)" 
+                  className="animate-[pulsing_3s_ease-in-out_infinite]"
+                  filter="url(#subtle-glow)" />
+          
+          {/* Pequenos detalhes de conectividade */}
+          <line x1="45" y1="45" x2="55" y2="55" 
+                stroke="rgba(255,255,255,0.4)" 
+                strokeWidth="0.5" 
+                strokeDasharray="2 1" />
+          
+          <line x1="55" y1="45" x2="45" y2="55" 
+                stroke="rgba(255,255,255,0.4)" 
+                strokeWidth="0.5" 
+                strokeDasharray="2 1" />
         </svg>
       </div>
       
