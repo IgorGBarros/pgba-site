@@ -432,94 +432,31 @@
   }
 }
 
-/* ========================================
-   VARIÁVEIS DE CORES NEON
-   ======================================== */
-
+/* ===== VARIÁVEIS DE CORES ORIGINAIS ===== */
 :root {
-  /* Cores neon base */
-  --neon-cyan: #00d4ff;
-  --neon-pink: #ff0080;
-  --neon-purple: #8b5cf6;
-  --neon-blue: #38bdf8;
+  /* Cores do tema claro - mais vibrantes */
+  --bg-page-light: #f8fafc;
+  --card-bg-light: rgba(255, 255, 255, 0.85);
+  --card-border-light: rgba(0, 0, 0, 0.08);
+  --text-main-light: #0f172a;
+  --text-sub-light: #64748b;
+  --shadow-light: 0 20px 40px -10px rgba(0,0,0,0.08);
   
-  /* Cores neon ultra saturadas */
-  --neon-cyan-ultra: #00ffff;
-  --neon-pink-ultra: #ff0099;
-  --neon-green-ultra: #00ff88;
-  --neon-white: #ffffff;
+  /* Cores do tema escuro - originais */
+  --bg-page-dark: #020617;
+  --card-bg-dark: rgba(15, 23, 42, 0.6);
+  --card-border-dark: rgba(255, 255, 255, 0.1);
+  --text-main-dark: #ffffff;
+  --text-sub-dark: #94a3b8;
+  --shadow-dark: 0 30px 60px -15px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
-/* ========================================
-   CONFIGURAÇÕES DE TEMA
-   ======================================== */
-
-/* Tema claro com efeitos neon extremos */
+/* ===== TEMA CLARO ===== */
 :root:not([data-theme="dark"]) {
-  --primary-neon: var(--neon-cyan-ultra);
-  --secondary-neon: var(--neon-pink-ultra);
-  --canvas-glow-intensity: 50px;
-  --particle-glow-layers: 4;
-  --line-glow-intensity: 25px;
-  --prisma-energy-intensity: 1;
-}
-
-/* Tema escuro com efeitos suaves */
-[data-theme="dark"] {
-  --primary-neon: var(--neon-blue);
-  --secondary-neon: var(--neon-purple);
-  --canvas-glow-intensity: 8px;
-  --particle-glow-layers: 1;
-  --line-glow-intensity: 0px;
-  --prisma-energy-intensity: 0.7;
-}
-
-/* ========================================
-   RESPONSIVIDADE PARA ANIMAÇÕES
-   ======================================== */
-
-@media (prefers-reduced-motion: reduce) {
-  /* Reduz animações para usuários que preferem menos movimento */
-  .animate-prisma-float,
-  .animate-prisma-rotate,
-  .animate-energy-ring,
-  .animate-particle-orbit-1,
-  .animate-particle-orbit-2,
-  .animate-particle-orbit-3 {
-    animation-duration: 20s !important;
-  }
-  
-  .animate-core-processing,
-  .animate-core-energy {
-    animation: none !important;
-  }
-}
-
-@media (max-width: 768px) {
-  /* Otimizações para mobile */
-  .energy-ring {
-    animation-duration: 8s !important;
-  }
-  
-  .prisma-container {
-    transform: scale(0.8);
-  }
-}
-
-/* ========================================
-   PERFORMANCE OPTIMIZATIONS
-   ======================================== */
-
-/* Força aceleração por hardware para animações pesadas */
-.prisma-container,
-.energy-aura,
-.particle-orbital {
-  will-change: transform;
-  transform-style: preserve-3d;
-}
-
-/* Otimização para filtros SVG */
-.neon-filter {
-  filter: url(#neon-glow-intense);
-  will-change: filter;
+  --bg-page: var(--bg-page-light);
+  --card-bg: var(--card-bg-light);
+  --card-border: var(--card-border-light);
+  --text-main: var(--text-main-light);
+  --text-sub: var(--text-sub-light);
+  --shadow: var(--shadow-light);
 }
