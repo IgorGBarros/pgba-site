@@ -1,4 +1,4 @@
-/* Seu CSS existente + Animações 3D das Bolinhas Integradas */
+/* Seu CSS existente + Animações 3D das Bolinhas + Responsividade Completa */
 
 #root {
   max-width: 1280px;
@@ -600,6 +600,156 @@
 }
 
 /* ========================================
+   RESPONSIVIDADE COMPLETA
+   ======================================== */
+
+/* ===== RESPONSIVIDADE MELHORADA ===== */
+@media (max-width: 768px) {
+  /* Ajustes gerais para mobile */
+  #root {
+    padding: 1rem;
+  }
+
+  /* Ajustes para o canvas neural */
+  .neural-canvas-mobile {
+    opacity: 0.3; /* Reduz opacidade no mobile para não interferir na leitura */
+  }
+
+  /* Layout responsivo do logo */
+  .logo-container-responsive {
+    flex-direction: column !important;
+    gap: 1rem !important;
+    padding: 1.5rem !important;
+    margin: 1rem !important;
+    max-width: 20rem !important;
+    text-align: center !important;
+  }
+
+  /* Cubo menor no mobile */
+  .cube-mobile {
+    width: 70px !important;
+    height: 85px !important;
+  }
+
+  /* Texto responsivo */
+  .text-responsive-main {
+    font-size: 3rem !important;
+    line-height: 1 !important;
+  }
+
+  .text-responsive-sub {
+    font-size: 0.625rem !important;
+    letter-spacing: 0.125rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  /* Botão de tema compacto */
+  .theme-button-mobile {
+    top: 1rem !important;
+    right: 1rem !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Esconde elementos complexos no mobile */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Otimizações de animação para mobile */
+  svg circle {
+    animation-duration: 8s !important; /* Animações mais lentas */
+  }
+  
+  .animate-floating {
+    animation-duration: 8s !important;
+  }
+
+  /* Simplifica efeitos visuais */
+  .backdrop-blur-2xl {
+    backdrop-filter: blur(8px) !important;
+  }
+  
+  .drop-shadow-\[0_4px_20px_rgba\(59\,130\,246\,0\.25\)\] {
+    filter: drop-shadow(0 2px 10px rgba(59,130,246,0.15)) !important;
+  }
+  
+  /* Simplifica sombras */
+  .shadow-\[0_20px_40px_-10px_rgba\(0\,0\,0\,0\.08\)\] {
+    box-shadow: 0 4px 12px -2px rgba(0,0,0,0.1) !important;
+  }
+
+  /* Canvas responsivo */
+  .canvas-responsive {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Ajustes para telas muito pequenas */
+  .logo-container-mobile {
+    padding: 1rem !important;
+    margin: 0.5rem !important;
+    max-width: 18rem !important;
+  }
+
+  .text-responsive-main {
+    font-size: 2.5rem !important;
+  }
+
+  .text-responsive-sub {
+    font-size: 0.5rem !important;
+  }
+
+  /* Reduz ainda mais as animações */
+  svg * {
+    animation-duration: 10s !important;
+  }
+
+  /* Botão ainda menor */
+  .theme-button-mobile {
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.625rem !important;
+  }
+}
+
+/* ===== CLASSES UTILITÁRIAS RESPONSIVAS ===== */
+.container-responsive {
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .container-responsive {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* Mostra elementos desktop */
+  .desktop-only {
+    display: block !important;
+  }
+
+  /* Layout desktop do logo */
+  .logo-container-responsive {
+    flex-direction: row !important;
+    gap: 2rem !important;
+    padding: 4rem !important;
+    margin: 0 !important;
+    max-width: none !important;
+    text-align: left !important;
+  }
+
+  /* Canvas desktop */
+  .canvas-responsive {
+    width: 40% !important;
+    height: 100% !important;
+  }
+}
+
+/* ========================================
    OTIMIZAÇÕES DE PERFORMANCE
    ======================================== */
 
@@ -655,4 +805,61 @@
 /* Classe para pausar animações quando necessário */
 .pause-animations * {
   animation-play-state: paused !important;
+}
+
+/* ===== CLASSES ESPECÍFICAS PARA RESPONSIVIDADE ===== */
+
+/* Utilitários de visibilidade responsiva */
+.mobile-only {
+  display: block;
+}
+
+.desktop-only {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none;
+  }
+  
+  .desktop-only {
+    display: block;
+  }
+}
+
+/* Utilitários de layout responsivo */
+.flex-responsive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .flex-responsive {
+    flex-direction: row;
+    text-align: left;
+  }
+}
+
+/* Utilitários de espaçamento responsivo */
+.gap-responsive {
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .gap-responsive {
+    gap: 2rem;
+  }
+}
+
+.padding-responsive {
+  padding: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .padding-responsive {
+    padding: 4rem;
+  }
 }

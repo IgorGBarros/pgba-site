@@ -1,4 +1,4 @@
-// src/components/pgba/PGBACanvas.tsx - Canvas neural com cores mais vibrantes no tema claro
+// src/components/pgba/PGBACanvas.tsx - Canvas responsivo
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -26,45 +26,51 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Canvas apenas no canto esquerdo - 40% da largura
-    const canvasWidth = window.innerWidth * 0.4;
-    const canvasHeight = window.innerHeight;
-    
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+    const updateCanvasSize = () => {
+      const isMobile = window.innerWidth < 768;
+      
+      if (isMobile) {
+        // Mobile: Canvas ocupa toda a tela como fundo
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      } else {
+        // Desktop: Canvas apenas no canto esquerdo
+        canvas.width = window.innerWidth * 0.4;
+        canvas.height = window.innerHeight;
+      }
+    };
+
+    updateCanvasSize();
 
     const resizeCanvas = () => {
-      const newWidth = window.innerWidth * 0.4;
-      const newHeight = window.innerHeight;
-      canvas.width = newWidth;
-      canvas.height = newHeight;
+      updateCanvasSize();
       
       // Reposiciona partículas se necessário
       particlesRef.current.forEach(particle => {
-        if (particle.x > newWidth) particle.x = newWidth - 50;
-        if (particle.y > newHeight) particle.y = newHeight - 50;
+        if (particle.x > canvas.width) particle.x = canvas.width - 50;
+        if (particle.y > canvas.height) particle.y = canvas.height - 50;
       });
     };
 
-    // Configurações ajustadas
-    const numParticles = 60;
-    const connectionDistance = 180;
+    // Configurações responsivas
+    const isMobile = window.innerWidth < 768;
+    const numParticles = isMobile ? 40 : 60; // Menos partículas no mobile
+    const connectionDistance = isMobile ? 120 : 180;
     
     particlesRef.current = Array.from({ length: numParticles }, () => ({
-      x: Math.random() * canvasWidth,
-      y: Math.random() * canvasHeight,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      radius: Math.random() * 1.5 + 1,
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.3), // Movimento mais lento no mobile
+      vy: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.3),
+      radius: Math.random() * (isMobile ? 1.2 : 1.5) + (isMobile ? 0.8 : 1), // Partículas menores no mobile
       type: Math.random() > 0.5 ? 1 : 2,
     }));
 
     const getParticleColor = (type: number) => {
       if (isDarkMode) {
-        return type === 1 ? '#38bdf8' : '#c026d3'; // Cores originais escuro
+        return type === 1 ? '#38bdf8' : '#c026d3';
       } else {
-        // CORES MAIS VIBRANTES NO TEMA CLARO
-        return type === 1 ? '#0066ff' : '#cc0099'; // Azul e Rosa mais saturados
+        return type === 1 ? '#0066ff' : '#cc0099';
       }
     };
 
@@ -72,11 +78,10 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       particlesRef.current.forEach((particle, i) => {
-        // Update position com movimento mais suave
+        // Update position
         particle.x += particle.vx;
         particle.y += particle.vy;
         
-        // Bounce mais suave nas bordas
         if (particle.x < 0 || particle.x > canvas.width) {
           particle.vx *= -1;
           particle.x = Math.max(0, Math.min(canvas.width, particle.x));
@@ -90,11 +95,11 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
         ctx.fillStyle = getParticleColor(particle.type);
-        ctx.shadowBlur = isDarkMode ? 8 : 15; // Mais brilho no tema claro
+        ctx.shadowBlur = isDarkMode ? (isMobile ? 6 : 8) : (isMobile ? 10 : 15);
         ctx.shadowColor = getParticleColor(particle.type);
         ctx.fill();
 
-        // Draw connections com mais densidade
+        // Draw connections
         particlesRef.current.slice(i + 1).forEach((otherParticle) => {
           const dx = particle.x - otherParticle.x;
           const dy = particle.y - otherParticle.y;
@@ -109,34 +114,30 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
               rgbLine = '139, 92, 246';
               lineOpacity = opacity * 0.6;
             } else {
-              // LINHAS MAIS VIBRANTES NO TEMA CLARO
-              rgbLine = particle.type === 1 ? '0, 102, 255' : '204, 0, 153'; // Azul e Rosa vibrantes
-              lineOpacity = opacity * 0.8; // Mais opacas
+              rgbLine = particle.type === 1 ? '0, 102, 255' : '204, 0, 153';
+              lineOpacity = opacity * 0.8;
             }
             
             ctx.strokeStyle = `rgba(${rgbLine}, ${lineOpacity})`;
-            ctx.lineWidth = opacity > 0.7 ? 2 : 1.5; // Linhas mais grossas
+            ctx.lineWidth = opacity > 0.7 ? (isMobile ? 1.5 : 2) : (isMobile ? 1 : 1.5);
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(otherParticle.x, otherParticle.y);
             
-            // Adiciona brilho nas linhas no tema claro
             if (!isDarkMode) {
-              ctx.shadowBlur = 5;
+              ctx.shadowBlur = isMobile ? 3 : 5;
               ctx.shadowColor = `rgba(${rgbLine}, 0.4)`;
             }
             
             ctx.stroke();
             
-            // Adiciona um brilho extra nas conexões mais fortes
             if (opacity > 0.8) {
               if (isDarkMode) {
                 ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.2})`;
-                ctx.lineWidth = 2;
+                ctx.lineWidth = isMobile ? 1.5 : 2;
               } else {
-                // Brilho extra no tema claro
                 ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * 0.3})`;
-                ctx.lineWidth = 2.5;
-                ctx.shadowBlur = 8;
+                ctx.lineWidth = isMobile ? 2 : 2.5;
+                ctx.shadowBlur = isMobile ? 6 : 8;
               }
               ctx.stroke();
             }
@@ -162,8 +163,7 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute top-0 left-0 z-[1]"
-      style={{ width: '40%', height: '100%' }}
+      className="absolute top-0 left-0 z-[1] md:w-[40%] w-full h-full"
     />
   );
 };

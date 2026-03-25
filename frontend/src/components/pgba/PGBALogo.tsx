@@ -1,4 +1,4 @@
-// src/components/pgba/PGBALogo.tsx - Cubo com bolinhas animadas em 3D
+// src/components/pgba/PGBALogo.tsx - Logo responsivo
 import React, { useState } from 'react';
 
 interface PGBALogoProps {
@@ -14,7 +14,7 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
   };
 
   return (
-    <div className="relative z-10 flex items-center gap-8 bg-white/85 dark:bg-slate-900/60 backdrop-blur-2xl border border-black/8 dark:border-white/10 px-16 py-12 rounded-3xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-500">
+    <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 md:gap-8 bg-white/85 dark:bg-slate-900/60 backdrop-blur-2xl border border-black/8 dark:border-white/10 px-6 py-8 md:px-16 md:py-12 rounded-2xl md:rounded-3xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-500 mx-4 md:mx-0 max-w-sm md:max-w-none">
       <div 
         className={`animate-[floating_6s_ease-in-out_infinite] cursor-pointer transition-transform duration-300 hover:scale-105 ${
           isSpinning ? 'animate-[spin360_1.2s_cubic-bezier(0.64,0.04,0.35,1)_forwards]' : ''
@@ -23,11 +23,11 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
       >
         <svg
           viewBox="0 -5 50 70"
-          width="85"
-          height="100"
+          width="70"
+          height="85"
+          className="md:w-[85px] md:h-[100px] drop-shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="drop-shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
         >
           <defs>
             {/* Gradientes profissionais corporativos */}
@@ -142,7 +142,7 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
                 strokeOpacity="0.7" 
                 strokeDasharray="2 2" />
 
-          {/* BOLINHAS ANIMADAS EM 3D */}
+          {/* BOLINHAS ANIMADAS EM 3D - Responsivas */}
           
           {/* Bolinha 1 - Movimento orbital no eixo XY */}
           <circle r="2.2" 
@@ -151,7 +151,7 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
                   strokeWidth="0.5"
                   opacity="0.9"
                   filter="url(#professional-glow)"
-                  className="animate-[orbit-xy_4s_ease-in-out_infinite]">
+                  className="animate-[orbit-xy_4s_ease-in-out_infinite] md:block hidden">
             <animateTransform
               attributeName="transform"
               type="translate"
@@ -167,14 +167,14 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
             />
           </circle>
           
-          {/* Bolinha 2 - Movimento em Z simulado com escala e posição */}
+          {/* Bolinha 2 - Movimento em Z simulado */}
           <circle r="2.2" 
                   fill="rgba(255,255,255,0.95)" 
                   stroke={isDarkMode ? "#a78bfa" : "#8b5cf6"}
                   strokeWidth="0.5"
                   opacity="0.9"
                   filter="url(#professional-glow)"
-                  className="animate-[orbit-z_5s_ease-in-out_infinite]">
+                  className="animate-[orbit-z_5s_ease-in-out_infinite] md:block hidden">
             <animateTransform
               attributeName="transform"
               type="translate"
@@ -196,7 +196,7 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
             />
           </circle>
           
-          {/* Núcleo central com movimento sutil em todos os eixos */}
+          {/* Núcleo central - Sempre visível */}
           <circle r="3.2" 
                   fill="rgba(255,255,255,0.98)" 
                   stroke={isDarkMode ? "#38bdf8" : "#0ea5e9"}
@@ -218,11 +218,11 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
             />
           </circle>
 
-          {/* Partículas extras flutuando */}
+          {/* Partículas extras - Apenas desktop */}
           <circle r="1" 
                   fill={isDarkMode ? "#60a5fa" : "#3b82f6"} 
                   opacity="0.7"
-                  className="animate-[particle-float-1_3s_ease-in-out_infinite]">
+                  className="animate-[particle-float-1_3s_ease-in-out_infinite] md:block hidden">
             <animateTransform
               attributeName="transform"
               type="translate"
@@ -241,7 +241,7 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
           <circle r="0.8" 
                   fill={isDarkMode ? "#a78bfa" : "#8b5cf6"} 
                   opacity="0.6"
-                  className="animate-[particle-float-2_4.5s_ease-in-out_infinite]">
+                  className="animate-[particle-float-2_4.5s_ease-in-out_infinite] md:block hidden">
             <animateTransform
               attributeName="transform"
               type="translate"
@@ -265,11 +265,11 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
         </svg>
       </div>
       
-      <div className="flex flex-col border-l-2 border-black/8 dark:border-white/10 pl-8 transition-colors duration-500">
-        <h1 className="text-5xl font-medium text-slate-900 dark:text-white tracking-[2px] m-0 leading-[0.95] transition-colors duration-500">
+      <div className="flex flex-col md:border-l-2 border-black/8 dark:border-white/10 md:pl-8 transition-colors duration-500 text-center md:text-left">
+        <h1 className="text-3xl md:text-5xl font-medium text-slate-900 dark:text-white tracking-[2px] m-0 leading-[0.95] transition-colors duration-500">
           PGBA<span className="text-sky-500 font-bold drop-shadow-[0_0_10px_rgba(14,165,233,0.3)]">.</span>
         </h1>
-        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-[3.5px] mt-2 transition-colors duration-500">
+        <span className="text-[10px] md:text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-[2px] md:tracking-[3.5px] mt-2 transition-colors duration-500">
           Data, AI & Tech Solutions
         </span>
       </div>
