@@ -863,3 +863,16 @@
     padding: 4rem;
   }
 }
+
+/* Adicione essas animações ao seu CSS existente */
+
+/* Animação de gradiente */
+@keyframes gradient-x {
+  0%, 100% {
+    background-size: 200% 200%;
+    background-position: left center;
+  }
+  50% {
+    background-size: 200% 200%;
+    background-position: right center
+  }}
