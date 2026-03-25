@@ -1,4 +1,4 @@
-// src/components/pgba/PGBALogo.tsx - Cubo original com design profissional
+// src/components/pgba/PGBALogo.tsx - Cubo com bolinhas animadas em 3D
 import React, { useState } from 'react';
 
 interface PGBALogoProps {
@@ -142,33 +142,126 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
                 strokeOpacity="0.7" 
                 strokeDasharray="2 2" />
 
-          {/* Pontos de conexão profissionais */}
-          <circle cx="12" cy="19" r="2.2" 
+          {/* BOLINHAS ANIMADAS EM 3D */}
+          
+          {/* Bolinha 1 - Movimento orbital no eixo XY */}
+          <circle r="2.2" 
                   fill="rgba(255,255,255,0.95)" 
                   stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
                   strokeWidth="0.5"
                   opacity="0.9"
-                  filter="url(#professional-glow)" />
+                  filter="url(#professional-glow)"
+                  className="animate-[orbit-xy_4s_ease-in-out_infinite]">
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="12 19; 18 22; 25 27; 32 32; 25 37; 18 32; 12 19"
+              dur="4s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values="2.2; 3; 2.2; 1.8; 2.2; 3; 2.2"
+              dur="4s"
+              repeatCount="indefinite"
+            />
+          </circle>
           
-          <circle cx="38" cy="40" r="2.2" 
+          {/* Bolinha 2 - Movimento em Z simulado com escala e posição */}
+          <circle r="2.2" 
                   fill="rgba(255,255,255,0.95)" 
                   stroke={isDarkMode ? "#a78bfa" : "#8b5cf6"}
                   strokeWidth="0.5"
                   opacity="0.9"
-                  filter="url(#professional-glow)" />
+                  filter="url(#professional-glow)"
+                  className="animate-[orbit-z_5s_ease-in-out_infinite]">
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="38 40; 35 35; 30 30; 25 27; 30 24; 35 29; 38 40"
+              dur="5s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values="2.2; 1.5; 1; 2.8; 3.2; 2.8; 2.2"
+              dur="5s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="opacity"
+              values="0.9; 0.6; 0.4; 1; 1; 0.8; 0.9"
+              dur="5s"
+              repeatCount="indefinite"
+            />
+          </circle>
           
-          {/* Núcleo central profissional */}
-          <circle cx="25" cy="27" r="3.2" 
+          {/* Núcleo central com movimento sutil em todos os eixos */}
+          <circle r="3.2" 
                   fill="rgba(255,255,255,0.98)" 
                   stroke={isDarkMode ? "#38bdf8" : "#0ea5e9"}
                   strokeWidth="0.8"
-                  className="animate-[professional-pulse_3s_ease-in-out_infinite]"
-                  filter="url(#professional-glow)" />
+                  filter="url(#professional-glow)"
+                  className="animate-[core-3d_6s_ease-in-out_infinite]">
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="25 27; 26 26; 25 25; 24 26; 25 27; 26 28; 25 27"
+              dur="6s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values="3.2; 3.8; 3.2; 2.8; 3.2; 3.6; 3.2"
+              dur="6s"
+              repeatCount="indefinite"
+            />
+          </circle>
 
-          {/* Detalhes internos sutis */}
+          {/* Partículas extras flutuando */}
+          <circle r="1" 
+                  fill={isDarkMode ? "#60a5fa" : "#3b82f6"} 
+                  opacity="0.7"
+                  className="animate-[particle-float-1_3s_ease-in-out_infinite]">
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="15 25; 20 20; 25 25; 30 30; 25 35; 20 30; 15 25"
+              dur="3s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="opacity"
+              values="0.7; 1; 0.5; 0.8; 0.6; 1; 0.7"
+              dur="3s"
+              repeatCount="indefinite"
+            />
+          </circle>
+
+          <circle r="0.8" 
+                  fill={isDarkMode ? "#a78bfa" : "#8b5cf6"} 
+                  opacity="0.6"
+                  className="animate-[particle-float-2_4.5s_ease-in-out_infinite]">
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="35 35; 30 40; 25 45; 20 40; 25 35; 30 30; 35 35"
+              dur="4.5s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values="0.8; 1.2; 0.8; 0.5; 0.8; 1; 0.8"
+              dur="4.5s"
+              repeatCount="indefinite"
+            />
+          </circle>
+
+          {/* Detalhes internos do núcleo */}
           <circle cx="25" cy="27" r="1.5" 
                   fill={isDarkMode ? "#60a5fa" : "#3b82f6"} 
-                  opacity="0.6" />
+                  opacity="0.6"
+                  className="animate-[core-inner_2s_ease-in-out_infinite]" />
         </svg>
       </div>
       

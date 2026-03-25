@@ -1,4 +1,4 @@
-/* Seu CSS existente + Animações do Prisma 3D integradas */
+/* Seu CSS existente + Animações 3D das Bolinhas Integradas */
 
 #root {
   max-width: 1280px;
@@ -46,7 +46,7 @@
 }
 
 /* ========================================
-   ANIMAÇÕES PGBA NEURAL & PRISMA 3D
+   ANIMAÇÕES PGBA NEURAL & CUBO 3D
    ======================================== */
 
 @layer utilities {
@@ -54,7 +54,7 @@
     font-family: 'Outfit', sans-serif;
   }
 
-  /* Animações originais refinadas */
+  /* ===== ANIMAÇÕES ORIGINAIS REFINADAS ===== */
   @keyframes floating {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-8px); }
@@ -76,6 +76,89 @@
     }
   }
 
+  @keyframes dash {
+    to { stroke-dashoffset: -6; }
+  }
+
+  @keyframes pulsing {
+    0% { r: 3.5; opacity: 0.8; }
+    50% { r: 4.5; opacity: 1; filter: drop-shadow(0 0 8px #fff); }
+    100% { r: 3.5; opacity: 0.8; }
+  }
+
+  /* ===== ANIMAÇÕES 3D DAS BOLINHAS DO CUBO ===== */
+  
+  /* Movimento orbital no plano XY */
+  @keyframes orbit-xy {
+    0% { cx: 12; cy: 19; r: 2.2; }
+    16.66% { cx: 18; cy: 22; r: 3; }
+    33.33% { cx: 25; cy: 27; r: 2.2; }
+    50% { cx: 32; cy: 32; r: 1.8; }
+    66.66% { cx: 25; cy: 37; r: 2.2; }
+    83.33% { cx: 18; cy: 32; r: 3; }
+    100% { cx: 12; cy: 19; r: 2.2; }
+  }
+
+  /* Movimento simulando eixo Z com escala e opacidade */
+  @keyframes orbit-z {
+    0% { cx: 38; cy: 40; r: 2.2; opacity: 0.9; }
+    14.28% { cx: 35; cy: 35; r: 1.5; opacity: 0.6; }
+    28.57% { cx: 30; cy: 30; r: 1; opacity: 0.4; }
+    42.85% { cx: 25; cy: 27; r: 2.8; opacity: 1; }
+    57.14% { cx: 30; cy: 24; r: 3.2; opacity: 1; }
+    71.42% { cx: 35; cy: 29; r: 2.8; opacity: 0.8; }
+    85.71% { cx: 38; cy: 35; r: 2.4; opacity: 0.7; }
+    100% { cx: 38; cy: 40; r: 2.2; opacity: 0.9; }
+  }
+
+  /* Movimento 3D do núcleo central */
+  @keyframes core-3d {
+    0% { cx: 25; cy: 27; r: 3.2; }
+    14.28% { cx: 26; cy: 26; r: 3.8; }
+    28.57% { cx: 25; cy: 25; r: 3.2; }
+    42.85% { cx: 24; cy: 26; r: 2.8; }
+    57.14% { cx: 25; cy: 27; r: 3.2; }
+    71.42% { cx: 26; cy: 28; r: 3.6; }
+    85.71% { cx: 25; cy: 28; r: 3.4; }
+    100% { cx: 25; cy: 27; r: 3.2; }
+  }
+
+  /* Partícula flutuante 1 */
+  @keyframes particle-float-1 {
+    0% { cx: 15; cy: 25; opacity: 0.7; r: 1; }
+    14.28% { cx: 20; cy: 20; opacity: 1; r: 1.2; }
+    28.57% { cx: 25; cy: 25; opacity: 0.5; r: 0.8; }
+    42.85% { cx: 30; cy: 30; opacity: 0.8; r: 1.1; }
+    57.14% { cx: 25; cy: 35; opacity: 0.6; r: 0.9; }
+    71.42% { cx: 20; cy: 30; opacity: 1; r: 1.3; }
+    85.71% { cx: 18; cy: 28; opacity: 0.8; r: 1; }
+    100% { cx: 15; cy: 25; opacity: 0.7; r: 1; }
+  }
+
+  /* Partícula flutuante 2 */
+  @keyframes particle-float-2 {
+    0% { cx: 35; cy: 35; r: 0.8; }
+    11.11% { cx: 30; cy: 40; r: 1.2; }
+    22.22% { cx: 25; cy: 45; r: 0.8; }
+    33.33% { cx: 20; cy: 40; r: 0.5; }
+    44.44% { cx: 25; cy: 35; r: 0.8; }
+    55.55% { cx: 30; cy: 30; r: 1; }
+    66.66% { cx: 32; cy: 32; r: 1.1; }
+    77.77% { cx: 34; cy: 34; r: 0.9; }
+    88.88% { cx: 35; cy: 36; r: 0.7; }
+    100% { cx: 35; cy: 35; r: 0.8; }
+  }
+
+  /* Animação do núcleo interno */
+  @keyframes core-inner {
+    0% { r: 1.5; opacity: 0.6; }
+    25% { r: 1.8; opacity: 0.8; }
+    50% { r: 1.2; opacity: 0.4; }
+    75% { r: 1.6; opacity: 0.7; }
+    100% { r: 1.5; opacity: 0.6; }
+  }
+
+  /* Animação profissional do pulse */
   @keyframes professional-pulse {
     0% { 
       r: 3.2; 
@@ -90,19 +173,6 @@
       opacity: 0.9; 
     }
   }
-
-  @keyframes dash {
-    to { stroke-dashoffset: -6; }
-  }
-
-  @keyframes pulsing {
-    0% { r: 3.5; opacity: 0.8; }
-    50% { r: 4.5; opacity: 1; filter: drop-shadow(0 0 8px #fff); }
-    100% { r: 3.5; opacity: 0.8; }
-  }
-
-
-  
 
   /* ===== ANIMAÇÕES DE ENERGIA E AURA ===== */
   @keyframes energy-aura {
@@ -240,7 +310,7 @@
     }
   }
 
-  /* ===== ANIMAÇÕES DE PARTÍCULAS ORBITAIS ===== */
+  /* ===== ANIMAÇÕES DE PARTÍCULAS ORBITAIS (PRISMA) ===== */
   @keyframes particle-orbit-1 {
     0% { 
       cx: 50; 
@@ -435,9 +505,58 @@
   .bg-gradient-radial {
     background: radial-gradient(circle, var(--tw-gradient-stops));
   }
+
+  /* ===== CLASSES CSS PARA MOVIMENTOS ALTERNATIVOS ===== */
+  .orbit-xy-css {
+    animation: orbit-xy-transform 4s ease-in-out infinite;
+  }
+
+  .orbit-z-css {
+    animation: orbit-z-transform 5s ease-in-out infinite;
+  }
+
+  .core-3d-css {
+    animation: core-3d-transform 6s ease-in-out infinite;
+  }
+
+  /* ===== TRANSFORMAÇÕES CSS COMO FALLBACK ===== */
+  @keyframes orbit-xy-transform {
+    0% { transform: translate(12px, 19px) scale(1); }
+    16.66% { transform: translate(18px, 22px) scale(1.36); }
+    33.33% { transform: translate(25px, 27px) scale(1); }
+    50% { transform: translate(32px, 32px) scale(0.82); }
+    66.66% { transform: translate(25px, 37px) scale(1); }
+    83.33% { transform: translate(18px, 32px) scale(1.36); }
+    100% { transform: translate(12px, 19px) scale(1); }
+  }
+
+  @keyframes orbit-z-transform {
+    0% { transform: translate(38px, 40px) scale(1); opacity: 0.9; }
+    14.28% { transform: translate(35px, 35px) scale(0.68); opacity: 0.6; }
+    28.57% { transform: translate(30px, 30px) scale(0.45); opacity: 0.4; }
+    42.85% { transform: translate(25px, 27px) scale(1.27); opacity: 1; }
+    57.14% { transform: translate(30px, 24px) scale(1.45); opacity: 1; }
+    71.42% { transform: translate(35px, 29px) scale(1.27); opacity: 0.8; }
+    85.71% { transform: translate(38px, 35px) scale(1.09); opacity: 0.7; }
+    100% { transform: translate(38px, 40px) scale(1); opacity: 0.9; }
+  }
+
+  @keyframes core-3d-transform {
+    0% { transform: translate(25px, 27px) scale(1); }
+    14.28% { transform: translate(26px, 26px) scale(1.19); }
+    28.57% { transform: translate(25px, 25px) scale(1); }
+    42.85% { transform: translate(24px, 26px) scale(0.88); }
+    57.14% { transform: translate(25px, 27px) scale(1); }
+    71.42% { transform: translate(26px, 28px) scale(1.13); }
+    85.71% { transform: translate(25px, 28px) scale(1.06); }
+    100% { transform: translate(25px, 27px) scale(1); }
+  }
 }
 
-/* ===== VARIÁVEIS DE CORES ORIGINAIS ===== */
+/* ========================================
+   VARIÁVEIS DE CORES
+   ======================================== */
+
 :root {
   /* Cores do tema claro - mais vibrantes */
   --bg-page-light: #f8fafc;
@@ -456,7 +575,11 @@
   --shadow-dark: 0 30px 60px -15px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
-/* ===== TEMA CLARO ===== */
+/* ========================================
+   CONFIGURAÇÕES DE TEMA
+   ======================================== */
+
+/* Tema claro */
 :root:not([data-theme="dark"]) {
   --bg-page: var(--bg-page-light);
   --card-bg: var(--card-bg-light);
@@ -464,4 +587,72 @@
   --text-main: var(--text-main-light);
   --text-sub: var(--text-sub-light);
   --shadow: var(--shadow-light);
+}
+
+/* Tema escuro */
+[data-theme="dark"] {
+  --bg-page: var(--bg-page-dark);
+  --card-bg: var(--card-bg-dark);
+  --card-border: var(--card-border-dark);
+  --text-main: var(--text-main-dark);
+  --text-sub: var(--text-sub-dark);
+  --shadow: var(--shadow-dark);
+}
+
+/* ========================================
+   OTIMIZAÇÕES DE PERFORMANCE
+   ======================================== */
+
+/* Força aceleração por hardware para animações suaves */
+.cube-particles {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Reduz animações para dispositivos com preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  .orbit-xy-css,
+  .orbit-z-css,
+  .core-3d-css {
+    animation-duration: 10s !important;
+  }
+  
+  /* Pausa animações SVG para acessibilidade */
+  svg circle[class*="animate-"],
+  svg line[class*="animate-"] {
+    animation-play-state: paused !important;
+  }
+}
+
+/* Otimizações para mobile */
+@media (max-width: 768px) {
+  .cube-particles {
+    animation-duration: 1.5s !important;
+  }
+  
+  /* Reduz complexidade das animações em telas pequenas */
+  svg circle {
+    animation-duration: 6s !important;
+  }
+}
+
+/* ========================================
+   CLASSES DE UTILIDADE EXTRAS
+   ======================================== */
+
+/* Classe para elementos que precisam de hardware acceleration */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Classe para suavizar animações */
+.smooth-animation {
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Classe para pausar animações quando necessário */
+.pause-animations * {
+  animation-play-state: paused !important;
 }
