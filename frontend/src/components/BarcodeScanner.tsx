@@ -24,7 +24,7 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const hasScannedRef = useRef(false); // Evita múltiplos scans
+  const hasScannedRef = useRef(false);
 
   useEffect(() => {
     const scannerId = "barcode-reader";
@@ -48,11 +48,11 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
         const scanner = new Html5Qrcode(scannerId);
         scannerRef.current = scanner;
 
-        // ✅ Configuração otimizada para iOS (mais conservadora)
+        // ✅ Configuração otimizada por plataforma
         const config = {
-          fps: isIOS ? 12 : 15, // iOS: um pouco mais lento = melhor foco
+          fps: isIOS ? 12 : 15,
           qrbox: isIOS 
-            ? { width: 240, height: 160 } // iOS: área um pouco menor
+            ? { width: 240, height: 160 }
             : { width: 260, height: 180 },
           aspectRatio: 1.0,
           formatsToSupport: [
@@ -71,25 +71,22 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
             if (/^\d{8,14}$/.test(decodedText)) {
               hasScannedRef.current = true;
               
-              // ✅ iOS: pequeno delay para mostrar resultado antes de fechar
-              if (isIOS) {
-                setTimeout(() => {
-                  stopScanner();
-                  onScan(decodedText);
-                }, 200);
-              } else {
+              // ✅ Delay para ambas as plataformas (mostra resultado)
+              const delay = isIOS ? 200 : 150;
+              setTimeout(() => {
                 stopScanner();
                 onScan(decodedText);
-              }
+              }, delay);
             }
           },
           () => {} // Ignora erros de frame vazio
         );
 
+        // ✅ Scanner iniciado com sucesso
         setIsScanning(true);
 
         if (isMounted) {
-          // ✅ iOS: delay maior para detectar torch
+          // Detectar torch após inicialização
           const torchDelay = isIOS ? 1000 : 500;
           setTimeout(() => {
             try {
@@ -124,7 +121,6 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       }
     };
 
-    // ✅ iOS: delay um pouco maior para garantir renderização
     const initDelay = isIOS ? 200 : 100;
     const timer = setTimeout(startScanner, initDelay);
 
@@ -157,7 +153,6 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       const fileScanner = new Html5Qrcode("barcode-reader-file");
       const result = await fileScanner.scanFile(file, true);
       
-      // ✅ Validação também no upload
       if (/^\d{8,14}$/.test(result)) {
         onScan(result);
       } else {
@@ -179,8 +174,12 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       <div className="flex items-center justify-between px-4 py-4 bg-zinc-900 z-20">
         <div className="flex items-center gap-2">
           <h2 className="font-bold">Scanner</h2>
-          {/* ✅ Indicador sutil de plataforma */}
-          {isIOS && <span className="text-xs text-blue-400">📱</span>}
+          {/* ✅ Indicador de plataforma */}
+          {isIOS ? (
+            <span className="text-xs text-blue-400">📱</span>
+          ) : (
+            <span className="text-xs text-green-400">🤖</span>
+          )}
         </div>
         
         <div className="flex gap-4">
@@ -202,12 +201,12 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
       <div className="flex-1 relative overflow-hidden bg-black flex items-center justify-center">
         <div id="barcode-reader" className="w-full h-full" />
         
-        {/* ✅ Mira otimizada por plataforma */}
+        {/* Mira otimizada por plataforma */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
           <div className={`${isIOS ? 'w-[65%] aspect-[3/2]' : 'w-[70%] aspect-[3/2]'} border-2 border-red-500 rounded-xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]`}>
             <div className="absolute top-1/2 w-full h-0.5 bg-red-500 animate-pulse shadow-[0_0_8px_red]" />
             
-            {/* ✅ Cantos da mira para melhor visibilidade */}
+            {/* Cantos da mira */}
             <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-white rounded-tl-sm" />
             <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-white rounded-tr-sm" />
             <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-white rounded-bl-sm" />
@@ -215,25 +214,42 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           </div>
         </div>
         
-        {/* ✅ Status de scanning */}
+        {/* ✅ Status de scanning - AMBAS AS PLATAFORMAS */}
         {isScanning && !error && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600/90 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600/90 px-4 py-2 rounded-full text-sm flex items-center gap-2 backdrop-blur-sm"
+          >
             <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse" />
-            {isIOS ? 'Focando...' : 'Procurando código...'}
-          </div>
+            {isIOS ? 'Focando câmera...' : 'Procurando código...'}
+          </motion.div>
         )}
         
-        {/* ✅ Dica discreta para iOS */}
-        {isIOS && isScanning && !error && (
-          <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-blue-600/80 px-3 py-1 rounded-full text-xs">
-            💡 Aproxime devagar
-          </div>
+        {/* ✅ Dica específica por plataforma - AMBAS */}
+        {isScanning && !error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.5 }} // Aparece após 1.5s
+            className={`absolute top-16 left-1/2 transform -translate-x-1/2 px-3 py-1 rounded-full text-xs backdrop-blur-sm ${
+              isIOS 
+                ? 'bg-blue-600/80' 
+                : 'bg-emerald-600/80'
+            }`}
+          >
+            {isIOS ? '💡 Aproxime devagar para focar' : '🎯 Mantenha o código na mira'}
+          </motion.div>
         )}
         
         {error && (
-          <div className="absolute bottom-10 left-4 right-4 bg-red-600/90 px-4 py-2 rounded-lg text-sm font-bold text-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute bottom-10 left-4 right-4 bg-red-600/90 px-4 py-3 rounded-lg text-sm font-bold text-center backdrop-blur-sm"
+          >
             {error}
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -247,11 +263,19 @@ export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps)
           {isIOS ? 'Enviar Foto (Alternativa)' : 'Enviar Foto (Melhor Foco)'}
         </button>
         
+        {/* ✅ Dica no rodapé - AMBAS AS PLATAFORMAS */}
+        <p className="text-xs text-zinc-400 text-center mt-2">
+          {isIOS 
+            ? '📱 Otimizado para iPhone' 
+            : '🤖 Scanner rápido para Android'
+          }
+        </p>
+        
         <input 
           ref={fileInputRef} 
           type="file" 
           accept="image/*" 
-          capture="environment" // ✅ Força câmera traseira no mobile
+          capture="environment"
           onChange={handleFileUpload} 
           className="hidden" 
         />
