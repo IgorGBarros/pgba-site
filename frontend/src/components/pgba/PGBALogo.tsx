@@ -1,4 +1,4 @@
-// src/components/pgba/PGBALogo.tsx - Cubo original simples do HTML
+// src/components/pgba/PGBALogo.tsx - Cubo original com design profissional
 import React, { useState } from 'react';
 
 interface PGBALogoProps {
@@ -16,7 +16,7 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
   return (
     <div className="relative z-10 flex items-center gap-8 bg-white/85 dark:bg-slate-900/60 backdrop-blur-2xl border border-black/8 dark:border-white/10 px-16 py-12 rounded-3xl shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-500">
       <div 
-        className={`animate-[floating_6s_ease-in-out_infinite] filter drop-shadow-[0_0_20px_rgba(139,92,246,0.2)] cursor-pointer ${
+        className={`animate-[floating_6s_ease-in-out_infinite] cursor-pointer transition-transform duration-300 hover:scale-105 ${
           isSpinning ? 'animate-[spin360_1.2s_cubic-bezier(0.64,0.04,0.35,1)_forwards]' : ''
         }`}
         onClick={handleCubeClick}
@@ -27,32 +27,148 @@ export const PGBALogo: React.FC<PGBALogoProps> = ({ isDarkMode }) => {
           height="100"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
+          className="drop-shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
         >
           <defs>
-            <linearGradient id="pgba-blue" x1="5" y1="5" x2="25" y2="55" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#0EA5E9" />
-              <stop offset="1" stopColor="#1E3A8A" />
+            {/* Gradientes profissionais corporativos */}
+            <linearGradient id="pgba-blue-pro" x1="5" y1="5" x2="25" y2="55" gradientUnits="userSpaceOnUse">
+              <stop stopColor={isDarkMode ? "#60a5fa" : "#3b82f6"} />
+              <stop offset="0.5" stopColor={isDarkMode ? "#3b82f6" : "#2563eb"} />
+              <stop offset="1" stopColor={isDarkMode ? "#1e40af" : "#1d4ed8"} />
             </linearGradient>
-            <linearGradient id="pgba-ia" x1="25" y1="55" x2="45" y2="5" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#8B5CF6" />
-              <stop offset="1" stopColor="#D946EF" />
+            
+            <linearGradient id="pgba-purple-pro" x1="25" y1="55" x2="45" y2="5" gradientUnits="userSpaceOnUse">
+              <stop stopColor={isDarkMode ? "#a78bfa" : "#8b5cf6"} />
+              <stop offset="0.5" stopColor={isDarkMode ? "#8b5cf6" : "#7c3aed"} />
+              <stop offset="1" stopColor={isDarkMode ? "#7c3aed" : "#6d28d9"} />
             </linearGradient>
+
+            <linearGradient id="pgba-top-pro" x1="5" y1="16" x2="45" y2="16" gradientUnits="userSpaceOnUse">
+              <stop stopColor={isDarkMode ? "#38bdf8" : "#0ea5e9"} />
+              <stop offset="0.5" stopColor={isDarkMode ? "#0ea5e9" : "#0284c7"} />
+              <stop offset="1" stopColor={isDarkMode ? "#0284c7" : "#0369a1"} />
+            </linearGradient>
+
+            {/* Sombras internas para profundidade */}
+            <linearGradient id="shadow-blue" x1="5" y1="5" x2="25" y2="55" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
+            </linearGradient>
+
+            <linearGradient id="shadow-purple" x1="25" y1="55" x2="45" y2="5" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
+            </linearGradient>
+
+            {/* Filtro de brilho sutil */}
+            <filter id="professional-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
           </defs>
           
-          {/* Faces do Cubo - Originais do HTML */}
-          <path d="M 25 5 L 5 16 L 5 44 L 25 55 L 25 30 Z" fill="url(#pgba-blue)" opacity="0.95" />
-          <path d="M 25 55 L 45 44 L 45 16 L 25 5 L 25 30 Z" fill="url(#pgba-ia)" style={{ mixBlendMode: 'multiply' }} opacity="0.85" />
-          <path d="M 5 16 L 25 5 L 45 16 L 25 27 Z" fill="#38BDF8" opacity="0.7" />
+          {/* Faces do Cubo - Formato original com gradientes profissionais */}
           
-          {/* Conexões originais */}
-          <line x1="12" y1="19" x2="25" y2="27" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.9" strokeDasharray="4" className="animate-[dash_1.5s_linear_infinite]" />
-          <line x1="38" y1="40" x2="25" y2="27" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.9" strokeDasharray="4" className="animate-[dash_1.5s_linear_infinite]" />
-          <line x1="25" y1="27" x2="25" y2="48" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.6" strokeDasharray="2 3" />
+          {/* Face esquerda (azul) */}
+          <path 
+            d="M 25 5 L 5 16 L 5 44 L 25 55 L 25 30 Z" 
+            fill="url(#pgba-blue-pro)" 
+            opacity="0.95"
+          />
           
-          {/* Pontos originais */}
-          <circle cx="12" cy="19" r="2.5" fill="#FFFFFF" opacity="0.9" />
-          <circle cx="38" cy="40" r="2.5" fill="#FFFFFF" opacity="0.9" />
-          <circle cx="25" cy="27" r="3.5" fill="#FFFFFF" className="animate-[pulsing_2s_ease-in-out_infinite]" />
+          {/* Sombra interna da face esquerda */}
+          <path 
+            d="M 25 5 L 5 16 L 5 44 L 25 55 L 25 30 Z" 
+            fill="url(#shadow-blue)" 
+          />
+          
+          {/* Face direita (roxa) */}
+          <path 
+            d="M 25 55 L 45 44 L 45 16 L 25 5 L 25 30 Z" 
+            fill="url(#pgba-purple-pro)" 
+            style={{ mixBlendMode: 'multiply' }} 
+            opacity="0.85"
+          />
+          
+          {/* Sombra interna da face direita */}
+          <path 
+            d="M 25 55 L 45 44 L 45 16 L 25 5 L 25 30 Z" 
+            fill="url(#shadow-purple)" 
+          />
+          
+          {/* Face superior (azul claro) */}
+          <path 
+            d="M 5 16 L 25 5 L 45 16 L 25 27 Z" 
+            fill="url(#pgba-top-pro)" 
+            opacity="0.8"
+          />
+
+          {/* Bordas de destaque profissionais */}
+          <line x1="25" y1="5" x2="5" y2="16" 
+                stroke="rgba(255,255,255,0.4)" 
+                strokeWidth="0.8" 
+                filter="url(#professional-glow)" />
+          
+          <line x1="25" y1="5" x2="45" y2="16" 
+                stroke="rgba(255,255,255,0.4)" 
+                strokeWidth="0.8" 
+                filter="url(#professional-glow)" />
+          
+          <line x1="25" y1="30" x2="25" y2="55" 
+                stroke="rgba(255,255,255,0.3)" 
+                strokeWidth="0.6" />
+
+          {/* Conexões originais com estilo profissional */}
+          <line x1="12" y1="19" x2="25" y2="27" 
+                stroke="rgba(255,255,255,0.8)" 
+                strokeWidth="1.2" 
+                strokeOpacity="0.9" 
+                strokeDasharray="3 1.5" 
+                className="animate-[dash_2s_linear_infinite]" />
+          
+          <line x1="38" y1="40" x2="25" y2="27" 
+                stroke="rgba(255,255,255,0.8)" 
+                strokeWidth="1.2" 
+                strokeOpacity="0.9" 
+                strokeDasharray="3 1.5" 
+                className="animate-[dash_2s_linear_infinite] [animation-delay:0.5s]" />
+          
+          <line x1="25" y1="27" x2="25" y2="48" 
+                stroke="rgba(255,255,255,0.6)" 
+                strokeWidth="1" 
+                strokeOpacity="0.7" 
+                strokeDasharray="2 2" />
+
+          {/* Pontos de conexão profissionais */}
+          <circle cx="12" cy="19" r="2.2" 
+                  fill="rgba(255,255,255,0.95)" 
+                  stroke={isDarkMode ? "#60a5fa" : "#3b82f6"}
+                  strokeWidth="0.5"
+                  opacity="0.9"
+                  filter="url(#professional-glow)" />
+          
+          <circle cx="38" cy="40" r="2.2" 
+                  fill="rgba(255,255,255,0.95)" 
+                  stroke={isDarkMode ? "#a78bfa" : "#8b5cf6"}
+                  strokeWidth="0.5"
+                  opacity="0.9"
+                  filter="url(#professional-glow)" />
+          
+          {/* Núcleo central profissional */}
+          <circle cx="25" cy="27" r="3.2" 
+                  fill="rgba(255,255,255,0.98)" 
+                  stroke={isDarkMode ? "#38bdf8" : "#0ea5e9"}
+                  strokeWidth="0.8"
+                  className="animate-[professional-pulse_3s_ease-in-out_infinite]"
+                  filter="url(#professional-glow)" />
+
+          {/* Detalhes internos sutis */}
+          <circle cx="25" cy="27" r="1.5" 
+                  fill={isDarkMode ? "#60a5fa" : "#3b82f6"} 
+                  opacity="0.6" />
         </svg>
       </div>
       
