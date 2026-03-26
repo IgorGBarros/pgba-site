@@ -51,6 +51,7 @@ export interface AuthUser {
   email: string;
   name?: string;
 }
+
 export const authApi = {
   login: (email: string, password: string) =>
     apiRequest<{ access: string; refresh: string }>("/api/auth/login/", {
@@ -83,6 +84,7 @@ export interface GlobalProduct {
   brand: string | null;
   description: string | null;
 }
+
 export interface LookupResult {
   found: boolean;
   source: "local" | "remote" | "remote_learned" | "remote_partial" | "suggestion" | "fuzzy" | "none";
@@ -91,6 +93,7 @@ export interface LookupResult {
   data?: any;                     
   message?: string | null; 
 }
+
 export const productLookupApi = {
   lookup: (barcodeOrName: string | null) => {
     const query = barcodeOrName ?? "";
@@ -169,12 +172,10 @@ export const inventoryApi = {
     if (!forceRefresh && inventoryCache) {
       return inventoryCache;
     }
-
     const data = await apiRequest<InventoryItem[]>("/api/inventory/");
     inventoryCache = data; // Guarda em Standby
     return data;
   },
-
   get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
                                      : apiRequest<InventoryItem>(`/api/inventory/${id}/`)),
                                      
@@ -185,7 +186,6 @@ export const inventoryApi = {
     const items = await inventoryApi.list();
     return items.find(i => i.product?.bar_code === barcode || i.barcode === barcode) || null;
   },
-
   update: async (id: string, data: Partial<InventoryItem>) => {
     const res = await apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
       method: "PATCH",
@@ -194,7 +194,6 @@ export const inventoryApi = {
     clearAppCache(); // 🧹 Limpa cache ao alterar
     return res;
   },
-
   delete: async (id: string) => {
     await apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" });
     clearAppCache(); // 🧹 Limpa cache ao deletar
@@ -229,6 +228,7 @@ export const batchApi = {
 
 // ── Movements ──
 export type TransactionType = "venda" | "uso_proprio" | "presente" | "brinde" | "perda";
+
 export interface Movement {
   id: string | number;
   transaction_type?: string; 
@@ -257,12 +257,10 @@ export const movementsApi = {
     if (!forceRefresh && movementsCache) {
       return movementsCache;
     }
-
     const data = await apiRequest<Movement[]>("/api/transactions/");
     movementsCache = data; // Guarda em Standby
     return data;
   },
-
   create: async (data: Omit<Movement, "id" | "created_at" | "profit">) => {
     if (isDemoMode()) return { id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement;
     const res = await apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
@@ -318,6 +316,88 @@ export interface StorefrontItem {
   store_slug: string | null;
 }
 
+// ✅ CORREÇÃO: API pública da vitrine com tratamento de erro robusto
+export const publicStorefrontApi = {
+  listBySlug: async (slug: string) => {
+    try {
+      console.log(`🔍 Buscando vitrine por slug: ${slug}`);
+      
+      // ✅ CORREÇÃO: Usar API_BASE_URL completo
+      const response = await fetch(`${API_BASE_URL}/api/public/storefront/${slug}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+          // ✅ SEM Authorization header para endpoint público
+        }
+      });
+      
+      console.log(`📊 Status da resposta: ${response.status}`);
+      
+      if (!response.ok) {
+        // ✅ CORREÇÃO: Melhor tratamento de erro
+        let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          const errorText = await response.text();
+          if (errorText.includes('<!doctype')) {
+            errorMessage = 'Endpoint não encontrado (retornou HTML)';
+          }
+        }
+        
+        console.error(`❌ Erro ${response.status}:`, errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Dados recebidos:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Erro na API publicStorefront:', error);
+      throw error;
+    }
+  },
+  
+  listById: async (sellerId: string) => {
+    try {
+      console.log(`🔍 Buscando vitrine por ID: ${sellerId}`);
+      
+      // ✅ CORREÇÃO: Usar API_BASE_URL completo
+      const response = await fetch(`${API_BASE_URL}/api/public/storefront/?seller=${sellerId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          const errorText = await response.text();
+          if (errorText.includes('<!doctype')) {
+            errorMessage = 'Endpoint não encontrado (retornou HTML)';
+          }
+        }
+        
+        console.error(`❌ Erro ${response.status}:`, errorMessage);
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Dados recebidos:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Erro na API publicStorefront:', error);
+      throw error;
+    }
+  }
+};
+
+// ✅ CORREÇÃO: Manter compatibilidade com API existente
 export const storefrontApi = {
   list: (sellerId?: string) => {
     if (isDemoMode() || sellerId === "demo") {
@@ -338,12 +418,19 @@ export const storefrontApi = {
         }));
       return Promise.resolve(demoItems);
     }
-    const params = sellerId ? `?seller=${sellerId}` : "";
-    return apiRequest<StorefrontItem[]>(`/api/storefront/${params}`);
+    
+    // ✅ CORREÇÃO: Para vitrine pública, usar API pública
+    if (sellerId) {
+      return publicStorefrontApi.listById(sellerId);
+    }
+    
+    // ✅ Fallback para API autenticada (se necessário)
+    return apiRequest<StorefrontItem[]>("/api/storefront/");
   },
+  
   listBySlug: (slug: string) => {
     if (slug === "demo") return storefrontApi.list("demo");
-    return apiRequest<StorefrontItem[]>(`/api/storefront/${slug}/`);
+    return publicStorefrontApi.listBySlug(slug);
   },
 };
 
@@ -378,39 +465,4 @@ export const salesApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-};
-// lib/api.ts - SUBSTITUA ou ADICIONE
-
-export const publicStorefrontApi = {
-  listBySlug: async (slug: string) => {
-    const response = await fetch(`/api/public/storefront/${slug}/`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-        // ✅ SEM Authorization header
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Erro ${response.status}: ${response.statusText}`);
-    }
-    
-    return response.json();
-  },
-  
-  listById: async (sellerId: string) => {
-    const response = await fetch(`/api/public/storefront/?seller=${sellerId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-        // ✅ SEM Authorization header
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Erro ${response.status}: ${response.statusText}`);
-    }
-    
-    return response.json();
-  }
 };
