@@ -9,40 +9,76 @@ from urllib.parse import quote_plus
 from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
-import firebase_admin
-from firebase_admin import credentials
+from cryptography.fernet import Fernet
 from datetime import timedelta
 
 # --------------------------------------------------------------------------
 # Caminhos base / .env
 # --------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+# Carrega chave Fernet (mantendo sua lógica existente)
+env_key_path = BASE_DIR / ".env.key"
+fernet_key = None
+if env_key_path.exists():
+    with open(env_key_path) as f:
+        line = f.read().strip()
+        if "=" in line:
+            line = line.split("=", 1)[1].strip()
+        fernet_key = line.encode()
+
+if fernet_key:
+    f = Fernet(fernet_key)
+else:
+    f = None
 
 # --------------------------------------------------------------------------
-# Banco de Dados
+# ✅ CORREÇÃO: Banco de Dados com fallbacks seguros
 # --------------------------------------------------------------------------
+DB_NAME = os.getenv("DB_NAME", "natura_inventory")
+DB_USER = os.getenv("DB_USER", "natura_admin")  
+DB_PASSWORD = os.getenv("DB_PASSWORD", "senha_segura_123")
+DB_AI_USER = os.getenv("DB_AI_USER", DB_USER)  # ✅ Agora DB_USER sempre existe
+DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", DB_PASSWORD)
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+
+# ✅ Configuração dinâmica de banco (PostgreSQL vs SQLite)
 database_url = os.getenv("DATABASE_URL")
-if not database_url:
-    DB_NAME = os.getenv("DB_NAME", "natura_inventory")
-    DB_USER = quote_plus(os.getenv("DB_USER", "natura_admin"))
-    DB_PASSWORD = quote_plus(os.getenv("DB_PASSWORD", "senha_segura_123"))
-    DB_HOST = os.getenv("DB_HOST", "localhost")
-    DB_PORT = os.getenv("DB_PORT", "5432")
-    database_url = f"postgres://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+if database_url:
+    # Produção: usa DATABASE_URL (Render, Heroku, etc)
+    DATABASES = {
+        "default": dj_database_url.parse(
+            database_url,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    # Desenvolvimento: PostgreSQL local ou SQLite
+    if all([DB_NAME, DB_USER, DB_PASSWORD]):
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": DB_NAME,
+                "USER": DB_USER,
+                "PASSWORD": DB_PASSWORD,
+                "HOST": DB_HOST,
+                "PORT": DB_PORT,
+            }
+        }
+    else:
+        # Fallback para SQLite se PostgreSQL não estiver configurado
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
-DATABASES = {
-    "default": dj_database_url.parse(
-        database_url,
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
-
-# ✅ NOVO: DATABASE_URL para IA (read-only)
-DB_AI_USER = os.getenv("DB_AI_USER", DB_USER)
-DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", os.getenv("DB_PASSWORD", "senha_segura_123"))
-DATABASE_URL = f"postgresql+psycopg2://{quote_plus(DB_AI_USER)}:{quote_plus(DB_AI_PASSWORD)}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'natura_inventory')}"
+# ✅ DATABASE_URL para IA (LangChain/SQLAlchemy)
+DATABASE_URL = f"postgresql+psycopg2://{quote_plus(DB_AI_USER)}:{quote_plus(DB_AI_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # --------------------------------------------------------------------------
 # Segurança / Hosts
@@ -50,7 +86,7 @@ DATABASE_URL = f"postgresql+psycopg2://{quote_plus(DB_AI_USER)}:{quote_plus(DB_A
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-+rc4szhd0d(k@((%vp6og@k_p)y5x*$9_=214d4+p@e3^o4gj7")
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
-# ✅ NOVO: ALLOWED_HOSTS dinâmico para vitrine
+# ✅ ALLOWED_HOSTS dinâmico para vitrine
 def get_allowed_hosts():
     """Configura hosts permitidos dinamicamente para vitrine"""
     hosts = ['localhost', '127.0.0.1', '0.0.0.0']
@@ -83,55 +119,55 @@ SIMPLE_JWT = {
 # Apps / Middleware
 # --------------------------------------------------------------------------
 INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
     # Libs adicionais
-    "django_filters",
-    "corsheaders",
-    "rest_framework",
-    "rest_framework_simplejwt",
+    'django_filters',
+    'corsheaders',
+    'rest_framework',
+    'rest_framework_simplejwt',
     # Apps do projeto
-    "inventory",
-    "ai",
+    'inventory',
+    'ai',
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = "core.urls"
+ROOT_URLCONF = 'core.urls'
 
 TEMPLATES = [
     {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = "core.wsgi.application"
+WSGI_APPLICATION = 'core.wsgi.application'
 
 # --------------------------------------------------------------------------
-# ✅ NOVO: CORS DINÂMICO para Vitrine
+# ✅ CORS DINÂMICO para Vitrine
 # --------------------------------------------------------------------------
 def get_cors_allowed_origins():
     """Configura CORS dinamicamente para suportar vitrines por consultora"""
@@ -158,7 +194,7 @@ def get_cors_allowed_origins():
 
 CORS_ALLOWED_ORIGINS = get_cors_allowed_origins()
 
-# ✅ NOVO: CORS REGEX para qualquer slug de vitrine
+# ✅ CORS REGEX para qualquer slug de vitrine
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",  # Qualquer deploy Vercel
     r"^https://gestao-estoque.*\.vercel\.app$",  # Seus deploys específicos
@@ -167,20 +203,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  # Manter False para segurança
-
-# ✅ NOVO: Headers permitidos para vitrine
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
+CORS_ALLOW_ALL_ORIGINS = False
 
 # CSRF para produção
 CSRF_TRUSTED_ORIGINS = [
@@ -191,7 +214,7 @@ CSRF_TRUSTED_ORIGINS = [
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
 # --------------------------------------------------------------------------
-# ✅ NOVO: Cache para Vitrine (Performance)
+# ✅ Cache para Vitrine (Performance)
 # --------------------------------------------------------------------------
 CACHES = {
     'default': {
@@ -203,10 +226,6 @@ CACHES = {
         }
     }
 }
-
-# ✅ Configurações específicas para vitrine
-STOREFRONT_CACHE_TIMEOUT = 300  # 5 minutos
-STOREFRONT_MAX_ITEMS = 100      # Limite de produtos por vitrine
 
 # --------------------------------------------------------------------------
 # Django REST Framework
@@ -220,7 +239,6 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    # ✅ NOVO: Configurações para API pública
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle"
@@ -237,77 +255,39 @@ REST_FRAMEWORK = {
 AUTH_USER_MODEL = "inventory.CustomUser"
 
 # --------------------------------------------------------------------------
-# ✅ NOVO: Configurações de Segurança para API Pública
+# Validação de senhas
 # --------------------------------------------------------------------------
-# Rate limiting para endpoints públicos
-RATELIMIT_ENABLE = True
-RATELIMIT_USE_CACHE = 'default'
-
-# Configurações de segurança para produção
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_BROWSER_XSS_FILTER = True
-    X_FRAME_OPTIONS = 'DENY'
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
 # --------------------------------------------------------------------------
 # Internacionalização
 # --------------------------------------------------------------------------
-LANGUAGE_CODE = "pt-br"  # ✅ Alterado para português
-TIME_ZONE = "America/Sao_Paulo"
+LANGUAGE_CODE = 'pt-br'
+TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
 # --------------------------------------------------------------------------
 # Arquivos estáticos
 # --------------------------------------------------------------------------
-STATIC_URL = "static/"
+STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # --------------------------------------------------------------------------
-# ✅ NOVO: Logging para Debug de Vitrine
-# --------------------------------------------------------------------------
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'inventory.views': {
-            'handlers': ['console'],
-            'level': 'INFO' if DEBUG else 'ERROR',
-        },
-        'corsheaders': {
-            'handlers': ['console'],
-            'level': 'DEBUG' if DEBUG else 'ERROR',
-        },
-    },
-}
-
-# --------------------------------------------------------------------------
-# Firebase admin
-# --------------------------------------------------------------------------
-firebase_json_str = os.environ.get("FIREBASE_CREDENTIALS")
-if firebase_json_str:
-    try:
-        firebase_creds_dict = json.loads(firebase_json_str)
-        cred = credentials.Certificate(firebase_creds_dict)
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(cred)
-            print("✅ Firebase Admin inicializado com sucesso via variável de ambiente.")
-    except Exception as e:
-        print(f"❌ Falha ao inicializar Firebase Admin: {e}")
-else:
-    print("⚠️ Variável FIREBASE_CREDENTIALS não encontrada. Login do Google não funcionará.")
-
-# --------------------------------------------------------------------------
-# ✅ NOVO: Configurações Específicas do Projeto
+# ✅ Configurações específicas do projeto
 # --------------------------------------------------------------------------
 # Configurações da IA
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "qwen:latest")
@@ -321,8 +301,33 @@ ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 DEFAULT_CURRENCY = "BRL"
 DEFAULT_LANGUAGE = "pt-BR"
 
+# Configurações específicas para vitrine
+STOREFRONT_CACHE_TIMEOUT = 300  # 5 minutos
+STOREFRONT_MAX_ITEMS = 100      # Limite de produtos por vitrine
+
+# --------------------------------------------------------------------------
+# ✅ Firebase (mantendo sua configuração existente)
+# --------------------------------------------------------------------------
+try:
+    import firebase_admin
+    from firebase_admin import credentials
+    
+    firebase_json_str = os.environ.get("FIREBASE_CREDENTIALS")
+    if firebase_json_str:
+        try:
+            firebase_creds_dict = json.loads(firebase_json_str)
+            cred = credentials.Certificate(firebase_creds_dict)
+            if not firebase_admin._apps:
+                firebase_admin.initialize_app(cred)
+                print("✅ Firebase Admin inicializado com sucesso.")
+        except Exception as e:
+            print(f"❌ Falha ao inicializar Firebase Admin: {e}")
+    else:
+        print("⚠️ Variável FIREBASE_CREDENTIALS não encontrada.")
+except ImportError:
+    print("⚠️ Firebase Admin SDK não instalado.")
+
 print("✅ Settings carregado com sucesso!")
 print(f"📊 DEBUG: {DEBUG}")
+print(f"🗄️ Database: {DATABASES['default']['ENGINE']}")
 print(f"🌐 CORS Origins: {len(CORS_ALLOWED_ORIGINS)} configurados")
-print(f"💾 Cache: {CACHES['default']['BACKEND']}")
-print(f"🔗 Database: {DATABASES['default']['ENGINE']}")
