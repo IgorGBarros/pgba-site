@@ -824,54 +824,64 @@ class SessionSummaryView(APIView):
 
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
-
 @api_view(['GET'])
-@permission_classes([AllowAny])  # ✅ PÚBLICO - sem autenticação
+@permission_classes([AllowAny])
 def public_storefront_view(request, slug=None):
     """
     Endpoint público para vitrine - não requer autenticação
     """
     try:
         if slug:
-            # Busca por slug da loja
             try:
-                store = Store.objects.get(slug=slug, storefront_enabled=True)
+                store = Store.objects.get(slug=slug)
             except Store.DoesNotExist:
                 return Response({'error': 'Loja não encontrada'}, status=404)
         else:
-            # Fallback por ID (compatibilidade)
             store_id = request.GET.get('seller')
             if not store_id:
                 return Response({'error': 'Slug ou seller ID obrigatório'}, status=400)
             try:
-                store = Store.objects.get(id=store_id, storefront_enabled=True)
+                store = Store.objects.get(id=store_id)
             except Store.DoesNotExist:
                 return Response({'error': 'Loja não encontrada'}, status=404)
         
-        # ✅ DADOS PÚBLICOS SEGUROS - apenas o necessário
+        # ✅ CORREÇÃO: Buscar dados com relacionamentos corretos
         items = InventoryItem.objects.filter(
             store=store,
-            total_quantity__gt=0  # Apenas com estoque
+            total_quantity__gt=0
         ).select_related('product')
         
-        # Mapear dados para o formato esperado pelo frontend
+        # ✅ CORREÇÃO: Mapear dados corretamente
         items_data = []
         for item in items:
+            # Garantir que sempre temos um nome
+            product_name = item.product.name if item.product and item.product.name else "Produto sem nome"
+            
+            # Garantir que temos uma imagem válida
+            image_url = None
+            if item.product and item.product.image_url:
+                image_url = item.product.image_url
+            
+            # Preço com fallback
+            sale_price = float(item.sale_price) if item.sale_price else (
+                float(item.product.official_price) if item.product and item.product.official_price else 0
+            )
+            
             items_data.append({
-                'id': item.id,
-                'product_name': item.product.name,
-                'display_name': item.product.name,
-                'category': item.product.category,
-                'sale_price': float(item.sale_price) if item.sale_price else float(item.product.official_price),
+                'id': str(item.id),
+                'product_name': product_name,
+                'display_name': product_name,  # ✅ Usar o mesmo nome
+                'category': item.product.category if item.product else 'Geral',
+                'sale_price': sale_price,
                 'total_quantity': item.total_quantity,
-                'image_url': item.product.image_url,
+                'image_url': image_url,
             })
         
-        # ✅ DADOS DA LOJA (públicos e seguros)
+        # ✅ Dados da loja
         store_data = {
-            'name': store.name,
-            'whatsapp': store.whatsapp or '',
-            'slug': store.slug
+            'name': store.name or 'Consultora',
+            'whatsapp': getattr(store, 'whatsapp', '') or '',
+            'slug': getattr(store, 'slug', '') or slug
         }
         
         return Response({
@@ -880,5 +890,5 @@ def public_storefront_view(request, slug=None):
         })
         
     except Exception as e:
-        print(f"Erro no endpoint público: {e}")  # Debug
-        return Response({'error': 'Erro interno'}, status=500)
+        print(f"❌ Erro no endpoint público: {e}")
+        return Response({'error': 'Erro interno do servidor'}, status=500)

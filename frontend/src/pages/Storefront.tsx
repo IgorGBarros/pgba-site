@@ -8,28 +8,30 @@ import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { toast } from "../hooks/use-toast";
 import { publicStorefrontApi } from "../lib/api";
+
 type PaymentMethod = "pix" | "cartao";
 
 interface BagItem extends StorefrontItem {
   qty: number;
 }
 
-const CART_STORAGE_KEY = "storefront_cart";
-const CART_PAYMENT_KEY = "storefront_payment";
+// ✅ CORREÇÃO: Chaves de localStorage específicas por loja
+const getCartStorageKey = (storeSlug: string) => `storefront_cart_${storeSlug}`;
+const getPaymentStorageKey = (storeSlug: string) => `storefront_payment_${storeSlug}`;
 
-function loadCart(): BagItem[] {
+function loadCart(storeSlug: string): BagItem[] {
   try {
-    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    const raw = localStorage.getItem(getCartStorageKey(storeSlug));
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
-function saveCart(bag: BagItem[]) {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(bag));
+function saveCart(bag: BagItem[], storeSlug: string) {
+  localStorage.setItem(getCartStorageKey(storeSlug), JSON.stringify(bag));
 }
 
-function loadPayment(): PaymentMethod {
-  return (localStorage.getItem(CART_PAYMENT_KEY) as PaymentMethod) || "pix";
+function loadPayment(storeSlug: string): PaymentMethod {
+  return (localStorage.getItem(getPaymentStorageKey(storeSlug)) as PaymentMethod) || "pix";
 }
 
 export default function Storefront() {
@@ -44,44 +46,81 @@ export default function Storefront() {
   const [sellerName, setSellerName] = useState("");
   const [sellerWhatsapp, setSellerWhatsapp] = useState("");
   
-  const [bag, setBag] = useState<BagItem[]>(loadCart);
+  // ✅ CORREÇÃO: Estados com slug específico
+  const [storeSlug, setStoreSlug] = useState<string>("");
+  const [bag, setBag] = useState<BagItem[]>([]);
   const [bagOpen, setBagOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(loadPayment);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
 
-  // Persiste a sacola e a forma de pagamento localmente
-  useEffect(() => { saveCart(bag); }, [bag]);
-  useEffect(() => { localStorage.setItem(CART_PAYMENT_KEY, paymentMethod); }, [paymentMethod]);
+  // ✅ CORREÇÃO: Carregar sacola específica da loja
+  useEffect(() => {
+    if (storeSlug) {
+      setBag(loadCart(storeSlug));
+      setPaymentMethod(loadPayment(storeSlug));
+    }
+  }, [storeSlug]);
+
+  // ✅ CORREÇÃO: Salvar sacola específica da loja
+  useEffect(() => {
+    if (storeSlug) {
+      saveCart(bag, storeSlug);
+    }
+  }, [bag, storeSlug]);
 
   useEffect(() => {
+    if (storeSlug) {
+      localStorage.setItem(getPaymentStorageKey(storeSlug), paymentMethod);
+    }
+  }, [paymentMethod, storeSlug]);
+
+  useEffect(() => {
+    console.log('🚀 Iniciando carregamento da vitrine...', { slug, sellerIdParam });
+    
     const fetchItems = slug
-      ? publicStorefrontApi.listBySlug(slug)  // ✅ API pública
+      ? publicStorefrontApi.listBySlug(slug)
       : publicStorefrontApi.listById(sellerIdParam || "");
       
     fetchItems.then((res: any) => {
-      // ✅ Mapear dados do novo formato
+      console.log('📦 Resposta da API:', res);
+      
       const productsList = res.items || [];
       
+      // ✅ CORREÇÃO: Mapear nomes corretamente conforme o backend
       const mappedItems = productsList.map((item: any) => ({
         id: item.id,
-        product_name: item.product__name || "Produto",
-        display_name: item.product__name || "Produto", 
-        category: item.product__category || "Geral",
+        product_name: item.product_name || item.display_name || "Produto sem nome",
+        display_name: item.display_name || item.product_name || "Produto sem nome",
+        category: item.category || "Geral",
         sale_price: item.sale_price || 0,
         total_quantity: item.total_quantity || 0,
-        image_url: item.product__image_url || null,
+        image_url: item.image_url || null,
+        // ✅ Campos adicionais necessários para StorefrontItem
+        custom_name: null,
+        barcode: "",
+        expiry_date: null,
+        seller_name: null,
+        seller_whatsapp: null,
+        user_id: "",
+        store_slug: null,
       }));
-
+      
+      console.log('🎯 Produtos mapeados:', mappedItems);
       setItems(mappedItems);
-
-      // 3. Define os dados do lojista (Nome e WhatsApp) vindos do backend [1]
+      
+      // ✅ CORREÇÃO: Definir slug da loja e carregar sacola específica
       if (res.store) {
+        console.log('🏪 Dados da loja:', res.store);
         setSellerName(res.store.name || "Consultor(a)");
         setSellerWhatsapp(res.store.whatsapp || "");
+        
+        // ✅ Definir slug para isolamento da sacola
+        const currentStoreSlug = res.store.slug || slug || sellerIdParam || "default";
+        setStoreSlug(currentStoreSlug);
       }
       
       setLoading(false);
     }).catch((err) => {
-      console.error("Erro ao carregar vitrine:", err);
+      console.error("❌ Erro ao carregar vitrine:", err);
       setLoading(false);
     });
   }, [slug, sellerIdParam]);
@@ -117,7 +156,11 @@ export default function Storefront() {
   const bagTotal = bag.reduce((sum, b) => sum + (b.sale_price || 0) * b.qty, 0);
   const bagCount = bag.reduce((sum, b) => sum + b.qty, 0);
   const paymentLabel = paymentMethod === "pix" ? "PIX" : "Cartão / Link de Pagamento";
-  const getDisplayName = (item: StorefrontItem | BagItem) => item.display_name || item.product_name;
+
+  // ✅ CORREÇÃO: Função para nome consistente
+  const getDisplayName = (item: StorefrontItem | BagItem) => {
+    return item.display_name || item.product_name || "Produto sem nome";
+  };
 
   // 🚀 LÓGICA DO WHATSAPP SEGURA E CODIFICADA CORRETAMENTE
   const buildWhatsappLink = (itemsList: BagItem[]) => {
@@ -159,9 +202,12 @@ export default function Storefront() {
     window.open(link, "_blank", "noopener,noreferrer");
   };
 
+  // ✅ CORREÇÃO: Limpar sacola específica da loja
   const clearBag = () => {
     setBag([]);
-    localStorage.removeItem(CART_STORAGE_KEY);
+    if (storeSlug) {
+      localStorage.removeItem(getCartStorageKey(storeSlug));
+    }
   };
 
   const getItemQtyInBag = (id: string) => bag.find((b) => b.id === id)?.qty || 0;
@@ -251,7 +297,7 @@ export default function Storefront() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {filtered.map((item, i) => {
               const qtyInBag = getItemQtyInBag(item.id);
-              const name = getDisplayName(item);
+              const name = getDisplayName(item); // ✅ Usar função consistente
               
               return (
                 <motion.div
@@ -283,8 +329,12 @@ export default function Storefront() {
                   </div>
                   {/* Product Info */}
                   <div className="flex flex-1 flex-col p-3 border-t border-border/50">
-                    <p className="text-xs font-bold text-foreground leading-snug line-clamp-2">{name}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{item.category}</p>
+                    <p className="text-xs font-bold text-foreground leading-snug line-clamp-2">
+                      {name} {/* ✅ Nome correto */}
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      {item.category}
+                    </p>
                     
                     <div className="mt-auto pt-3">
                       {item.sale_price ? (
@@ -295,7 +345,6 @@ export default function Storefront() {
                         <p className="text-xs italic text-muted-foreground">Preço sob consulta</p>
                       )}
                     </div>
-
                     {/* 🚀 BOTÕES DE AÇÃO DO PRODUTO */}
                     <div className="mt-3 flex gap-2">
                       <Button
