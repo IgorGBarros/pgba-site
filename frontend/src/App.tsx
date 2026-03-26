@@ -10,6 +10,9 @@ import { FeatureGatesProvider } from "../src/hooks/useFeatureGates";
 import { ThemeProvider } from "../src/hooks/useTheme";
 import ProtectedRoute from "../src/components/ProtectedRoute";
 
+// ✅ NOVO IMPORT
+import { SessionHeader } from "../src/components/SessionHeader";
+
 // Suas páginas existentes
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -28,11 +31,18 @@ import Plans from "./pages/Plans";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 import PGBA from "./pages/pgba/PGBA";
-
 // Nova página PGBA Neural Canvas
 import PGBANeural from "./pages/pgba/PGBANeural";
 
 const queryClient = new QueryClient();
+
+// ✅ NOVO: Componente Layout com SessionHeader
+const AppLayout = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen">
+    <SessionHeader /> {/* ← Header da sessão aparece em todas as páginas protegidas */}
+    {children}
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -45,27 +55,107 @@ const App = () => (
             <FeatureGatesProvider>
               <BrowserRouter>
                 <Routes>
-                  {/* Rota pública para o PGBA Neural Canvas */}
+                  {/* Rotas públicas (SEM SessionHeader) */}
                   <Route path="/neural" element={<PGBANeural />} />
                   <Route path="/pgba" element={<PGBA />} />
-                  {/* Suas rotas existentes */}
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                  <Route path="/products" element={<ProtectedRoute><ProductList /></ProtectedRoute>} />
-                  <Route path="/products/new" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
-                  <Route path="/products/:id/edit" element={<ProtectedRoute><ProductForm /></ProtectedRoute>} />
-                  <Route path="/stock/entry" element={<ProtectedRoute><StockWizard /></ProtectedRoute>} />
-                  <Route path="/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-                  <Route path="/withdraw" element={<ProtectedRoute><WithdrawProduct /></ProtectedRoute>} />
-                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                  <Route path="/history" element={<ProtectedRoute><MovementHistory /></ProtectedRoute>} />
-                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                  <Route path="/plans" element={<ProtectedRoute><Plans /></ProtectedRoute>} />
                   <Route path="/vitrine/:slug" element={<Storefront />} />
                   <Route path="/vitrine" element={<Storefront />} />
-                  <Route path="/admin-panel" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
                   <Route path="/lp" element={<LandingPage />} />
+                  
+                  {/* ✅ Rotas protegidas (COM SessionHeader) */}
+                  <Route path="/" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Index />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/products" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <ProductList />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/products/new" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <ProductForm />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/products/:id/edit" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <ProductForm />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/stock/entry" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <StockWizard />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/add" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <AddProduct />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/withdraw" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <WithdrawProduct />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Dashboard />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/history" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <MovementHistory />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Settings />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Profile />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/plans" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Plans />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin-panel" element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <AdminPanel />
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } />
+                  
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
