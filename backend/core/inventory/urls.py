@@ -5,6 +5,8 @@ from .views import (
     FirebaseLoginView,
     ProductViewSet, 
     InventoryViewSet,
+    SessionControlView,
+    SessionSummaryView,
     feature_gates_view, 
     lookup_product, 
     StockEntryView, 
@@ -42,6 +44,9 @@ urlpatterns = [
     path('admin/users/', AdminUserListView.as_view(), name='admin-users-list'),
     path('admin/users/<int:pk>/plan/', AdminUpdatePlanView.as_view(), name='admin-update-plan'),
     path('admin/users/<int:pk>/subscription/', AdminUpdateSubscriptionView.as_view(), name='admin-update-sub'),
+
+    path('session-control/', SessionControlView.as_view(), name='session-control'),
+    path('session-summary/', SessionSummaryView.as_view(), name='session-summary'),
 
     # --- Rotas Automáticas (Router) ---
     path('', include(router.urls)),

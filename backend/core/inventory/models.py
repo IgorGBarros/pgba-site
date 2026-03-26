@@ -264,3 +264,29 @@ class StockTransaction(models.Model):
 
     def __str__(self):
         return f"{self.get_transaction_type_display()} - {self.product.name} ({self.quantity})"
+    
+
+
+# inventory/models.py - ADICIONAR apenas isso
+class RegistrationSession(models.Model):
+    """Sessão de cadastro de produtos"""
+    store = models.ForeignKey(Store, on_delete=models.CASCADE)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    
+    # Contadores automáticos
+    products_count = models.PositiveIntegerField(default=0)
+    total_estimated_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Dados do evento (preenchidos no final)
+    payment_method = models.CharField(max_length=20, null=True, blank=True)
+    total_paid = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    installments = models.PositiveIntegerField(default=1)
+    
+    def add_product(self, inventory_item, quantity=1):
+        """Incrementa contadores quando produto é cadastrado"""
+        self.products_count += quantity
+        cost = inventory_item.get_effective_cost() or 0
+        self.total_estimated_cost += cost * quantity
+        self.save()

@@ -12,6 +12,7 @@ import { ChatAssistant } from "../components/ChatAssistant";
 import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
 import ProfileCompletionBanner from "../components/ProfileCompletionBanner";
+import { sessionApi } from '../lib/sessionApi';
 
 interface Stats {
   investedValue: number;
@@ -111,7 +112,16 @@ export default function Index() {
     { label: "Vendas deste Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
     { label: "Lucro Real do Mês", value: fmt(stats.monthProfit), icon: BarChart3, color: "text-emerald-600" }, // Novo Card de Lucro do Mês!
   ];
-
+// Função para iniciar sessão
+const startRegistrationSession = async () => {
+  try {
+    await sessionApi.start();
+    navigate("/add");
+  } catch (error) {
+    console.error('Erro ao iniciar sessão:', error);
+    navigate("/add"); // Vai mesmo se der erro
+  }
+};
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-20 border-b border-border bg-card">
@@ -181,7 +191,14 @@ export default function Index() {
         
         {/* BOTÕES DE AÇÃO (Botão Manual removido) */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <ActionBtn onClick={() => navigate("/add")} icon={ScanBarcode} label="Cadastrar" desc="Escanear entrada" primary />
+          
+          <ActionBtn 
+            onClick={startRegistrationSession} 
+            icon={ScanBarcode} 
+            label="Cadastrar" 
+            desc="Escanear entrada" 
+            primary 
+          />
           <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Registrar saída" />
           <ActionBtn onClick={() => navigate("/products")} icon={List} label="Meu Estoque" desc="Lista completa" />
           <ActionBtn onClick={() => navigate("/history")} icon={History} label="Extrato" desc="Movimentações" />

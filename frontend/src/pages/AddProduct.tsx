@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ScanBarcode, Camera, Hash, DollarSign, ChevronRight, ChevronLeft,
-  Check, Loader2, X, Package, Search, Lock, ImageIcon
+  Check, Loader2, X, Package, Search, Lock, ImageIcon, Clock, CreditCard
 } from "lucide-react";
 import BarcodeScanner from "../components/BarcodeScanner";
 import ProductSearchModal from "../components/ProductSearchModal";
@@ -22,6 +22,8 @@ const STEPS = [
   { id: "expiry", label: "Validade", icon: Camera },
   { id: "details", label: "Detalhes", icon: DollarSign },
   { id: "confirm", label: "Confirmar", icon: Check },
+
+  
 ];
 
 const CATEGORIES = ["Perfumaria", "Corpo", "Rosto", "Cabelos", "Maquiagem", "Infantil", "Casa", "Outro"];
@@ -41,13 +43,47 @@ interface EntryData {
   expiry_photo_url: string;
 }
 
+interface SessionStatus {
+  has_session: boolean;
+  session_id?: number;
+  products_count?: number;
+  total_estimated_cost?: number;
+  duration_minutes?: number;
+}
+
+// ✅ NOVO: API de sessão
+const sessionApi = {
+  getStatus: async (): Promise<SessionStatus> => {
+    const response = await fetch('/api/session-control/');
+    return response.json();
+  },
+  
+  finish: async () => {
+    const response = await fetch('/api/session-control/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'finish' })
+    });
+    return response.json();
+  },
+  
+  confirmInvestment: async (sessionId: number, data: any) => {
+    const response = await fetch('/api/session-summary/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, ...data })
+    });
+    return response.json();
+  }
+};
+
 export default function AddProduct() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isLocked } = useFeatureGates();
   const { toast } = useToast();
   const { loading, saveEntry } = useStockEntry();
-
+  
   const [step, setStep] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -56,17 +92,65 @@ export default function AddProduct() {
   
   const [ocrLoading, setOcrLoading] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
-  
-  // 🚀 NOVO ESTADO: Controla a animação de sucesso no Step 3
   const [isSuccess, setIsSuccess] = useState(false);
   
+  // ✅ NOVOS ESTADOS: Controle de sessão
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>({ has_session: false });
+  const [showSessionSummary, setShowSessionSummary] = useState(false);
+  const [sessionSummaryData, setSessionSummaryData] = useState<any>(null);
+  const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [data, setData] = useState<EntryData>({
     bar_code: "", name: "", category: "Perfumaria", natura_sku: "",
     image_url: "", official_price: 0, sale_price: 0, cost_price: 0,
     quantity: 1, batch_code: "", expiry_date: "", expiry_photo_url: "",
   });
+
+  // ✅ NOVO: Verificar status da sessão ao carregar
+  useEffect(() => {
+    checkSessionStatus();
+  }, []);
+
+  const checkSessionStatus = async () => {
+    try {
+      const status = await sessionApi.getStatus();
+      setSessionStatus(status);
+    } catch (error) {
+      console.error('Erro ao verificar sessão:', error);
+    }
+  };
+
+  // ✅ NOVO: Finalizar sessão
+  const finishSession = async () => {
+    try {
+      const result = await sessionApi.finish();
+      setSessionStatus({ has_session: false });
+      
+      if (result.session_summary && result.session_summary.products_count > 0) {
+        setSessionSummaryData(result.session_summary);
+        setShowSessionSummary(true);
+      } else {
+        toast({ title: "Sessão finalizada", description: "Nenhum produto foi cadastrado." });
+      }
+    } catch (error) {
+      console.error('Erro ao finalizar sessão:', error);
+      toast({ title: "Erro", description: "Falha ao finalizar sessão.", variant: "destructive" });
+    }
+  };
+
+  // ✅ NOVO: Confirmar investimento
+  const confirmInvestment = async (paymentData: any) => {
+    try {
+      await sessionApi.confirmInvestment(sessionSummaryData.session_id, paymentData);
+      setShowInvestmentModal(false);
+      setShowSessionSummary(false);
+      toast({ title: "Sucesso!", description: "Investimento registrado com sucesso." });
+    } catch (error) {
+      console.error('Erro ao confirmar investimento:', error);
+      toast({ title: "Erro", description: "Falha ao registrar investimento.", variant: "destructive" });
+    }
+  };
 
   const triggerProGate = (feature: string, description: string) => {
     setUpgradeFeature({ feature, description });
@@ -174,15 +258,15 @@ export default function AddProduct() {
         cost_price: data.cost_price,
         sale_price: data.sale_price,
         batch_code: data.batch_code,
-     
       });
       
-      // 🚀 SUCESSO: Ativa a animação e redireciona após 2 segundos
+      // ✅ NOVO: Atualiza status da sessão após salvar
+      await checkSessionStatus();
+      
       setIsSuccess(true);
       setTimeout(() => {
         navigate("/");
       }, 2000);
-
     } catch {
       // O Toast de erro já vem do useStockEntry
     }
@@ -194,9 +278,36 @@ export default function AddProduct() {
     if (step === 2) return data.quantity > 0 && data.name.trim() !== "";
     return true;
   };
-
-  return (
+    return (
     <div className="min-h-screen bg-background">
+      {/* ✅ NOVO: Header com status da sessão */}
+      {sessionStatus.has_session && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Package size={16} />
+            <span className="text-sm font-medium">
+              Cadastrando... {sessionStatus.products_count} produtos
+            </span>
+            <div className="flex items-center gap-1 text-blue-200">
+              <Clock size={12} />
+              <span className="text-xs">{sessionStatus.duration_minutes}min</span>
+            </div>
+          </div>
+          
+          <button 
+            onClick={finishSession}
+            className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-medium flex items-center gap-1 transition-colors"
+          >
+            <Check size={14} />
+            Finalizar
+          </button>
+        </motion.div>
+      )}
+
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           <button onClick={() => navigate("/")} className="rounded-lg p-2 text-muted-foreground hover:text-foreground">
@@ -254,13 +365,11 @@ export default function AddProduct() {
                     />
                     {lookupLoading && <p className="text-xs text-primary mt-1 animate-pulse">Buscando informações...</p>}
                   </div>
-
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-border" />
                     <span className="text-xs text-muted-foreground">OU</span>
                     <div className="h-px flex-1 bg-border" />
                   </div>
-
                   <button onClick={handleScannerClick} className={`w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all ${isLocked("barcode_scanner") ? "opacity-80" : ""}`}>
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${!isLocked("barcode_scanner") ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
@@ -274,7 +383,6 @@ export default function AddProduct() {
                     </div>
                     <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
                   </button>
-
                   <button onClick={() => setIsSearchOpen(true)} className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-primary/10 text-primary rounded-lg"><Search size={20} /></div>
@@ -318,7 +426,7 @@ export default function AddProduct() {
             </motion.div>
           )}
 
-          {/* STEP 2: DETALHES GERAIS (INCLUI NOME E PREÇOS) */}
+          {/* STEP 2: DETALHES GERAIS */}
           {step === 2 && (
             <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-5 rounded-xl border border-border bg-card p-5">
@@ -333,7 +441,6 @@ export default function AddProduct() {
                       <div className="w-16 h-16 bg-muted rounded-lg border mt-6 flex items-center justify-center"><ImageIcon className="text-muted-foreground" size={20}/></div>
                    )}
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-sm font-medium text-foreground">Categoria</label>
@@ -346,7 +453,6 @@ export default function AddProduct() {
                         <input value={data.natura_sku} onChange={(e) => setData(p => ({...p, natura_sku: e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" placeholder="Opcional" />
                     </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-primary/5">
                     <div>
                         <label className="text-sm font-bold text-primary">Qtd Entrada *</label>
@@ -361,7 +467,6 @@ export default function AddProduct() {
                         <input value={data.batch_code} onChange={(e) => setData(p => ({...p, batch_code: e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" placeholder="Opcional" />
                     </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-foreground">Preço de Custo</label>
@@ -376,7 +481,7 @@ export default function AddProduct() {
             </motion.div>
           )}
 
-          {/* STEP 3: CONFIRMAR COM ANIMAÇÃO DE SUCESSO */}
+          {/* STEP 3: CONFIRMAR COM RESUMO DA SESSÃO */}
           {step === 3 && (
             <motion.div key="confirm" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4 rounded-xl border border-border bg-card p-5 overflow-hidden">
@@ -395,7 +500,7 @@ export default function AddProduct() {
                         </div>
                       </div>
                       
-                      <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
+                      <div className="space-y-2 rounded-lg bg-secondary/50 p-4 mb-4">
                         <Row label="EAN" value={data.bar_code} />
                         <Row label="SKU" value={data.natura_sku || "—"} />
                         <Row label="Lote" value={data.batch_code || "—"} />
@@ -404,9 +509,26 @@ export default function AddProduct() {
                         <Row label="Custo" value={formatMoney(data.cost_price)} />
                         <Row label="Venda" value={formatMoney(data.sale_price)} />
                       </div>
+
+                      {/* ✅ NOVO: Resumo da sessão */}
+                      {sessionStatus.has_session && (
+                        <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Package className="text-blue-600" size={16} />
+                            <span className="text-sm font-semibold text-blue-900">Resumo da Sessão</span>
+                          </div>
+                          <div className="text-xs text-blue-700 space-y-1">
+                            <p>• Total de produtos: {sessionStatus.products_count}</p>
+                            <p>• Valor estimado: {formatMoney(sessionStatus.total_estimated_cost || 0)}</p>
+                            <p>• Tempo de cadastro: {sessionStatus.duration_minutes}min</p>
+                          </div>
+                          <p className="text-xs text-blue-600 mt-2">
+                            💡 Após confirmar, você pode finalizar e registrar o investimento
+                          </p>
+                        </div>
+                      )}
                     </motion.div>
                   ) : (
-                    /* 🚀 MÁGICA: ANIMAÇÃO DE SUCESSO */
                     <motion.div
                       key="success"
                       initial={{ opacity: 0, scale: 0.8 }}
@@ -436,10 +558,9 @@ export default function AddProduct() {
               </div>
             </motion.div>
           )}
-
         </AnimatePresence>
 
-        {/* NAVIGATION BUTTONS (ESCONDE DURANTE O SUCESSO) */}
+        {/* NAVIGATION BUTTONS */}
         {(!showScanner || step > 0) && !isSuccess && (
           <div className="mt-6 flex gap-3">
             {step > 0 && (
@@ -460,12 +581,33 @@ export default function AddProduct() {
         )}
       </main>
 
+      {/* ✅ NOVO: Modal de Resumo da Sessão */}
+      {showSessionSummary && sessionSummaryData && (
+        <SessionSummaryModal 
+          summary={sessionSummaryData}
+          onClose={() => setShowSessionSummary(false)}
+          onConfirmInvestment={(_paymentData: any) => {
+            setShowInvestmentModal(true);
+            setShowSessionSummary(false);
+          }}
+        />
+      )}
+
+      {/* ✅ NOVO: Modal de Investimento */}
+      {showInvestmentModal && (
+        <InvestmentModal 
+          estimatedCost={sessionSummaryData?.total_estimated_cost || 0}
+          onClose={() => setShowInvestmentModal(false)}
+          onConfirm={confirmInvestment}
+        />
+      )}
+
       <ProductSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelect={(p) => selectSuggestion(p)}
       />
-
+      
       <UpgradeModal
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
@@ -481,6 +623,95 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between border-b border-border/50 pb-1 last:border-0">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-sm font-medium text-foreground">{value}</span>
+    </div>
+  );
+}
+
+// ✅ NOVO: Componentes dos modais (você precisa criar estes)
+function SessionSummaryModal({ summary, onClose, onConfirmInvestment }: any) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-lg font-bold mb-4">📦 Resumo da Sessão</h3>
+        <div className="space-y-2 mb-6">
+          <p>Produtos cadastrados: {summary.products_count}</p>
+          <p>Valor estimado: {formatMoney(summary.total_estimated_cost)}</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border rounded-lg py-2">
+            Depois
+          </button>
+          <button onClick={onConfirmInvestment} className="flex-1 bg-blue-600 text-white rounded-lg py-2">
+            Registrar Investimento
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InvestmentModal({ estimatedCost, onClose, onConfirm }: any)  {
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  const [totalPaid, setTotalPaid] = useState(estimatedCost);
+  const [installments, setInstallments] = useState(1);
+
+  const handleConfirm = () => {
+    onConfirm({ payment_method: paymentMethod, total_paid: totalPaid, installments });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-lg font-bold mb-4">💳 Registrar Investimento</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Como você pagou?</label>
+            <select 
+              value={paymentMethod} 
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2"
+            >
+              <option value="credit_card">Cartão de Crédito</option>
+              <option value="pix">PIX</option>
+              <option value="cash">Dinheiro</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Valor total pago</label>
+            <input 
+              type="number" 
+              step="0.01"
+              value={totalPaid} 
+              onChange={(e) => setTotalPaid(parseFloat(e.target.value))}
+              className="w-full border rounded-lg px-3 py-2"
+            />
+          </div>
+          
+          {paymentMethod === 'credit_card' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Parcelas</label>
+              <input 
+                type="number" 
+                min="1"
+                value={installments} 
+                onChange={(e) => setInstallments(parseInt(e.target.value))}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+          )}
+        </div>
+        
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 border rounded-lg py-2">
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} className="flex-1 bg-green-600 text-white rounded-lg py-2">
+            Confirmar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

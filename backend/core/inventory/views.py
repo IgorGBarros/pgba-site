@@ -18,7 +18,7 @@ from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView,TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import CustomTokenObtainPairSerializer, CustomUserSerializer, ProfileSerializer
-from .models import CustomUser
+from .models import CustomUser, RegistrationSession
 
 
 # Imports do seu Projeto
@@ -338,6 +338,10 @@ class StockEntryView(APIView):
             import traceback
             traceback.print_exc()
             return Response({"error": f"Erro interno: {str(e)}"}, status=500)
+        
+        session = RegistrationSession.objects.filter(store=store, is_active=True).first()
+        if session:
+            session.add_product(item, data['quantity'])
 
         print("✅ Sucesso!")
         return Response({
@@ -728,3 +732,89 @@ class AdminUpdateSubscriptionView(APIView):
             return Response({"message": "Assinatura e plano atualizados com sucesso!"})
         except Store.DoesNotExist:
             return Response({"error": "Loja não encontrada para este usuário"}, status=404)
+        
+
+# inventory/views.py - ADICIONAR
+class SessionControlView(APIView):
+    """Controla sessão de cadastro"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Status da sessão atual"""
+        store = get_current_store(request.user)
+        session = RegistrationSession.objects.filter(
+            store=store, is_active=True
+        ).first()
+        
+        if not session:
+            return Response({'has_session': False})
+            
+        return Response({
+            'has_session': True,
+            'session_id': session.id,
+            'products_count': session.products_count,
+            'total_estimated_cost': session.total_estimated_cost,
+            'duration_minutes': int((timezone.now() - session.started_at).total_seconds() / 60)
+        })
+    
+    def post(self, request):
+        """Inicia ou finaliza sessão"""
+        action = request.data.get('action')  # 'start' ou 'finish'
+        store = get_current_store(request.user)
+        
+        if action == 'start':
+            # Finaliza sessão anterior se existir
+            RegistrationSession.objects.filter(
+                store=store, is_active=True
+            ).update(is_active=False, finished_at=timezone.now())
+            
+            # Cria nova
+            session = RegistrationSession.objects.create(store=store)
+            return Response({
+                'session_id': session.id,
+                'message': 'Sessão iniciada'
+            })
+            
+        elif action == 'finish':
+            session = RegistrationSession.objects.filter(
+                store=store, is_active=True
+            ).first()
+            
+            if not session:
+                return Response({'error': 'Nenhuma sessão ativa'}, status=400)
+                
+            session.is_active = False
+            session.finished_at = timezone.now()
+            session.save()
+            
+            return Response({
+                'session_summary': {
+                    'products_count': session.products_count,
+                    'total_estimated_cost': session.total_estimated_cost,
+                    'session_id': session.id
+                }
+            })
+
+class SessionSummaryView(APIView):
+    """Confirma investimento da sessão"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        session_id = request.data.get('session_id')
+        
+        try:
+            session = RegistrationSession.objects.get(id=session_id)
+            
+            # Salva dados financeiros
+            session.payment_method = request.data.get('payment_method')
+            session.total_paid = request.data.get('total_paid')
+            session.installments = request.data.get('installments', 1)
+            session.save()
+            
+            return Response({
+                'message': 'Investimento registrado!',
+                'total_paid': session.total_paid
+            })
+            
+        except RegistrationSession.DoesNotExist:
+            return Response({'error': 'Sessão não encontrada'}, status=404)
