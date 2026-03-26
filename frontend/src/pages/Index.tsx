@@ -2,8 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   Package, TrendingDown, DollarSign, BarChart3, ScanBarcode, List,
-  ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2,
-  Clock, Check
+  ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { inventoryApi, movementsApi, profileApi } from "../lib/api";
@@ -14,7 +13,6 @@ import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
 import ProfileCompletionBanner from "../components/ProfileCompletionBanner";
 import { sessionApi } from '../lib/sessionApi';
-import { SessionSummaryModal } from '../components/SessionSummaryModal';
 
 interface Stats {
   investedValue: number;
@@ -22,14 +20,6 @@ interface Stats {
   projectedProfit: number;
   monthSales: number;
   monthProfit: number;
-}
-
-interface SessionStatus {
-  has_session: boolean;
-  session_id?: number;
-  products_count?: number;
-  total_estimated_cost?: number;
-  duration_minutes?: number;
 }
 
 export default function Index() {
@@ -49,43 +39,11 @@ export default function Index() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
+  
   const [showNotif, setShowNotif] = useState(false);
-  
-  // ✅ NOVOS ESTADOS: Controle de sessão
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus>({ has_session: false });
-  const [showSessionSummary, setShowSessionSummary] = useState(false);
-  const [sessionSummaryData, setSessionSummaryData] = useState<any>(null);
 
-  // ✅ NOVO: Verificar status da sessão
-  const checkSessionStatus = async () => {
-    try {
-      const status = await sessionApi.getStatus();
-      setSessionStatus(status);
-    } catch (error) {
-      console.error('Erro ao verificar sessão:', error);
-    }
-  };
-
-  // ✅ NOVO: Finalizar sessão
-  const finishSession = async () => {
-    try {
-      const result = await sessionApi.finish();
-      setSessionStatus({ has_session: false });
-      
-      if (result.session_summary && result.session_summary.products_count > 0) {
-        setSessionSummaryData(result.session_summary);
-        setShowSessionSummary(true);
-      }
-    } catch (error) {
-      console.error('Erro ao finalizar sessão:', error);
-    }
-  };
-  
   useEffect(() => {
     if (!user) return;
-    
-    // ✅ NOVO: Verificar sessão ao carregar
-    checkSessionStatus();
     
     profileApi
       .get()
@@ -109,6 +67,7 @@ export default function Index() {
             ui_type: uiType
           };
         });
+
         // Pega apenas as VENDAS REAIS (Saídas do tipo VENDA) deste mês
         const salesMovements = monthMovements.filter((m) => m.ui_type === "saida" && m.raw_type === "VENDA");
         
@@ -117,16 +76,19 @@ export default function Index() {
         
         // Lucro Real do Mês (soma o lucro já calculado e salvo pelo backend na hora da baixa)
         const monthProfit = salesMovements.reduce((s, m) => s + (m.profit || 0), 0);
+
         // 🚀 CÁLCULO DE INVESTIMENTO (Baseado no saldo de estoque atual)
         const totalInvested = items.reduce((s, i) => {
           const qty = i.total_quantity ?? i.quantity ?? 0;
           return s + (qty * i.cost_price);
         }, 0);
+
         const totalPotential = items.reduce((s, i) => {
           const qty = i.total_quantity ?? i.quantity ?? 0;
           const salePrice = i.sale_price || i.product?.official_price || 0;
           return s + (qty * salePrice);
         }, 0);
+
         setStats({
           investedValue: totalInvested,
           potentialValue: totalPotential,
@@ -150,48 +112,18 @@ export default function Index() {
     { label: "Vendas deste Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
     { label: "Lucro Real do Mês", value: fmt(stats.monthProfit), icon: BarChart3, color: "text-emerald-600" }, // Novo Card de Lucro do Mês!
   ];
-
-  // ✅ MODIFICADO: Função para iniciar sessão
-  const startRegistrationSession = async () => {
-    try {
-      await sessionApi.start();
-      navigate("/add");
-    } catch (error) {
-      console.error('Erro ao iniciar sessão:', error);
-      navigate("/add"); // Vai mesmo se der erro
-    }
-  };
-
+// Função para iniciar sessão
+const startRegistrationSession = async () => {
+  try {
+    await sessionApi.start();
+    navigate("/add");
+  } catch (error) {
+    console.error('Erro ao iniciar sessão:', error);
+    navigate("/add"); // Vai mesmo se der erro
+  }
+};
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* ✅ NOVO: Header da sessão ativa */}
-      {sessionStatus.has_session && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between"
-        >
-          <div className="flex items-center gap-3">
-            <Package size={16} />
-            <span className="text-sm font-medium">
-              Cadastrando... {sessionStatus.products_count} produtos
-            </span>
-            <div className="flex items-center gap-1 text-blue-200">
-              <Clock size={12} />
-              <span className="text-xs">{sessionStatus.duration_minutes}min</span>
-            </div>
-          </div>
-          
-          <button 
-            onClick={finishSession}
-            className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-medium flex items-center gap-1 transition-colors"
-          >
-            <Check size={14} />
-            Finalizar
-          </button>
-        </motion.div>
-      )}
-
       <header className="sticky top-0 z-20 border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -257,14 +189,14 @@ export default function Index() {
           ))}
         </div>
         
-        {/* BOTÕES DE AÇÃO */}
+        {/* BOTÕES DE AÇÃO (Botão Manual removido) */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           
           <ActionBtn 
             onClick={startRegistrationSession} 
             icon={ScanBarcode} 
             label="Cadastrar" 
-            desc={sessionStatus.has_session ? "Continuar sessão" : "Iniciar sessão de cadastro"}
+            desc="Escanear entrada" 
             primary 
           />
           <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Registrar saída" />
@@ -300,17 +232,6 @@ export default function Index() {
       </main>
 
       {!isLocked("chat_assistant") && <ChatAssistant />}
-      
-      {/* ✅ NOVO: Modal de resumo da sessão */}
-      {showSessionSummary && sessionSummaryData && (
-        <SessionSummaryModal 
-          summary={sessionSummaryData}
-          onClose={() => {
-            setShowSessionSummary(false);
-            setSessionSummaryData(null);
-          }}
-        />
-      )}
       
       <UpgradeModal
         isOpen={showUpgrade}
