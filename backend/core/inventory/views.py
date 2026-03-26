@@ -818,3 +818,56 @@ class SessionSummaryView(APIView):
             
         except RegistrationSession.DoesNotExist:
             return Response({'error': 'Sessão não encontrada'}, status=404)
+        
+# inventory/views.py - ADICIONE esta nova view
+
+
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import api_view, permission_classes
+
+@api_view(['GET'])
+@permission_classes([AllowAny])  # ✅ PÚBLICO - sem autenticação
+def public_storefront(request, slug=None):
+    """
+    Endpoint público para vitrine - não requer autenticação
+    """
+    try:
+        if slug:
+            # Busca por slug da loja
+            store = get_object_or_404(Store, slug=slug, storefront_enabled=True)
+        else:
+            # Fallback por ID (compatibilidade)
+            store_id = request.GET.get('seller')
+            if not store_id:
+                return Response({'error': 'Slug ou seller ID obrigatório'}, status=400)
+            store = get_object_or_404(Store, id=store_id, storefront_enabled=True)
+        
+        # ✅ DADOS PÚBLICOS SEGUROS - apenas o necessário
+        items = InventoryItem.objects.filter(
+            store=store,
+            total_quantity__gt=0  # Apenas com estoque
+        ).select_related('product').values(
+            'id',
+            'total_quantity',
+            'sale_price',
+            'product__name',
+            'product__category',
+            'product__image_url'
+        )
+        
+        # ✅ DADOS DA LOJA (públicos e seguros)
+        store_data = {
+            'name': store.name,
+            'whatsapp': store.whatsapp,
+            'slug': store.slug
+        }
+        
+        return Response({
+            'store': store_data,
+            'items': list(items)
+        })
+        
+    except Store.DoesNotExist:
+        return Response({'error': 'Loja não encontrada ou vitrine desabilitada'}, status=404)
+    except Exception as e:
+        return Response({'error': 'Erro interno'}, status=500)

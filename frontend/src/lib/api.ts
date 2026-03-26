@@ -379,3 +379,38 @@ export const salesApi = {
       body: JSON.stringify(payload),
     }),
 };
+// lib/api.ts - SUBSTITUA ou ADICIONE
+
+export const publicStorefrontApi = {
+  listBySlug: async (slug: string) => {
+    const response = await fetch(`/api/public/storefront/${slug}/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+        // ✅ SEM Authorization header
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+  
+  listById: async (sellerId: string) => {
+    const response = await fetch(`/api/public/storefront/?seller=${sellerId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+        // ✅ SEM Authorization header
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+};

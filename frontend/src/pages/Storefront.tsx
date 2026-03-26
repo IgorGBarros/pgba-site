@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { toast } from "../hooks/use-toast";
-
+import { publicStorefrontApi } from "../lib/api";
 type PaymentMethod = "pix" | "cartao";
 
 interface BagItem extends StorefrontItem {
@@ -52,24 +52,23 @@ export default function Storefront() {
   useEffect(() => { saveCart(bag); }, [bag]);
   useEffect(() => { localStorage.setItem(CART_PAYMENT_KEY, paymentMethod); }, [paymentMethod]);
 
-   useEffect(() => {
+  useEffect(() => {
     const fetchItems = slug
-      ? storefrontApi.listBySlug(slug)
-      : storefrontApi.list(sellerIdParam || undefined);
+      ? publicStorefrontApi.listBySlug(slug)  // ✅ API pública
+      : publicStorefrontApi.listById(sellerIdParam || "");
       
     fetchItems.then((res: any) => {
-      // 1. O Django retorna { store: {...}, items: [...] }. O Demo retorna um Array direto [1].
-      const productsList = res.items ? res.items : (Array.isArray(res) ? res : []);
+      // ✅ Mapear dados do novo formato
+      const productsList = res.items || [];
       
-      // 2. Mapeia os dados exatamente como o Django envia para a interface da Vitrine [1]
       const mappedItems = productsList.map((item: any) => ({
         id: item.id,
-        product_name: item.product?.name || item.product_name || "Produto",
-        display_name: item.product?.name || item.display_name || item.product_name || "Produto",
-        category: item.product?.category || item.category || "Geral",
-        sale_price: item.sale_price || item.product?.official_price || 0,
-        total_quantity: item.total_quantity || item.qty || 0,
-        image_url: item.product?.image_url || item.image_url || null,
+        product_name: item.product__name || "Produto",
+        display_name: item.product__name || "Produto", 
+        category: item.product__category || "Geral",
+        sale_price: item.sale_price || 0,
+        total_quantity: item.total_quantity || 0,
+        image_url: item.product__image_url || null,
       }));
 
       setItems(mappedItems);
@@ -78,10 +77,6 @@ export default function Storefront() {
       if (res.store) {
         setSellerName(res.store.name || "Consultor(a)");
         setSellerWhatsapp(res.store.whatsapp || "");
-      } else if (mappedItems.length > 0) {
-        // Fallback para o modo Demo
-        setSellerName(mappedItems[0].seller_name || "Consultor(a)");
-        setSellerWhatsapp(mappedItems[0].seller_whatsapp || "");
       }
       
       setLoading(false);
