@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useParams } from "react-router-dom";
 import { Package, Search, ShoppingBag, Plus, Minus, Trash2, Send, Sparkles, CreditCard, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { storefrontApi, StorefrontItem, formatMoney } from "../lib/api"; // ✅ Adicionar formatMoney
+import { storefrontApi, StorefrontItem, formatMoney } from "../lib/api";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../components/ui/sheet";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -15,7 +15,7 @@ interface BagItem extends StorefrontItem {
   qty: number;
 }
 
-// ✅ CORREÇÃO: Chaves de localStorage específicas por loja
+// Chaves de localStorage específicas por loja
 const getCartStorageKey = (storeSlug: string) => `storefront_cart_${storeSlug}`;
 const getPaymentStorageKey = (storeSlug: string) => `storefront_payment_${storeSlug}`;
 
@@ -34,14 +34,13 @@ function loadPayment(storeSlug: string): PaymentMethod {
   return (localStorage.getItem(getPaymentStorageKey(storeSlug)) as PaymentMethod) || "pix";
 }
 
-// ✅ NOVO: Função helper para nomes consistentes
+// Função helper para nomes consistentes
 function getProductDisplayName(item: any): string {
-  // Hierarquia de prioridade para o nome baseada na documentação [1]
-  return item.product?.name ||           // 1º: Nome do produto relacionado
-         item.display_name ||            // 2º: Nome customizado
-         item.product_name ||            // 3º: Nome direto
-         item.custom_name ||             // 4º: Nome personalizado
-         "Produto sem nome";             // 5º: Fallback
+  return item.product?.name ||
+         item.display_name ||
+         item.product_name ||
+         item.custom_name ||
+         "Produto sem nome";
 }
 
 export default function Storefront() {
@@ -61,6 +60,12 @@ export default function Storefront() {
   const [bag, setBag] = useState<BagItem[]>([]);
   const [bagOpen, setBagOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
+
+  // ✅ NOVO: Estados para filtro de marca
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>(""); // "" = todas as marcas
+
+  
 
   // Carregar sacola específica da loja
   useEffect(() => {
@@ -83,6 +88,22 @@ export default function Storefront() {
     }
   }, [paymentMethod, storeSlug]);
 
+  // ✅ NOVO: Processar marcas disponíveis dos produtos
+useEffect(() => {
+  if (items.length > 0) {
+    const validBrands: string[] = [];
+    
+    items.forEach(item => {
+      if (item.brand && typeof item.brand === 'string' && item.brand.trim() !== '') {
+        validBrands.push(item.brand);
+      }
+    });
+    
+    const uniqueBrands = [...new Set(validBrands)].sort();
+    setAvailableBrands(uniqueBrands);
+    console.log('🏷️ Marcas disponíveis:', uniqueBrands);
+  }
+}, [items]);
   useEffect(() => {
     console.log('🚀 Iniciando carregamento da vitrine...', { slug, sellerIdParam });
     
@@ -95,9 +116,8 @@ export default function Storefront() {
       
       const productsList = res.items || [];
       
-      // ✅ CORREÇÃO PRINCIPAL: Mapear dados corretamente usando a função helper
+      // Mapear dados corretamente usando a função helper
       const mappedItems = productsList.map((item: any) => {
-        // Debug para ver a estrutura real dos dados
         console.log('🔍 Item raw da API:', item);
         
         const productName = getProductDisplayName(item);
@@ -108,6 +128,7 @@ export default function Storefront() {
           product_name: productName,
           display_name: productName,
           category: item.category || item.product?.category || "Geral",
+          brand: item.brand || item.product?.brand || null, // ✅ NOVO: Campo marca
           sale_price: item.sale_price || item.product?.official_price || 0,
           total_quantity: item.total_quantity || 0,
           image_url: item.image_url || item.product?.image_url || null,
@@ -143,11 +164,19 @@ export default function Storefront() {
     });
   }, [slug, sellerIdParam]);
 
-  const filtered = items.filter(
-    (i) =>
-      getProductDisplayName(i).toLowerCase().includes(search.toLowerCase()) ||
-      i.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  // ✅ NOVO: Filtro que considera marca E busca
+// ✅ CORREÇÃO: Usar função helper para comparar marca
+const filtered = items.filter((item) => {
+  const matchesSearch = !search || 
+    getProductDisplayName(item).toLowerCase().includes(search.toLowerCase()) ||
+    item.category?.toLowerCase().includes(search.toLowerCase());
+  
+  // ✅ CORREÇÃO: Comparação segura de marca
+  const itemBrand = item.brand;
+  const matchesBrand = !selectedBrand || (itemBrand && itemBrand === selectedBrand);
+  
+  return matchesSearch && matchesBrand;
+});
 
   const addToBag = useCallback((item: StorefrontItem) => {
     setBag((prev) => {
@@ -175,12 +204,12 @@ export default function Storefront() {
   const bagCount = bag.reduce((sum, b) => sum + b.qty, 0);
   const paymentLabel = paymentMethod === "pix" ? "PIX" : "Cartão / Link de Pagamento";
 
-  // ✅ CORREÇÃO: Usar a função helper consistente
+  // Usar a função helper consistente
   const getDisplayName = (item: StorefrontItem | BagItem) => {
     return getProductDisplayName(item);
   };
 
-  // Lógica do WhatsApp (mantida igual)
+  // Lógica do WhatsApp
   const buildWhatsappLink = (itemsList: BagItem[]) => {
     const rawPhone = sellerWhatsapp?.replace(/\D/g, "") || "";
     const phone = rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`;
@@ -294,24 +323,102 @@ export default function Storefront() {
           </div>
         </motion.div>
         
-        {search && filtered.length > 0 && (
-          <p className="mb-4 text-xs font-medium text-muted-foreground">
-            {filtered.length} produto{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
-          </p>
+        {/* ✅ NOVO: Seletor de marcas (só aparece se tiver mais de uma marca) */}
+        {availableBrands.length > 1 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <button
+                onClick={() => setSelectedBrand("")}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                  selectedBrand === "" 
+                    ? "bg-primary text-primary-foreground shadow-md" 
+                    : "bg-secondary/80 text-secondary-foreground hover:bg-secondary hover:shadow-sm"
+                }`}
+              >
+                Todas as Marcas
+                <span className="ml-2 text-xs opacity-70">
+                  ({items.length})
+                </span>
+              </button>
+              
+                  {availableBrands.map((brand) => {
+                    // ✅ CORREÇÃO: Filtro seguro para contar
+                    const brandCount = items.filter(item => 
+                      item.brand && item.brand === brand
+                    ).length;
+                    
+                    return (
+                      <button
+                        key={brand}
+                        onClick={() => setSelectedBrand(brand)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                          selectedBrand === brand 
+                            ? "bg-primary text-primary-foreground shadow-md" 
+                            : "bg-secondary/80 text-secondary-foreground hover:bg-secondary hover:shadow-sm"
+                        }`}
+                      >
+                        {brand}
+                        <span className="ml-2 text-xs opacity-70">
+                          ({brandCount})
+                        </span>
+                      </button>
+                    );
+                  })}
+           
+            </div>
+          </motion.div>
+        )}
+
+        {/* Contador de resultados atualizado */}
+        {(search || selectedBrand) && (
+          <div className="mb-4 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span>
+              {filtered.length} produto{filtered.length !== 1 ? "s" : ""} 
+              {search && ` para "${search}"`}
+              {selectedBrand && ` da marca ${selectedBrand}`}
+            </span>
+            
+            {/* Botão para limpar filtros */}
+            {(search || selectedBrand) && (
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setSelectedBrand("");
+                }}
+                className="text-primary hover:text-primary/80 underline"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
         )}
 
         {/* Products Grid */}
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center py-20 text-muted-foreground">
             <Package className="mb-3 h-14 w-14 opacity-20" />
-            <p className="text-sm font-medium">Nenhum produto disponível</p>
-            <p className="text-xs mt-1">A loja está sem estoque no momento.</p>
+            <p className="text-sm font-medium">
+              {search || selectedBrand 
+                ? "Nenhum produto encontrado com os filtros aplicados" 
+                : "Nenhum produto disponível"
+              }
+            </p>
+            <p className="text-xs mt-1">
+              {search || selectedBrand 
+                ? "Tente remover alguns filtros" 
+                : "A loja está sem estoque no momento."
+              }
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {filtered.map((item, i) => {
               const qtyInBag = getItemQtyInBag(item.id);
-              const name = getDisplayName(item); // ✅ Usar função consistente
+              const name = getDisplayName(item);
               
               return (
                 <motion.div
@@ -321,6 +428,13 @@ export default function Storefront() {
                   transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 30 }}
                   className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5"
                 >
+                  {/* ✅ NOVO: Badge da marca (opcional) */}
+                  {item.brand && availableBrands.length > 1 && (
+                    <div className="absolute left-2 top-2 z-10 px-2 py-1 bg-black/70 text-white text-[10px] font-medium rounded">
+                      {item.brand}
+                    </div>
+                  )}
+                  
                   {qtyInBag > 0 && (
                     <div className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground shadow-md">
                       {qtyInBag}
@@ -336,7 +450,6 @@ export default function Storefront() {
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
                         onError={(e) => {
-                          // ✅ Fallback para imagem quebrada
                           e.currentTarget.style.display = 'none';
                         }}
                       />
@@ -350,7 +463,7 @@ export default function Storefront() {
                   {/* Product Info */}
                   <div className="flex flex-1 flex-col p-3 border-t border-border/50">
                     <p className="text-xs font-bold text-foreground leading-snug line-clamp-2" title={name}>
-                      {name} {/* ✅ Nome correto */}
+                      {name}
                     </p>
                     <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
                       {item.category}
@@ -359,7 +472,7 @@ export default function Storefront() {
                     <div className="mt-auto pt-3">
                       {item.sale_price ? (
                         <p className="text-base font-extrabold text-primary">
-                          {formatMoney(item.sale_price)} {/* ✅ Usar formatMoney */}
+                          {formatMoney(item.sale_price)}
                         </p>
                       ) : (
                         <p className="text-xs italic text-muted-foreground">Preço sob consulta</p>
@@ -419,7 +532,7 @@ export default function Storefront() {
               
               {bagTotal > 0 && (
                 <span className="text-base font-black">
-                  {formatMoney(bagTotal)} {/* ✅ Usar formatMoney */}
+                  {formatMoney(bagTotal)}
                 </span>
               )}
             </Button>
@@ -427,7 +540,7 @@ export default function Storefront() {
         )}
       </AnimatePresence>
 
-      {/* Bag Sheet */}
+      {/* Bag Sheet - permanece igual */}
       <Sheet open={bagOpen} onOpenChange={setBagOpen}>
         <SheetContent side="bottom" className="max-h-[85vh] rounded-t-3xl sm:max-w-md sm:mx-auto px-4">
           <SheetHeader className="pb-4">
@@ -469,7 +582,7 @@ export default function Storefront() {
                       <p className="truncate text-xs font-bold text-foreground">{getDisplayName(item)}</p>
                       {item.sale_price && (
                         <p className="mt-1 text-sm font-extrabold text-primary">
-                          {formatMoney(item.sale_price * item.qty)} {/* ✅ Usar formatMoney */}
+                          {formatMoney(item.sale_price * item.qty)}
                         </p>
                       )}
                     </div>

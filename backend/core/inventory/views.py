@@ -826,11 +826,13 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def public_storefront_view(request, slug=None):
+def public_storefront_view(request, slug=None, brand=None):
     """
     Endpoint público para vitrine - não requer autenticação
+    Suporta filtro por marca: /vitrine/{slug}/marca/{brand}
     """
     try:
+        # ✅ Validar e buscar a loja
         if slug:
             try:
                 store = Store.objects.get(slug=slug)
@@ -845,13 +847,31 @@ def public_storefront_view(request, slug=None):
             except Store.DoesNotExist:
                 return Response({'error': 'Loja não encontrada'}, status=404)
         
-        # ✅ CORREÇÃO: Buscar dados com relacionamentos corretos
-        items = InventoryItem.objects.filter(
+        # ✅ NOVO: Filtro por marca (query parameter ou URL)
+        brand_filter = brand or request.GET.get('brand')
+        
+        # ✅ Base query com relacionamentos corretos
+        items_query = InventoryItem.objects.filter(
             store=store,
             total_quantity__gt=0
         ).select_related('product')
         
-        # ✅ CORREÇÃO: Mapear dados corretamente
+        # ✅ NOVO: Aplicar filtro por marca se especificado
+        if brand_filter:
+            # Normalizar nome da marca (case-insensitive)
+            brand_filter = brand_filter.strip().lower()
+            items_query = items_query.filter(
+                product__brand__icontains=brand_filter
+            )
+        
+        items = items_query.order_by('product__brand', 'product__category', 'product__name')
+        
+        # ✅ NOVO: Coletar marcas disponíveis para navegação
+        available_brands = items.values_list('product__brand', flat=True).distinct()
+        available_brands = [brand for brand in available_brands if brand]  # Remove None/empty
+        available_brands = sorted(set(available_brands))  # Remove duplicatas e ordena
+        
+        # ✅ Mapear dados corretamente
         items_data = []
         for item in items:
             # Garantir que sempre temos um nome
@@ -867,11 +887,15 @@ def public_storefront_view(request, slug=None):
                 float(item.product.official_price) if item.product and item.product.official_price else 0
             )
             
+            # ✅ NOVO: Incluir marca no retorno
+            brand_name = item.product.brand if item.product else None
+            
             items_data.append({
                 'id': str(item.id),
                 'product_name': product_name,
-                'display_name': product_name,  # ✅ Usar o mesmo nome
+                'display_name': product_name,
                 'category': item.product.category if item.product else 'Geral',
+                'brand': item.product.brand if item.product else None,  # ✅ Campo marca
                 'sale_price': sale_price,
                 'total_quantity': item.total_quantity,
                 'image_url': image_url,
@@ -884,10 +908,19 @@ def public_storefront_view(request, slug=None):
             'slug': getattr(store, 'slug', '') or slug
         }
         
-        return Response({
+        # ✅ NOVO: Retorno enriquecido com informações de marca
+        response_data = {
             'store': store_data,
-            'items': items_data
-        })
+            'items': items_data,
+            'brands': {
+                'available': available_brands,
+                'current_filter': brand_filter,
+                'total_brands': len(available_brands),
+                'total_products': len(items_data)
+            }
+        }
+        
+        return Response(response_data)
         
     except Exception as e:
         print(f"❌ Erro no endpoint público: {e}")

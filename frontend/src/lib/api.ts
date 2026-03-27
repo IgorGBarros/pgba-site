@@ -125,6 +125,8 @@ export interface InventoryItem {
   min_quantity?: number;
   cost_price: number;
   sale_price: number | null;
+  
+  // ✅ CORREÇÃO: Estrutura do produto com brand incluído
   product?: {
     id: number | string;
     name: string;
@@ -133,13 +135,19 @@ export interface InventoryItem {
     category: string;
     image_url: string;
     official_price: number;
+    brand?: string; // ✅ NOVO: Campo brand no objeto product
   };
+  
   batches?: InventoryBatch[];
   quantity?: number;
   barcode?: string;
   product_name?: string;
   custom_name?: string | null;
   category?: string;
+  
+  // ✅ CORREÇÃO: Campo brand opcional (pode vir do produto ou direto)
+  brand?: string | null;
+  
   official_price?: number | null;
   sale_type?: string | null;
   expiry_date?: string | null;
@@ -207,6 +215,7 @@ export interface InventoryBatch {
   quantity: number;
   cost_price: number;
   batch_code?: string;
+
   expiration_date?: string | null;
   expiry_date?: string | null;
   expiry_photo_url?: string | null;
@@ -300,12 +309,15 @@ export const profileApi = {
 };
 
 // ── Storefront (public) ──
+// lib/api.ts - CORRIGIR a interface StorefrontItem
+
 export interface StorefrontItem {
   id: string;
   product_name: string;
   display_name: string;
   custom_name: string | null;
   category: string;
+  brand?: string | null; // ✅ ADICIONAR este campo
   sale_price: number | null;
   barcode: string;
   expiry_date: string | null;
@@ -315,7 +327,6 @@ export interface StorefrontItem {
   image_url: string | null;
   store_slug: string | null;
 }
-
 // ✅ CORREÇÃO: API pública da vitrine com tratamento de erro robusto
 export const publicStorefrontApi = {
   listBySlug: async (slug: string) => {
