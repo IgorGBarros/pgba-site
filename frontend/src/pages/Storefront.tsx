@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useParams } from "react-router-dom";
 import { Package, Search, ShoppingBag, Plus, Minus, Trash2, Send, Sparkles, CreditCard, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { storefrontApi, StorefrontItem } from "../lib/api";
+import { storefrontApi, StorefrontItem, formatMoney } from "../lib/api"; // ✅ Adicionar formatMoney
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../components/ui/sheet";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -34,6 +34,16 @@ function loadPayment(storeSlug: string): PaymentMethod {
   return (localStorage.getItem(getPaymentStorageKey(storeSlug)) as PaymentMethod) || "pix";
 }
 
+// ✅ NOVO: Função helper para nomes consistentes
+function getProductDisplayName(item: any): string {
+  // Hierarquia de prioridade para o nome baseada na documentação [1]
+  return item.product?.name ||           // 1º: Nome do produto relacionado
+         item.display_name ||            // 2º: Nome customizado
+         item.product_name ||            // 3º: Nome direto
+         item.custom_name ||             // 4º: Nome personalizado
+         "Produto sem nome";             // 5º: Fallback
+}
+
 export default function Storefront() {
   const { slug } = useParams<{ slug?: string }>();
   const [searchParams] = useSearchParams();
@@ -46,13 +56,13 @@ export default function Storefront() {
   const [sellerName, setSellerName] = useState("");
   const [sellerWhatsapp, setSellerWhatsapp] = useState("");
   
-  // ✅ CORREÇÃO: Estados com slug específico
+  // Estados com slug específico
   const [storeSlug, setStoreSlug] = useState<string>("");
   const [bag, setBag] = useState<BagItem[]>([]);
   const [bagOpen, setBagOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
 
-  // ✅ CORREÇÃO: Carregar sacola específica da loja
+  // Carregar sacola específica da loja
   useEffect(() => {
     if (storeSlug) {
       setBag(loadCart(storeSlug));
@@ -60,7 +70,7 @@ export default function Storefront() {
     }
   }, [storeSlug]);
 
-  // ✅ CORREÇÃO: Salvar sacola específica da loja
+  // Salvar sacola específica da loja
   useEffect(() => {
     if (storeSlug) {
       saveCart(bag, storeSlug);
@@ -85,35 +95,43 @@ export default function Storefront() {
       
       const productsList = res.items || [];
       
-      // ✅ CORREÇÃO: Mapear nomes corretamente conforme o backend
-      const mappedItems = productsList.map((item: any) => ({
-        id: item.id,
-        product_name: item.product_name || item.display_name || "Produto sem nome",
-        display_name: item.display_name || item.product_name || "Produto sem nome",
-        category: item.category || "Geral",
-        sale_price: item.sale_price || 0,
-        total_quantity: item.total_quantity || 0,
-        image_url: item.image_url || null,
-        // ✅ Campos adicionais necessários para StorefrontItem
-        custom_name: null,
-        barcode: "",
-        expiry_date: null,
-        seller_name: null,
-        seller_whatsapp: null,
-        user_id: "",
-        store_slug: null,
-      }));
+      // ✅ CORREÇÃO PRINCIPAL: Mapear dados corretamente usando a função helper
+      const mappedItems = productsList.map((item: any) => {
+        // Debug para ver a estrutura real dos dados
+        console.log('🔍 Item raw da API:', item);
+        
+        const productName = getProductDisplayName(item);
+        console.log('✅ Nome mapeado:', productName);
+        
+        return {
+          id: item.id,
+          product_name: productName,
+          display_name: productName,
+          category: item.category || item.product?.category || "Geral",
+          sale_price: item.sale_price || item.product?.official_price || 0,
+          total_quantity: item.total_quantity || 0,
+          image_url: item.image_url || item.product?.image_url || null,
+          // Campos adicionais necessários para StorefrontItem
+          custom_name: item.custom_name || null,
+          barcode: item.barcode || item.product?.bar_code || "",
+          expiry_date: item.expiry_date || null,
+          seller_name: null,
+          seller_whatsapp: null,
+          user_id: "",
+          store_slug: null,
+        };
+      });
       
       console.log('🎯 Produtos mapeados:', mappedItems);
       setItems(mappedItems);
       
-      // ✅ CORREÇÃO: Definir slug da loja e carregar sacola específica
+      // Definir dados da loja
       if (res.store) {
         console.log('🏪 Dados da loja:', res.store);
         setSellerName(res.store.name || "Consultor(a)");
         setSellerWhatsapp(res.store.whatsapp || "");
         
-        // ✅ Definir slug para isolamento da sacola
+        // Definir slug para isolamento da sacola
         const currentStoreSlug = res.store.slug || slug || sellerIdParam || "default";
         setStoreSlug(currentStoreSlug);
       }
@@ -127,7 +145,7 @@ export default function Storefront() {
 
   const filtered = items.filter(
     (i) =>
-      (i.display_name || i.product_name)?.toLowerCase().includes(search.toLowerCase()) ||
+      getProductDisplayName(i).toLowerCase().includes(search.toLowerCase()) ||
       i.category?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -157,32 +175,29 @@ export default function Storefront() {
   const bagCount = bag.reduce((sum, b) => sum + b.qty, 0);
   const paymentLabel = paymentMethod === "pix" ? "PIX" : "Cartão / Link de Pagamento";
 
-  // ✅ CORREÇÃO: Função para nome consistente
+  // ✅ CORREÇÃO: Usar a função helper consistente
   const getDisplayName = (item: StorefrontItem | BagItem) => {
-    return item.display_name || item.product_name || "Produto sem nome";
+    return getProductDisplayName(item);
   };
 
-  // 🚀 LÓGICA DO WHATSAPP SEGURA E CODIFICADA CORRETAMENTE
+  // Lógica do WhatsApp (mantida igual)
   const buildWhatsappLink = (itemsList: BagItem[]) => {
-    // Remove qualquer formatação, garantindo que o número fique limpo
     const rawPhone = sellerWhatsapp?.replace(/\D/g, "") || "";
-    // Adiciona o DDI (55) caso a consultora não tenha digitado
     const phone = rawPhone.startsWith("55") ? rawPhone : `55${rawPhone}`;
     
     if (itemsList.length === 1 && itemsList[0].qty === 1) {
       const name = getDisplayName(itemsList[0]);
-      const priceText = itemsList[0].sale_price ? ` — R$ ${itemsList[0].sale_price.toFixed(2).replace('.', ',')}` : "";
+      const priceText = itemsList[0].sale_price ? ` — ${formatMoney(itemsList[0].sale_price)}` : "";
       
       const msg = `Olá ${sellerName}! 😊\n\nTenho interesse no produto:\n• ${name}${priceText}\n\n💳 Forma de pagamento: *${paymentLabel}*\n\nEstá disponível?`;
-      // encodeURIComponent converte os \n e espaços em códigos que a URL entende perfeitamente
       return `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(msg)}`;
     }
     
     const lines = itemsList.map(
-      (b) => `• ${b.qty}x ${getDisplayName(b)}${b.sale_price ? ` — R$ ${(b.sale_price * b.qty).toFixed(2).replace('.', ',')}` : ""}`
+      (b) => `• ${b.qty}x ${getDisplayName(b)}${b.sale_price ? ` — ${formatMoney(b.sale_price * b.qty)}` : ""}`
     );
     
-    const msg = `Olá ${sellerName}! 😊\n\nGostaria de solicitar os seguintes produtos:\n\n${lines.join("\n")}\n\n💰 Total estimado: *R$ ${bagTotal.toFixed(2).replace('.', ',')}*\n💳 Forma de pagamento: *${paymentLabel}*\n\nPode verificar a disponibilidade e me retornar? Obrigada!`;
+    const msg = `Olá ${sellerName}! 😊\n\nGostaria de solicitar os seguintes produtos:\n\n${lines.join("\n")}\n\n💰 Total estimado: *${formatMoney(bagTotal)}*\n💳 Forma de pagamento: *${paymentLabel}*\n\nPode verificar a disponibilidade e me retornar? Obrigada!`;
     
     return `https://api.whatsapp.com/send/?phone=${phone}&text=${encodeURIComponent(msg)}`;
   };
@@ -202,7 +217,6 @@ export default function Storefront() {
     window.open(link, "_blank", "noopener,noreferrer");
   };
 
-  // ✅ CORREÇÃO: Limpar sacola específica da loja
   const clearBag = () => {
     setBag([]);
     if (storeSlug) {
@@ -312,6 +326,7 @@ export default function Storefront() {
                       {qtyInBag}
                     </div>
                   )}
+                  
                   {/* Product Image */}
                   <div className="relative aspect-square w-full overflow-hidden bg-secondary/30">
                     {item.image_url ? (
@@ -320,6 +335,10 @@ export default function Storefront() {
                         alt={name}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
+                        onError={(e) => {
+                          // ✅ Fallback para imagem quebrada
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
@@ -327,9 +346,10 @@ export default function Storefront() {
                       </div>
                     )}
                   </div>
+                  
                   {/* Product Info */}
                   <div className="flex flex-1 flex-col p-3 border-t border-border/50">
-                    <p className="text-xs font-bold text-foreground leading-snug line-clamp-2">
+                    <p className="text-xs font-bold text-foreground leading-snug line-clamp-2" title={name}>
                       {name} {/* ✅ Nome correto */}
                     </p>
                     <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -339,13 +359,14 @@ export default function Storefront() {
                     <div className="mt-auto pt-3">
                       {item.sale_price ? (
                         <p className="text-base font-extrabold text-primary">
-                          R$ {item.sale_price.toFixed(2).replace('.', ',')}
+                          {formatMoney(item.sale_price)} {/* ✅ Usar formatMoney */}
                         </p>
                       ) : (
                         <p className="text-xs italic text-muted-foreground">Preço sob consulta</p>
                       )}
                     </div>
-                    {/* 🚀 BOTÕES DE AÇÃO DO PRODUTO */}
+                    
+                    {/* Botões de ação */}
                     <div className="mt-3 flex gap-2">
                       <Button
                         size="sm"
@@ -398,7 +419,7 @@ export default function Storefront() {
               
               {bagTotal > 0 && (
                 <span className="text-base font-black">
-                  R$ {bagTotal.toFixed(2).replace('.', ',')}
+                  {formatMoney(bagTotal)} {/* ✅ Usar formatMoney */}
                 </span>
               )}
             </Button>
@@ -448,7 +469,7 @@ export default function Storefront() {
                       <p className="truncate text-xs font-bold text-foreground">{getDisplayName(item)}</p>
                       {item.sale_price && (
                         <p className="mt-1 text-sm font-extrabold text-primary">
-                          R$ {(item.sale_price * item.qty).toFixed(2).replace('.', ',')}
+                          {formatMoney(item.sale_price * item.qty)} {/* ✅ Usar formatMoney */}
                         </p>
                       )}
                     </div>
@@ -505,7 +526,7 @@ export default function Storefront() {
               
               <div className="flex items-center justify-between px-1">
                 <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Total do Pedido</span>
-                <span className="text-2xl font-black text-foreground">R$ {bagTotal.toFixed(2).replace('.', ',')}</span>
+                <span className="text-2xl font-black text-foreground">{formatMoney(bagTotal)}</span> {/* ✅ Usar formatMoney */}
               </div>
               
               <div className="space-y-2 pt-2">
