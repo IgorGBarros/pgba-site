@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { stockApi } from "../lib/api"; // 🚀 Agora só precisamos do stockApi!
+import { stockApi } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/use-toast";
 
@@ -13,6 +13,7 @@ export interface StockEntryData {
   name?: string;
   category?: string;
   natura_sku?: string | null;
+  brand?: string; // ✅ JÁ EXISTE - mantém
   // campos complementares visuais
   expiry_photo_url?: string | null;
   lookup_source?: string | null;
@@ -29,13 +30,13 @@ export function useStockEntry() {
     
     setLoading(true);
     try {
-      // 🔥 O BACKEND FAZ TUDO EM 1 CLIQUE! 
-      // Enviamos apenas o payload formatado para /api/stock/entry/
+      // 🔥 CORREÇÃO: Incluir campo brand no payload
       const response = await stockApi.create({
         bar_code: data.bar_code,
         natura_sku: data.natura_sku || "",
         name: data.name || "Produto sem nome",
         category: data.category || "Geral",
+        brand: data.brand || "", // ✅ ADICIONAR este campo
         quantity: Number(data.quantity),
         cost_price: Number(data.cost_price ?? 0),
         sale_price: Number(data.sale_price ?? 0),
@@ -50,16 +51,42 @@ export function useStockEntry() {
         description: `+${data.quantity} un. de ${data.name || "Produto"} registradas.`,
       });
 
-      // Retorna a resposta do backend caso as telas precisem de algum dado
       return response; 
       
     } catch (err: any) {
       console.error("❌ Falha ao salvar entrada:", err);
+      
+      // ✅ MELHOR tratamento de erro para debug
+      let errorMessage = "Falha ao registrar entrada de estoque.";
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      // ✅ Log detalhado para debug
+      console.error("Dados enviados:", {
+        bar_code: data.bar_code,
+        natura_sku: data.natura_sku,
+        name: data.name,
+        category: data.category,
+        brand: data.brand,
+        quantity: data.quantity,
+        cost_price: data.cost_price,
+        sale_price: data.sale_price,
+        batch_code: data.batch_code,
+        expiration_date: data.expiration_date
+      });
+      
       toast({
         title: "Erro de Validação",
-        description: err.response?.data?.error || err.message || "Falha ao registrar entrada de estoque.",
+        description: errorMessage,
         variant: "destructive",
       });
+      
       throw err;
     } finally {
       setLoading(false);
