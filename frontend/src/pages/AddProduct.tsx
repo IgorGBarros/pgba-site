@@ -473,7 +473,31 @@ const handleSave = async () => {
                     </div>
                 </div>
                 
-                {/* Resto do código permanece igual... */}
+                 <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-primary/5">
+                    <div>
+                        <label className="text-sm font-bold text-primary">Qtd Entrada *</label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <button type="button" onClick={() => setData(p => ({ ...p, quantity: Math.max(1, p.quantity - 1) }))} className="h-8 w-8 rounded bg-background border font-bold">-</button>
+                            <input type="number" min={1} value={data.quantity} onChange={(e) => setData(p => ({ ...p, quantity: parseInt(e.target.value)||1 }))} className="h-8 w-12 rounded border text-center font-bold outline-none" />
+                            <button type="button" onClick={() => setData(p => ({ ...p, quantity: p.quantity + 1 }))} className="h-8 w-8 rounded bg-background border font-bold">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-foreground">Lote</label>
+                        <input value={data.batch_code} onChange={(e) => setData(p => ({...p, batch_code: e.target.value}))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" placeholder="Opcional" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Preço de Custo</label>
+                    <input type="number" step="0.01" value={data.cost_price || ""} onChange={(e) => setData((p) => ({ ...p, cost_price: parseFloat(e.target.value)||0 }))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground">Preço Venda</label>
+                    <input type="number" step="0.01" value={data.sale_price || ""} onChange={(e) => setData((p) => ({ ...p, sale_price: parseFloat(e.target.value)||0 }))} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                  </div>
+                </div>
+            
               </div>
             </motion.div>
           )}
