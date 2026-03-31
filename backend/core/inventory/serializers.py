@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -67,25 +69,96 @@ class ProductSerializer(serializers.ModelSerializer):
             'category','brand', 'description', 'official_price', 'min_quantity'
         ]
 
+# inventory/serializers.py - CORRIGIR InventoryBatchSerializer
+
+# inventory/serializers.py - ATUALIZAR InventoryBatchSerializer
+
 class InventoryBatchSerializer(serializers.ModelSerializer):
+    formatted_date = serializers.SerializerMethodField()
+    is_expired = serializers.SerializerMethodField()
+    is_near_expiry = serializers.SerializerMethodField()
+    days_to_expire = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    
     class Meta:
         model = InventoryBatch
-        fields = ['id', 'batch_code', 'expiration_date', 'quantity']
+        fields = [
+            'id', 'batch_code', 'expiration_date', 'quantity', 
+            'formatted_date', 'is_expired', 'is_near_expiry', 
+            'days_to_expire', 'status'
+        ]
+    
+    def get_formatted_date(self, obj):
+        if obj.expiration_date:
+            return obj.expiration_date.strftime('%d/%m/%Y')
+        return 'Sem validade'
+    
+    def get_is_expired(self, obj):
+        if obj.expiration_date:
+            return obj.expiration_date < timezone.now().date()
+        return False
+    
+    def get_is_near_expiry(self, obj):
+        if obj.expiration_date and not self.get_is_expired(obj):
+            days_diff = (obj.expiration_date - timezone.now().date()).days
+            return days_diff <= 30
+        return False
+    
+    def get_days_to_expire(self, obj):
+        if obj.expiration_date and not self.get_is_expired(obj):
+            return (obj.expiration_date - timezone.now().date()).days
+        return None
+    
+    def get_status(self, obj):
+        if self.get_is_expired(obj):
+            return 'expired'
+        elif self.get_is_near_expiry(obj):
+            return 'near_expiry'
+        else:
+            return 'valid'
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
-    batches = InventoryBatchSerializer(many=True, read_only=True)
+    batches = serializers.SerializerMethodField()
+    batch_stats = serializers.SerializerMethodField()
     display_price = serializers.SerializerMethodField()
     
     class Meta:
         model = InventoryItem
         fields = [
-            'id', 'product', 'sale_price', 'cost_price', 
-            'total_quantity', 'min_quantity', 'batches', 'display_price'
+            'id', 'product', 'total_quantity', 'cost_price', 'sale_price', 
+            'display_price', 'batches', 'batch_stats', 'created_at', 'updated_at'
         ]
     
+    def get_batches(self, obj):
+        # ✅ CORREÇÃO: Retornar apenas lotes com estoque, ordenados por validade
+        active_batches = obj.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
+        return InventoryBatchSerializer(active_batches, many=True).data
+    
+    def get_batch_stats(self, obj):
+        # ✅ NOVO: Estatísticas dos lotes
+        active_batches = obj.batches.filter(quantity__gt=0)
+        today = timezone.now().date()
+        
+        expired_count = 0
+        near_expiry_count = 0
+        
+        for batch in active_batches:
+            if batch.expiration_date:
+                if batch.expiration_date < today:
+                    expired_count += 1
+                elif (batch.expiration_date - today).days <= 30:
+                    near_expiry_count += 1
+        
+        return {
+            'total_batches': active_batches.count(),
+            'expired_batches': expired_count,
+            'near_expiry_batches': near_expiry_count,
+            'valid_batches': active_batches.count() - expired_count - near_expiry_count
+        }
+    
     def get_display_price(self, obj):
-        return obj.sale_price if obj.sale_price and obj.sale_price > 0 else obj.product.official_price
+        return float(obj.sale_price) if obj.sale_price else 0.0
 
 # ==========================================
 # 3. SERIALIZER DE ENTRADA (SCAN)

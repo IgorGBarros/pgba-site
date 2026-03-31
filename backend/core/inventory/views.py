@@ -166,10 +166,135 @@ class ProductViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+from django.db.models import Sum, Prefetch
+from django.utils import timezone
+from rest_framework import viewsets
+from rest_framework.response import Response
+
 class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
-    """Estoque Privado da Consultora"""
-    queryset = InventoryItem.objects.all().select_related('product')
+    """Estoque Privado da Consultora - VERSÃO CORRIGIDA"""
     serializer_class = InventoryItemSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['product__category']
+
+    def get_queryset(self):
+        store = get_current_store(self.request.user)
+        return InventoryItem.objects.filter(store=store).select_related('product').prefetch_related(
+            # ✅ CORREÇÃO: Ordenar lotes por validade (FIFO) e incluir apenas com estoque
+            Prefetch(
+                'batches', 
+                queryset=InventoryBatch.objects.filter(quantity__gt=0).order_by('expiration_date', 'id')
+            )
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        ✅ CORREÇÃO: Retornar detalhes do produto com lotes organizados e totais corretos
+        """
+        instance = self.get_object()
+        
+        # ✅ Buscar lotes ativos ordenados por validade (FIFO)
+        active_batches = instance.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
+        
+        # ✅ Recalcular total real baseado nos lotes
+        total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
+        
+        # ✅ Atualizar total se estiver desatualizado
+        if instance.total_quantity != total_real:
+            print(f"🔄 Corrigindo total de {instance.product.name}: {instance.total_quantity} → {total_real}")
+            instance.total_quantity = total_real
+            instance.save()
+        
+        # ✅ Serializar com dados atualizados
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        
+        # ✅ CORREÇÃO: Substituir lotes por versão ordenada e enriquecida
+        batches_data = []
+        for batch in active_batches:
+            # Calcular informações de validade
+            is_expired = False
+            days_to_expire = None
+            
+            if batch.expiration_date:
+                today = timezone.now().date()
+                is_expired = batch.expiration_date < today
+                if not is_expired:
+                    days_to_expire = (batch.expiration_date - today).days
+            
+            batches_data.append({
+                'id': batch.id,
+                'batch_code': batch.batch_code or 'S/N',
+                'expiration_date': batch.expiration_date,
+                'quantity': batch.quantity,
+                'formatted_date': batch.expiration_date.strftime('%d/%m/%Y') if batch.expiration_date else 'Sem validade',
+                'is_expired': is_expired,
+                'is_near_expiry': days_to_expire is not None and days_to_expire <= 30,
+                'days_to_expire': days_to_expire,
+                'status': 'expired' if is_expired else ('near_expiry' if days_to_expire is not None and days_to_expire <= 30 else 'valid')
+            })
+        
+        # ✅ Estatísticas dos lotes
+        batch_stats = {
+            'total_batches': len(batches_data),
+            'expired_batches': len([b for b in batches_data if b['is_expired']]),
+            'near_expiry_batches': len([b for b in batches_data if b['is_near_expiry'] and not b['is_expired']]),
+            'valid_batches': len([b for b in batches_data if not b['is_expired'] and not b['is_near_expiry']])
+        }
+        
+        # ✅ Atualizar response com dados organizados
+        data['batches'] = batches_data
+        data['batch_stats'] = batch_stats
+        data['total_quantity'] = total_real
+        
+        return Response(data)
+
+    def list(self, request, *args, **kwargs):
+        """
+        ✅ CORREÇÃO: Lista com totais sempre atualizados
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # ✅ Verificar e corrigir totais desatualizados
+        for item in queryset:
+            active_batches = item.batches.filter(quantity__gt=0)
+            total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
+            
+            if item.total_quantity != total_real:
+                print(f"🔄 Corrigindo total de {item.product.name}: {item.total_quantity} → {total_real}")
+                item.total_quantity = total_real
+                item.save()
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        """
+        ✅ Garantir que criação sempre vincula à loja correta
+        """
+        store = get_current_store(self.request.user)
+        serializer.save(store=store)
+
+    def perform_update(self, serializer):
+        """
+        ✅ Recalcular total após atualização
+        """
+        instance = serializer.save()
+        
+        # Recalcular total baseado nos lotes
+        total_real = instance.batches.filter(quantity__gt=0).aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        if instance.total_quantity != total_real:
+            instance.total_quantity = total_real
+            instance.save()
 
 class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Extrato de Movimentações da Loja"""
@@ -891,31 +1016,30 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
 # inventory/views.py - SUBSTITUA a função existente por esta versão completa
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from .models import Store, InventoryItem
+from django.shortcuts import get_object_or_404
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def public_storefront_view(request, slug=None, brand=None):
     """
     Endpoint público para vitrine - não requer autenticação
     Suporta filtro por marca: /vitrine/{slug}/marca/{brand}
-    Implementa estratégia de urgência do marketing
     """
     try:
-        # ✅ Validar e buscar a loja
+        # ✅ CORREÇÃO: Validar e buscar a loja de forma mais segura
         if slug:
-            try:
-                store = Store.objects.get(slug=slug)
-            except Store.DoesNotExist:
-                return Response({'error': 'Loja não encontrada'}, status=404)
+            store = get_object_or_404(Store, slug=slug)
         else:
             store_id = request.GET.get('seller')
             if not store_id:
                 return Response({'error': 'Slug ou seller ID obrigatório'}, status=400)
-            try:
-                store = Store.objects.get(id=store_id)
-            except Store.DoesNotExist:
-                return Response({'error': 'Loja não encontrada'}, status=404)
+            store = get_object_or_404(Store, id=store_id)
         
-        # ✅ NOVO: Filtro por marca (query parameter ou URL)
+        # ✅ Filtro por marca
         brand_filter = brand or request.GET.get('brand')
         
         # ✅ Base query com relacionamentos corretos
@@ -924,67 +1048,79 @@ def public_storefront_view(request, slug=None, brand=None):
             total_quantity__gt=0
         ).select_related('product')
         
-        # ✅ NOVO: Aplicar filtro por marca se especificado
+        # ✅ Aplicar filtro por marca se especificado
         if brand_filter:
-            # Normalizar nome da marca (case-insensitive)
-            brand_filter = brand_filter.strip().lower()
+            brand_filter = brand_filter.strip()
             items_query = items_query.filter(
                 product__brand__icontains=brand_filter
             )
         
         items = items_query.order_by('product__brand', 'product__category', 'product__name')
         
-        # ✅ NOVO: Coletar marcas disponíveis para navegação
-        available_brands = items.values_list('product__brand', flat=True).distinct()
-        available_brands = [brand for brand in available_brands if brand and brand.strip()]  # Remove None/empty
-        available_brands = sorted(set(available_brands))  # Remove duplicatas e ordena
+        # ✅ CORREÇÃO: Coletar marcas disponíveis de forma mais segura
+        available_brands_query = InventoryItem.objects.filter(
+            store=store,
+            total_quantity__gt=0,
+            product__brand__isnull=False
+        ).exclude(
+            product__brand__exact=''
+        ).values_list('product__brand', flat=True).distinct()
         
-        # ✅ Mapear dados corretamente
+        available_brands = sorted(set(available_brands_query))
+        
+        # ✅ CORREÇÃO: Mapear dados com verificações de segurança
         items_data = []
         for item in items:
-            # Garantir que sempre temos um nome
-            product_name = item.product.name if item.product and item.product.name else "Produto sem nome"
-            
-            # Garantir que temos uma imagem válida
-            image_url = None
-            if item.product and item.product.image_url:
-                image_url = item.product.image_url
-            
-            # Preço com fallback
-            sale_price = float(item.sale_price) if item.sale_price else (
-                float(item.product.official_price) if item.product and item.product.official_price else 0
-            )
-            
-            # ✅ NOVO: Incluir marca no retorno
-            brand_name = item.product.brand if item.product else None
-            
-            # ✅ NOVO: Estratégia de urgência (conforme marketing)
-            stock_info = {
-                'quantity': item.total_quantity,
-                'is_urgent': item.total_quantity <= 3,  # 3 ou menos = urgência
-                'display_text': 'Em estoque' if item.total_quantity > 3 else f'Restam apenas {item.total_quantity}!'
-            }
-            
-            items_data.append({
-                'id': str(item.id),
-                'product_name': product_name,
-                'display_name': product_name,
-                'category': item.product.category if item.product else 'Geral',
-                'brand': brand_name,  # ✅ Campo marca
-                'sale_price': sale_price,
-                'total_quantity': item.total_quantity,
-                'stock_info': stock_info,  # ✅ NOVO: Info de urgência
-                'image_url': image_url,
-            })
+            try:
+                # Verificações de segurança
+                if not item.product:
+                    continue
+                    
+                product_name = item.product.name or "Produto sem nome"
+                image_url = getattr(item.product, 'image_url', None)
+                
+                # ✅ CORREÇÃO: Tratamento seguro de preços
+                sale_price = 0
+                if item.sale_price:
+                    sale_price = float(item.sale_price)
+                elif hasattr(item.product, 'official_price') and item.product.official_price:
+                    sale_price = float(item.product.official_price)
+                
+                # ✅ CORREÇÃO: Verificação segura da marca
+                brand_name = getattr(item.product, 'brand', None)
+                category = getattr(item.product, 'category', 'Geral')
+                
+                # Estratégia de urgência
+                stock_info = {
+                    'quantity': item.total_quantity,
+                    'is_urgent': item.total_quantity <= 3,
+                    'display_text': 'Em estoque' if item.total_quantity > 3 else f'Restam apenas {item.total_quantity}!'
+                }
+                
+                items_data.append({
+                    'id': str(item.id),
+                    'product_name': product_name,
+                    'display_name': product_name,
+                    'category': category,
+                    'brand': brand_name,
+                    'sale_price': sale_price,
+                    'total_quantity': item.total_quantity,
+                    'stock_info': stock_info,
+                    'image_url': image_url,
+                })
+                
+            except Exception as item_error:
+                print(f"❌ Erro ao processar item {item.id}: {item_error}")
+                continue
         
-        # ✅ Dados da loja
+        # ✅ CORREÇÃO: Dados da loja com verificações seguras
         store_data = {
-            'name': store.name or 'Consultora',
-            'whatsapp': getattr(store, 'whatsapp', '') or '',
-            'slug': getattr(store, 'slug', '') or slug
+            'name': getattr(store, 'name', 'Consultora'),
+            'whatsapp': getattr(store, 'whatsapp', ''),
+            'slug': getattr(store, 'slug', slug or '')
         }
         
-        # ✅ NOVO: Retorno enriquecido com informações de marca
+        # Response final
         response_data = {
             'store': store_data,
             'items': items_data,

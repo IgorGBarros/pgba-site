@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Plus, Search, Edit2, Package, ArrowLeft, Scale, Loader2, 
-  AlertTriangle, Clock, ChevronDown, ChevronUp, X, BookOpen, ZoomIn, Calendar
+  AlertTriangle, Clock, ChevronDown, ChevronUp, X, BookOpen, ZoomIn, Calendar,
+  TrendingUp, TrendingDown
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { inventoryApi, formatMoney } from "../lib/api";
@@ -14,6 +15,23 @@ function getStockStatus(qty: number, min: number): { label: string; color: strin
   if (qty <= 0) return { label: "Esgotado", color: "bg-destructive/10 text-destructive border-destructive/20" };
   if (qty <= min) return { label: "Baixo", color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20" };
   return { label: "Em Estoque", color: "bg-primary/10 text-primary border-primary/20" };
+}
+
+// ✅ NOVO: Função para status de validade dos lotes
+function getBatchStatus(batch: any) {
+  if (!batch.expiration_date) return { status: 'no_date', color: 'text-muted-foreground', icon: Calendar };
+  
+  const exp = new Date(batch.expiration_date);
+  exp.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  
+  const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
+  
+  if (daysLeft <= 0) return { status: 'expired', color: 'text-destructive', icon: AlertTriangle };
+  if (daysLeft <= 7) return { status: 'critical', color: 'text-destructive', icon: AlertTriangle };
+  if (daysLeft <= 30) return { status: 'warning', color: 'text-orange-600', icon: Clock };
+  return { status: 'valid', color: 'text-emerald-600', icon: Clock };
 }
 
 type StockFilter = "TODOS" | "COM_ESTOQUE" | "ESGOTADO";
@@ -33,11 +51,43 @@ export default function ProductList() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // ✅ CORREÇÃO: Função de carregamento melhorada
   const loadInventory = async () => {
     try {
+      setLoading(true);
       const data = await inventoryApi.list();
-      setInventory(data);
+      
+      // ✅ NOVO: Processar dados para garantir consistência
+      const processedData = data.map((item: any) => {
+        // Garantir que batches estejam ordenados por validade (FIFO)
+        if (item.batches && Array.isArray(item.batches)) {
+          item.batches = item.batches
+            .filter((batch: any) => batch.quantity > 0)
+            .sort((a: any, b: any) => {
+              // Ordenar por data de validade, depois por ID
+              if (!a.expiration_date && !b.expiration_date) return a.id - b.id;
+              if (!a.expiration_date) return 1;
+              if (!b.expiration_date) return -1;
+              return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
+            });
+        }
+        
+        // ✅ NOVO: Adicionar estatísticas dos lotes
+        if (item.batch_stats) {
+          item.batchSummary = {
+            total: item.batch_stats.total_batches || 0,
+            expired: item.batch_stats.expired_batches || 0,
+            nearExpiry: item.batch_stats.near_expiry_batches || 0,
+            valid: item.batch_stats.valid_batches || 0
+          };
+        }
+        
+        return item;
+      });
+      
+      setInventory(processedData);
     } catch (error) {
+      console.error('Erro ao carregar estoque:', error);
       toast({ title: "Erro ao carregar estoque", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -158,10 +208,15 @@ export default function ProductList() {
               const productIdToEdit = item.product?.id || item.id;
               
               const isExpanded = expandedId === item.id;
-              // 🚀 Força a conversão para Number para garantir a formatação de moeda correta
+              
+              // ✅ CORREÇÃO: Conversão segura de preços
               const salePrice = Number(item.sale_price) || 0;
               const costPrice = Number(item.cost_price) || 0;
               const profitUnit = salePrice - costPrice;
+
+              // ✅ NOVO: Análise de validade mais próxima
+              const nextExpiryBatch = item.batches && item.batches.length > 0 ? 
+                item.batches.find((b: any) => b.expiration_date && b.quantity > 0) : null;
 
               return (
                 <motion.div
@@ -173,7 +228,7 @@ export default function ProductList() {
                   onClick={() => setExpandedId(isExpanded ? null : item.id)}
                 >
                   <div className="flex items-start gap-4">
-                    {/* 🚀 FOTO CLICÁVEL COM EFEITO HOVER */}
+                    {/* Foto clicável com efeito hover */}
                     <div 
                       className="relative group shrink-0"
                       onClick={(e) => {
@@ -199,6 +254,7 @@ export default function ProductList() {
                       <p className="text-sm font-bold text-foreground line-clamp-2 leading-tight">
                         {displayName}
                       </p>
+                      
                       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                         <span className={`shrink-0 rounded-full border px-2 py-0.5 font-bold uppercase tracking-wider ${status.color}`}>
                           {status.label}
@@ -206,41 +262,50 @@ export default function ProductList() {
                         <span className="bg-secondary px-2 py-0.5 rounded text-foreground font-medium">{category}</span>
                         <span className="font-mono bg-secondary/50 px-2 py-0.5 rounded">{barcode}</span>
                         
-                        {/* Alerta de Validade Global */}
-                        {item.batches && item.batches.length > 0 && (() => {
-                          const batchesWithDates = item.batches.filter((b: any) => b.expiration_date && b.quantity > 0);
-                          if (batchesWithDates.length === 0) return null;
+                        {/* ✅ MELHORADO: Alerta de validade mais preciso */}
+                        {nextExpiryBatch && (() => {
+                          const batchStatus = getBatchStatus(nextExpiryBatch);
+                          if (batchStatus.status === 'valid' || batchStatus.status === 'no_date') return null;
                           
-                          const closestBatch = batchesWithDates.sort((a: any, b: any) => new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime())[0];
-                          const exp = new Date(closestBatch.expiration_date); 
-                          exp.setHours(0,0,0,0);
-                          const now = new Date(); 
-                          now.setHours(0,0,0,0);
-                          
+                          const exp = new Date(nextExpiryBatch.expiration_date);
+                          const now = new Date();
                           const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
-                          const alertDays = parseInt(localStorage.getItem("expiry_alert_days") || "30", 10);
-                          const alertEnabled = localStorage.getItem("expiry_alert_enabled") !== "false";
                           
-                          if (!alertEnabled || daysLeft > alertDays) return null;
                           return (
                             <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${
-                              daysLeft <= 0 || daysLeft <= 7
+                              batchStatus.status === 'expired' || batchStatus.status === 'critical'
                                 ? "border-destructive/20 bg-destructive/10 text-destructive"
-                                : "border-accent/20 bg-accent/10 text-accent-foreground"
+                                : "border-orange-500/20 bg-orange-500/10 text-orange-700"
                             }`}>
-                              {daysLeft <= 7 ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                              <batchStatus.icon className="h-3 w-3" />
                               {daysLeft <= 0 ? "Vencido" : `${daysLeft}d`}
                             </span>
                           );
                         })()}
+
+                        {/* ✅ NOVO: Indicador de múltiplos lotes */}
+                        {item.batches && item.batches.length > 1 && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-700 px-1.5 py-0.5 text-[10px] font-bold">
+                            <Package className="h-3 w-3" />
+                            {item.batches.length} lotes
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Resumo do Card Fechado (Venda, Qtd e Setinha) */}
+                  {/* Resumo do Card Fechado */}
                   <div className="flex items-center justify-between border-t border-border/50 pt-3 mt-3">
                     <div className="flex gap-4 text-xs text-muted-foreground">
                       <p>Venda: <span className="font-bold text-foreground">{formatMoney(salePrice)}</span></p>
+                      {/* ✅ NOVO: Indicador de lucro */}
+                      <p className="flex items-center gap-1">
+                        Lucro: 
+                        <span className={`font-bold flex items-center gap-0.5 ${profitUnit >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+                          {profitUnit >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {formatMoney(profitUnit)}
+                        </span>
+                      </p>
                     </div>
                     
                     <div className="flex items-center gap-3">
@@ -253,7 +318,7 @@ export default function ProductList() {
                     </div>
                   </div>
 
-                  {/* 🚀 ACORDEÃO DE DETALHES COMPLETOS E AÇÕES */}
+                  {/* ✅ MELHORADO: Acordeão de detalhes com lotes ordenados */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
@@ -278,28 +343,78 @@ export default function ProductList() {
                             </div>
                           </div>
 
-                          {/* Lotes e Validades */}
+                          {/* ✅ MELHORADO: Lotes ordenados por validade com status visual */}
                           {item.batches && item.batches.length > 0 && (
                             <div className="space-y-2">
-                              <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> Lotes Ativos
-                              </p>
-                              {item.batches.filter((b:any) => b.quantity > 0).map((batch: any) => (
-                                <div key={batch.id} className="flex justify-between items-center bg-card shadow-sm p-3 rounded-xl border border-border text-xs">
-                                  <span className="font-medium text-muted-foreground">{batch.batch_code ? `Lote: ${batch.batch_code}` : "Lote S/N"}</span>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-foreground flex items-center gap-1">
-                                      <Calendar className="h-3 w-3 text-muted-foreground" /> 
-                                      {batch.expiration_date ? new Date(batch.expiration_date).toLocaleDateString('pt-BR') : "Sem validade"}
-                                    </span>
-                                    <span className="font-mono font-bold bg-secondary px-2 py-0.5 rounded-full">{batch.quantity} un.</span>
+                              <div className="flex items-center justify-between">
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-3 w-3" /> Lotes Ativos (FIFO)
+                                </p>
+                                {/* ✅ NOVO: Resumo dos lotes */}
+                                {item.batchSummary && (
+                                  <div className="flex items-center gap-1 text-[10px]">
+                                    {item.batchSummary.expired > 0 && (
+                                      <span className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded-full font-bold">
+                                        {item.batchSummary.expired} vencidos
+                                      </span>
+                                    )}
+                                    {item.batchSummary.nearExpiry > 0 && (
+                                      <span className="bg-orange-500/10 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">
+                                        {item.batchSummary.nearExpiry} próximos
+                                      </span>
+                                    )}
                                   </div>
-                                </div>
-                              ))}
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                {item.batches.map((batch: any, index: number) => {
+                                  const batchStatus = getBatchStatus(batch);
+                                  const isFirstBatch = index === 0; // Próximo a sair (FIFO)
+                                  
+                                  return (
+                                    <motion.div 
+                                      key={batch.id}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: index * 0.05 }}
+                                      className={`flex justify-between items-center p-3 rounded-xl border text-xs transition-all ${
+                                        isFirstBatch 
+                                          ? "bg-primary/5 border-primary/20 shadow-sm" 
+                                          : "bg-card border-border"
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <batchStatus.icon className={`h-3 w-3 ${batchStatus.color}`} />
+                                        <span className="font-medium text-muted-foreground">
+                                          {batch.batch_code ? `Lote: ${batch.batch_code}` : "Lote S/N"}
+                                        </span>
+                                        {isFirstBatch && (
+                                          <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                                            PRÓXIMO
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="flex items-center gap-3">
+                                        <span className={`text-foreground flex items-center gap-1 ${batchStatus.color}`}>
+                                          <Calendar className="h-3 w-3" /> 
+                                          {batch.expiration_date ? new Date(batch.expiration_date).toLocaleDateString('pt-BR') : "Sem validade"}
+                                        </span>
+                                        <span className={`font-mono font-bold px-2 py-0.5 rounded-full ${
+                                          isFirstBatch ? "bg-primary text-primary-foreground" : "bg-secondary"
+                                        }`}>
+                                          {batch.quantity} un.
+                                        </span>
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
 
-                          {/* 🚀 BOTÕES DE AÇÃO (Lixeira Removida) */}
+                          {/* Botões de ação */}
                           <div className="flex gap-2 pt-2">
                             <button
                               onClick={(e) => { e.stopPropagation(); setAdjustItem(item); }}
@@ -314,7 +429,6 @@ export default function ProductList() {
                               <Edit2 className="h-4 w-4" /> Editar Produto
                             </button>
                           </div>
-
                         </div>
                       </motion.div>
                     )}
@@ -326,7 +440,7 @@ export default function ProductList() {
         </div>
       </main>
 
-      {/* 🚀 MODAL DE IMAGEM (Lightbox) */}
+      {/* Modal de imagem (Lightbox) */}
       <AnimatePresence>
         {previewImage && (
           <motion.div
