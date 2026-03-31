@@ -6,7 +6,7 @@ const rawBaseUrl =(import.meta as any).env?.VITE_API_BASE_URL || "https://gestao
 
 // 🚀 CORREÇÃO: Removemos o + "/api/" para não duplicar. 
 // Apenas limpamos a barra final caso ela exista.
-const finalBaseUrl = rawBaseUrl.replace(/\/$/, "");
+const finalBaseUrl = rawBaseUrl.replace(/\/$/, "")+ "/api";
 
 // 🔐 token helpers
 export function getToken(): string | null {
