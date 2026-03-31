@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useParams } from "react-router-dom";
-import { Package, Search, ShoppingBag, Plus, Minus, Trash2, Send, Sparkles, CreditCard, QrCode } from "lucide-react";
+import { Package, Search, ShoppingBag, Plus, Minus, Trash2, Send, Sparkles, CreditCard, QrCode, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { storefrontApi, StorefrontItem, formatMoney } from "../lib/api";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "../components/ui/sheet";
@@ -34,13 +34,52 @@ function loadPayment(storeSlug: string): PaymentMethod {
   return (localStorage.getItem(getPaymentStorageKey(storeSlug)) as PaymentMethod) || "pix";
 }
 
-// Função helper para nomes consistentes
+// ✅ CORREÇÃO: Funções helper com tipagem correta
 function getProductDisplayName(item: any): string {
   return item.product?.name ||
          item.display_name ||
          item.product_name ||
          item.custom_name ||
          "Produto sem nome";
+}
+
+// ✅ CORREÇÃO: Função helper para extrair marca
+function getProductBrand(item: any): string | null {
+  return item.product?.brand ||
+         item.brand ||
+         null;
+}
+
+// ✅ CORREÇÃO: Função para quantidade segura
+function getProductQuantity(item: any): number {
+  return item.total_quantity ?? item.quantity ?? 0;
+}
+
+// ✅ ESTRATÉGIA DE MARKETING: Função para urgência inteligente
+function getStockDisplay(quantity: number | undefined): { text: string; isUrgent: boolean; className: string } {
+  const qty = quantity ?? 0;
+  
+  if (qty <= 0) {
+    return {
+      text: "Sem estoque",
+      isUrgent: true,
+      className: "text-destructive font-bold"
+    };
+  }
+  
+  if (qty <= 3) {
+    return {
+      text: `Restam apenas ${qty}!`,
+      isUrgent: true,
+      className: "text-red-600 font-bold animate-pulse"
+    };
+  }
+  
+  return {
+    text: "Em estoque",
+    isUrgent: false,
+    className: "text-green-600 font-medium"
+  };
 }
 
 export default function Storefront() {
@@ -60,13 +99,11 @@ export default function Storefront() {
   const [bag, setBag] = useState<BagItem[]>([]);
   const [bagOpen, setBagOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
-
-  // ✅ NOVO: Estados para filtro de marca
-  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState<string>(""); // "" = todas as marcas
-
   
-
+  // ✅ Estados para filtro de marca
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  
   // Carregar sacola específica da loja
   useEffect(() => {
     if (storeSlug) {
@@ -74,122 +111,122 @@ export default function Storefront() {
       setPaymentMethod(loadPayment(storeSlug));
     }
   }, [storeSlug]);
-
+  
   // Salvar sacola específica da loja
   useEffect(() => {
     if (storeSlug) {
       saveCart(bag, storeSlug);
     }
   }, [bag, storeSlug]);
-
+  
   useEffect(() => {
     if (storeSlug) {
       localStorage.setItem(getPaymentStorageKey(storeSlug), paymentMethod);
     }
   }, [paymentMethod, storeSlug]);
 
-  // ✅ NOVO: Processar marcas disponíveis dos produtos
-useEffect(() => {
-  if (items.length > 0) {
-    const validBrands: string[] = [];
-    
-    items.forEach(item => {
-      if (item.brand && typeof item.brand === 'string' && item.brand.trim() !== '') {
-        validBrands.push(item.brand);
-      }
-    });
-    
-    const uniqueBrands = [...new Set(validBrands)].sort();
-    setAvailableBrands(uniqueBrands);
-    console.log('🏷️ Marcas disponíveis:', uniqueBrands);
-  }
-}, [items]);
-
-
+  // ✅ CORREÇÃO: useEffect principal com mapeamento correto
   useEffect(() => {
-  console.log('🚀 Iniciando carregamento da vitrine...', { slug, sellerIdParam });
-  
-  const fetchItems = slug
-    ? publicStorefrontApi.listBySlug(slug)
-    : publicStorefrontApi.listById(sellerIdParam || "");
+    console.log('🚀 Iniciando carregamento da vitrine...', { slug, sellerIdParam });
     
-  fetchItems.then((res: any) => {
-    console.log('📦 Resposta da API:', res);
-    
-    const productsList = res.items || [];
-    
-    // ✅ NOVO: Mapear dados com marca e urgência
-    const mappedItems = productsList.map((item: any) => {
-      console.log('🔍 Item raw da API:', item);
+    const fetchItems = slug
+      ? publicStorefrontApi.listBySlug(slug)
+      : publicStorefrontApi.listById(sellerIdParam || "");
       
-      const productName = item.product_name || item.display_name || "Produto sem nome";
-      console.log('✅ Nome mapeado:', productName);
+    fetchItems.then((res: any) => {
+      console.log('📦 Resposta completa da API:', res);
       
-      return {
-        id: item.id,
-        product_name: productName,
-        display_name: productName,
-        category: item.category || "Geral",
-        brand: item.brand || null, // ✅ NOVO: Campo marca
-        sale_price: item.sale_price || 0,
-        total_quantity: item.total_quantity || 0,
-        stock_info: item.stock_info || { // ✅ NOVO: Info de urgência
-          quantity: item.total_quantity || 0,
-          is_urgent: (item.total_quantity || 0) <= 3,
-          display_text: (item.total_quantity || 0) > 3 ? 'Em estoque' : `Restam apenas ${item.total_quantity || 0}!`
-        },
-        image_url: item.image_url || null,
-        // Campos adicionais necessários para StorefrontItem
-        custom_name: item.custom_name || null,
-        barcode: item.barcode || "",
-        expiry_date: item.expiry_date || null,
-        seller_name: null,
-        seller_whatsapp: null,
-        user_id: "",
-        store_slug: null,
-      };
+      const productsList = res.items || [];
+      
+      // ✅ CORREÇÃO: Mapear dados com funções helper e tipagem explícita
+      const mappedItems: StorefrontItem[] = productsList.map((item: any) => {
+        console.log('🔍 Item raw da API:', item);
+        
+        const productName = getProductDisplayName(item);
+        const brand = getProductBrand(item);
+        const quantity = getProductQuantity(item);
+        
+        console.log('✅ Nome mapeado:', productName);
+        console.log('🏷️ Marca mapeada:', brand);
+        console.log('📊 Quantidade:', quantity);
+        
+        return {
+          id: item.id,
+          product_name: productName,
+          display_name: productName,
+          category: item.category || item.product?.category || "Geral",
+          brand: brand, // ✅ USAR função helper
+          sale_price: item.sale_price || item.product?.official_price || 0,
+          total_quantity: quantity,
+          // ✅ ESTRATÉGIA: Info de urgência baseada no marketing
+          stock_info: {
+            quantity: quantity,
+            is_urgent: quantity <= 3 && quantity > 0,
+            display_text: getStockDisplay(quantity).text
+          },
+          image_url: item.image_url || item.product?.image_url || null,
+          // Campos adicionais necessários para StorefrontItem
+          custom_name: item.custom_name || null,
+          barcode: item.barcode || item.product?.bar_code || "",
+          expiry_date: item.expiry_date || null,
+          seller_name: null,
+          seller_whatsapp: null,
+          user_id: "",
+          store_slug: null,
+        };
+      });
+      
+      console.log('🎯 Produtos mapeados:', mappedItems);
+      setItems(mappedItems);
+      
+      // ✅ CORREÇÃO: Processar marcas com tipagem explícita
+      const validBrands: string[] = [];
+      
+      mappedItems.forEach((item: StorefrontItem) => {
+        const itemBrand = getProductBrand(item);
+        if (itemBrand && typeof itemBrand === 'string' && itemBrand.trim() !== '') {
+          validBrands.push(itemBrand);
+        }
+      });
+      
+      const uniqueBrands = [...new Set(validBrands)].sort();
+      setAvailableBrands(uniqueBrands);
+      console.log('🏷️ Marcas extraídas dos produtos:', uniqueBrands);
+      
+      // ✅ BACKUP: Processar marcas da API se disponível
+      if (res.brands && res.brands.available) {
+        console.log('🏷️ Marcas da API:', res.brands.available);
+        setAvailableBrands(res.brands.available);
+      }
+      
+      // Definir dados da loja
+      if (res.store) {
+        console.log('🏪 Dados da loja:', res.store);
+        setSellerName(res.store.name || "Consultor(a)");
+        setSellerWhatsapp(res.store.whatsapp || "");
+        
+        const currentStoreSlug = res.store.slug || slug || sellerIdParam || "default";
+        setStoreSlug(currentStoreSlug);
+      }
+      
+      setLoading(false);
+    }).catch((err) => {
+      console.error("❌ Erro ao carregar vitrine:", err);
+      setLoading(false);
     });
+  }, [slug, sellerIdParam]);
+
+  // ✅ CORREÇÃO: Filtro usando funções helper
+  const filtered = items.filter((item: StorefrontItem) => {
+    const matchesSearch = !search || 
+      getProductDisplayName(item).toLowerCase().includes(search.toLowerCase()) ||
+      (item.category || "").toLowerCase().includes(search.toLowerCase());
     
-    console.log('🎯 Produtos mapeados:', mappedItems);
-    setItems(mappedItems);
+    const itemBrand = getProductBrand(item);
+    const matchesBrand = !selectedBrand || itemBrand === selectedBrand;
     
-    // ✅ NOVO: Processar marcas da API
-    if (res.brands && res.brands.available) {
-      setAvailableBrands(res.brands.available);
-      console.log('🏷️ Marcas da API:', res.brands.available);
-    }
-    
-    // Definir dados da loja
-    if (res.store) {
-      console.log('🏪 Dados da loja:', res.store);
-      setSellerName(res.store.name || "Consultor(a)");
-      setSellerWhatsapp(res.store.whatsapp || "");
-      
-      const currentStoreSlug = res.store.slug || slug || sellerIdParam || "default";
-      setStoreSlug(currentStoreSlug);
-    }
-    
-    setLoading(false);
-  }).catch((err) => {
-    console.error("❌ Erro ao carregar vitrine:", err);
-    setLoading(false);
+    return matchesSearch && matchesBrand;
   });
-}, [slug, sellerIdParam]);
-
-
-  // ✅ NOVO: Filtro que considera marca E busca
-// ✅ CORREÇÃO: Usar função helper para comparar marca
-const filtered = items.filter((item) => {
-  const matchesSearch = !search || 
-    getProductDisplayName(item).toLowerCase().includes(search.toLowerCase()) ||
-    item.category?.toLowerCase().includes(search.toLowerCase());
-  
-  // ✅ CORREÇÃO: Comparação segura de marca
-  const itemBrand = item.brand;
-  const matchesBrand = !selectedBrand || (itemBrand && itemBrand === selectedBrand);
-  
-  return matchesSearch && matchesBrand;
-});
 
   const addToBag = useCallback((item: StorefrontItem) => {
     setBag((prev) => {
@@ -217,7 +254,6 @@ const filtered = items.filter((item) => {
   const bagCount = bag.reduce((sum, b) => sum + b.qty, 0);
   const paymentLabel = paymentMethod === "pix" ? "PIX" : "Cartão / Link de Pagamento";
 
-  // Usar a função helper consistente
   const getDisplayName = (item: StorefrontItem | BagItem) => {
     return getProductDisplayName(item);
   };
@@ -336,7 +372,7 @@ const filtered = items.filter((item) => {
           </div>
         </motion.div>
         
-        {/* ✅ NOVO: Seletor de marcas (só aparece se tiver mais de uma marca) */}
+        {/* ✅ CORREÇÃO: Seletor de marcas (só aparece se tiver mais de uma marca) */}
         {availableBrands.length > 1 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -358,30 +394,29 @@ const filtered = items.filter((item) => {
                 </span>
               </button>
               
-                  {availableBrands.map((brand) => {
-                    // ✅ CORREÇÃO: Filtro seguro para contar
-                    const brandCount = items.filter(item => 
-                      item.brand && item.brand === brand
-                    ).length;
-                    
-                    return (
-                      <button
-                        key={brand}
-                        onClick={() => setSelectedBrand(brand)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                          selectedBrand === brand 
-                            ? "bg-primary text-primary-foreground shadow-md" 
-                            : "bg-secondary/80 text-secondary-foreground hover:bg-secondary hover:shadow-sm"
-                        }`}
-                      >
-                        {brand}
-                        <span className="ml-2 text-xs opacity-70">
-                          ({brandCount})
-                        </span>
-                      </button>
-                    );
-                  })}
-           
+              {availableBrands.map((brand: string) => {
+                // ✅ CORREÇÃO: Contador usando função helper
+                const brandCount = items.filter((item: StorefrontItem) => 
+                  getProductBrand(item) === brand
+                ).length;
+                
+                return (
+                  <button
+                    key={brand}
+                    onClick={() => setSelectedBrand(brand)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                      selectedBrand === brand 
+                        ? "bg-primary text-primary-foreground shadow-md" 
+                        : "bg-secondary/80 text-secondary-foreground hover:bg-secondary hover:shadow-sm"
+                    }`}
+                  >
+                    {brand}
+                    <span className="ml-2 text-xs opacity-70">
+                      ({brandCount})
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -395,7 +430,6 @@ const filtered = items.filter((item) => {
               {selectedBrand && ` da marca ${selectedBrand}`}
             </span>
             
-            {/* Botão para limpar filtros */}
             {(search || selectedBrand) && (
               <button
                 onClick={() => {
@@ -429,9 +463,11 @@ const filtered = items.filter((item) => {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {filtered.map((item, i) => {
+            {filtered.map((item: StorefrontItem, i: number) => {
               const qtyInBag = getItemQtyInBag(item.id);
               const name = getDisplayName(item);
+              const quantity = getProductQuantity(item);
+              const stockDisplay = getStockDisplay(quantity);
               
               return (
                 <motion.div
@@ -441,10 +477,18 @@ const filtered = items.filter((item) => {
                   transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 30 }}
                   className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5"
                 >
-                  {/* ✅ NOVO: Badge da marca (opcional) */}
-                  {item.brand && availableBrands.length > 1 && (
+                  {/* ✅ Badge da marca */}
+                  {getProductBrand(item) && availableBrands.length > 1 && (
                     <div className="absolute left-2 top-2 z-10 px-2 py-1 bg-black/70 text-white text-[10px] font-medium rounded">
-                      {item.brand}
+                      {getProductBrand(item)}
+                    </div>
+                  )}
+                  
+                  {/* ✅ ESTRATÉGIA: Badge de urgência (só aparece se for urgente) */}
+                  {stockDisplay.isUrgent && quantity > 0 && (
+                    <div className="absolute left-2 top-8 z-10 flex items-center gap-1 px-2 py-1 bg-red-600 text-white text-[9px] font-bold rounded animate-pulse">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      ÚLTIMAS UNIDADES!
                     </div>
                   )}
                   
@@ -482,6 +526,13 @@ const filtered = items.filter((item) => {
                       {item.category}
                     </p>
                     
+                    {/* ✅ ESTRATÉGIA: Indicador de estoque com marketing inteligente */}
+                    <div className="mt-1">
+                      <p className={`text-[10px] ${stockDisplay.className}`}>
+                        {stockDisplay.text}
+                      </p>
+                    </div>
+                    
                     <div className="mt-auto pt-3">
                       {item.sale_price ? (
                         <p className="text-base font-extrabold text-primary">
@@ -499,8 +550,10 @@ const filtered = items.filter((item) => {
                         variant="outline"
                         className="rounded-xl h-9 flex-1 bg-secondary/50 border-transparent hover:border-primary/30 hover:bg-primary/10 hover:text-primary transition-all text-xs font-semibold"
                         onClick={() => addToBag(item)}
+                        disabled={quantity === 0}
                       >
-                        <Plus className="h-3.5 w-3.5 mr-1" /> Sacola
+                        <Plus className="h-3.5 w-3.5 mr-1" /> 
+                        {quantity === 0 ? "Sem estoque" : "Sacola"}
                       </Button>
                       
                       <Button
@@ -508,6 +561,7 @@ const filtered = items.filter((item) => {
                         className="rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white shadow-sm transition-all h-9 w-9 p-0 shrink-0"
                         onClick={() => handleDirectBuy(item)}
                         title="Pedir pelo WhatsApp"
+                        disabled={quantity === 0}
                       >
                         <Send className="h-4 w-4" />
                       </Button>

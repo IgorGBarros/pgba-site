@@ -313,19 +313,39 @@ export const profileApi = {
 
 export interface StorefrontItem {
   id: string;
-  product_name: string;
-  display_name: string;
-  custom_name: string | null;
-  category: string;
-  brand?: string | null; // ✅ ADICIONAR este campo
-  sale_price: number | null;
-  barcode: string;
-  expiry_date: string | null;
-  seller_name: string | null;
-  seller_whatsapp: string | null;
-  user_id: string;
-  image_url: string | null;
-  store_slug: string | null;
+  product_name?: string;
+  display_name?: string;
+  custom_name?: string | null;
+  category?: string;
+  brand?: string | null; // ✅ Campo brand adicionado
+  sale_price?: number | null;
+  total_quantity?: number; // ✅ Opcional, pode ser undefined
+  barcode?: string;
+  expiry_date?: string | null;
+  seller_name?: string | null;
+  seller_whatsapp?: string | null;
+  user_id?: string;
+  image_url?: string | null;
+  store_slug?: string | null;
+  
+  // ✅ Campos do produto relacionado
+  product?: {
+    id: number | string;
+    name: string;
+    bar_code: string;
+    natura_sku?: string;
+    category: string;
+    brand?: string | null; // ✅ Brand no produto
+    image_url?: string;
+    official_price?: number;
+  };
+  
+  // ✅ Info de urgência
+  stock_info?: {
+    quantity: number;
+    is_urgent: boolean;
+    display_text: string;
+  };
 }
 // ✅ CORREÇÃO: API pública da vitrine com tratamento de erro robusto
 export const publicStorefrontApi = {
@@ -477,3 +497,23 @@ export const salesApi = {
       body: JSON.stringify(payload),
     }),
 };
+
+export function getProductBrand(item: any): string | null {
+  // Hierarquia: brand direto > product.brand > null
+  return item.brand || 
+         item.product?.brand || 
+         null;
+}
+
+export function getProductDisplayName(item: any): string {
+  return item.product?.name ||
+         item.display_name ||
+         item.product_name ||
+         item.custom_name ||
+         "Produto sem nome";
+}
+
+// ✅ NOVA: Função para quantidade segura
+export function getProductQuantity(item: any): number {
+  return item.total_quantity ?? item.quantity ?? 0;
+}
