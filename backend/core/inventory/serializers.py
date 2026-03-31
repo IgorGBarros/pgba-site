@@ -1,4 +1,5 @@
 from django.utils import timezone
+from datetime import timedelta
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
@@ -119,6 +120,8 @@ class InventoryBatchSerializer(serializers.ModelSerializer):
 
 # inventory/serializers.py - ATUALIZAR InventoryItemSerializer
 
+# inventory/serializers.py - ATUALIZAR InventoryItemSerializer
+
 class InventoryItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     batches = serializers.SerializerMethodField()
@@ -134,34 +137,63 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         ]
     
     def get_batches(self, obj):
-        # Retornar apenas lotes com estoque, ordenados por validade
-        active_batches = obj.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
-        return InventoryBatchSerializer(active_batches, many=True).data
-    
-    def get_batch_stats(self, obj):
-        # Estatísticas dos lotes
-        active_batches = obj.batches.filter(quantity__gt=0)
-        today = timezone.now().date()
+        from collections import defaultdict
+        from django.utils import timezone
         
-        expired_count = 0
-        near_expiry_count = 0
+        # ✅ CORREÇÃO: Consolidar lotes por data de validade
+        active_batches = obj.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
+        
+        # Agrupar por data de validade
+        consolidated_batches = defaultdict(lambda: {
+            'total_quantity': 0,
+            'batch_codes': [],
+            'ids': []
+        })
         
         for batch in active_batches:
-            if batch.expiration_date:
-                if batch.expiration_date < today:
-                    expired_count += 1
-                elif (batch.expiration_date - today).days <= 30:
-                    near_expiry_count += 1
+            # ✅ FILTRO: Remover lotes vencidos automaticamente
+            if batch.expiration_date and batch.expiration_date < timezone.now().date():
+                continue
+                
+            key = batch.expiration_date or 'no_date'
+            consolidated_batches[key]['total_quantity'] += batch.quantity
+            consolidated_batches[key]['batch_codes'].append(batch.batch_code or 'S/N')
+            consolidated_batches[key]['ids'].append(batch.id)
         
-        return {
-            'total_batches': active_batches.count(),
-            'expired_batches': expired_count,
-            'near_expiry_batches': near_expiry_count,
-            'valid_batches': active_batches.count() - expired_count - near_expiry_count
-        }
-    
-    def get_display_price(self, obj):
-        return float(obj.sale_price) if obj.sale_price else 0.0
+        # Converter para lista ordenada
+        result = []
+        for exp_date, data in sorted(consolidated_batches.items(), 
+                                   key=lambda x: x[0] if x[0] != 'no_date' else timezone.now().date() + timedelta(days=9999)):
+            
+            # Calcular informações de validade
+            is_expired = False
+            days_to_expire = None
+            
+            if exp_date != 'no_date':
+                today = timezone.now().date()
+                is_expired = exp_date < today
+                if not is_expired:
+                    days_to_expire = (exp_date - today).days
+            
+            # Consolidar códigos de lote
+            unique_codes = list(set(data['batch_codes']))
+            batch_code_display = unique_codes[0] if len(unique_codes) == 1 else f"{len(unique_codes)} lotes"
+            
+            result.append({
+                'id': f"consolidated_{data['ids'][0]}",  # ID do primeiro lote para referência
+                'batch_code': batch_code_display,
+                'expiration_date': exp_date if exp_date != 'no_date' else None,
+                'quantity': data['total_quantity'],
+                'formatted_date': exp_date.strftime('%d/%m/%Y') if exp_date != 'no_date' else 'Sem validade',
+                'is_expired': is_expired,
+                'is_near_expiry': days_to_expire is not None and days_to_expire <= 30,
+                'days_to_expire': days_to_expire,
+                'status': 'expired' if is_expired else ('near_expiry' if days_to_expire is not None and days_to_expire <= 30 else 'valid'),
+                'consolidated_ids': data['ids']  # IDs dos lotes que foram consolidados
+            })
+        
+        return result
+
 
 # ==========================================
 # 3. SERIALIZER DE ENTRADA (SCAN)
