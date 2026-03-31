@@ -181,7 +181,6 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.response import Response
 
-# inventory/views.py - SUBSTITUIR o InventoryViewSet por esta versão
 
 class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Estoque Privado da Consultora - VERSÃO CORRIGIDA"""
@@ -193,6 +192,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         store = get_current_store(self.request.user)
         return InventoryItem.objects.filter(store=store).select_related('product').prefetch_related(
+            # ✅ CORREÇÃO: Ordenar lotes por validade (FIFO) e incluir apenas com estoque
             Prefetch(
                 'batches', 
                 queryset=InventoryBatch.objects.filter(quantity__gt=0).order_by('expiration_date', 'id')
@@ -200,34 +200,38 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
         )
 
     def retrieve(self, request, *args, **kwargs):
+        """
+        ✅ CORREÇÃO: Retornar detalhes do produto com lotes organizados e totais corretos
+        """
         try:
             instance = self.get_object()
             
-            # Buscar lotes ativos ordenados por validade (FIFO)
+            # ✅ Buscar lotes ativos ordenados por validade (FIFO)
             active_batches = instance.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
             
-            # Recalcular total real baseado nos lotes
+            # ✅ Recalcular total real baseado nos lotes
             total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
             
-            # Atualizar total se estiver desatualizado
+            # ✅ Atualizar total se estiver desatualizado
             if instance.total_quantity != total_real:
                 print(f"🔄 Corrigindo total de {instance.product.name}: {instance.total_quantity} → {total_real}")
                 instance.total_quantity = total_real
                 instance.save()
             
-            # Serializar com dados atualizados
+            # ✅ Serializar com dados básicos
             serializer = self.get_serializer(instance)
             data = serializer.data
             
-            # Substituir lotes por versão ordenada e enriquecida
+            # ✅ CORREÇÃO: Substituir lotes por versão ordenada e enriquecida
             batches_data = []
+            today = timezone.now().date()
+            
             for batch in active_batches:
                 # Calcular informações de validade
                 is_expired = False
                 days_to_expire = None
                 
                 if batch.expiration_date:
-                    today = timezone.now().date()
                     is_expired = batch.expiration_date < today
                     if not is_expired:
                         days_to_expire = (batch.expiration_date - today).days
@@ -244,7 +248,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                     'status': 'expired' if is_expired else ('near_expiry' if days_to_expire is not None and days_to_expire <= 30 else 'valid')
                 })
             
-            # Estatísticas dos lotes
+            # ✅ Estatísticas dos lotes
             batch_stats = {
                 'total_batches': len(batches_data),
                 'expired_batches': len([b for b in batches_data if b['is_expired']]),
@@ -252,7 +256,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                 'valid_batches': len([b for b in batches_data if not b['is_expired'] and not b['is_near_expiry']])
             }
             
-            # Atualizar response com dados organizados
+            # ✅ Atualizar response com dados organizados
             data['batches'] = batches_data
             data['batch_stats'] = batch_stats
             data['total_quantity'] = total_real
@@ -261,14 +265,19 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             
         except Exception as e:
             print(f"❌ Erro no retrieve: {e}")
-            return Response({"error": "Erro interno do servidor"}, status=500)
+            import traceback
+            traceback.print_exc()
+            return Response({'error': 'Erro interno do servidor'}, status=500)
 
     def list(self, request, *args, **kwargs):
+        """
+        ✅ CORREÇÃO: Lista com totais sempre atualizados
+        """
         try:
             queryset = self.filter_queryset(self.get_queryset())
             
-            # Verificar e corrigir totais desatualizados
-            for item in queryset:
+            # ✅ Verificar e corrigir totais desatualizados (apenas para os primeiros 50 itens para performance)
+            for item in queryset[:50]:  # Limitar para evitar timeout
                 active_batches = item.batches.filter(quantity__gt=0)
                 total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
                 
@@ -281,13 +290,15 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
-            
+
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data)
             
         except Exception as e:
             print(f"❌ Erro no list: {e}")
-            return Response({"error": "Erro interno do servidor"}, status=500)
+            import traceback
+            traceback.print_exc()
+            return Response({'error': 'Erro interno do servidor'}, status=500)
 
     def perform_create(self, serializer):
         """

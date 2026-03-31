@@ -139,6 +139,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     def get_batches(self, obj):
         from collections import defaultdict
         from django.utils import timezone
+        from datetime import timedelta
         
         # ✅ CORREÇÃO: Consolidar lotes por data de validade
         active_batches = obj.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
@@ -194,6 +195,31 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         
         return result
 
+    # ✅ MÉTODO FALTANTE: get_batch_stats
+    def get_batch_stats(self, obj):
+        """Retorna estatísticas dos lotes do item"""
+        from django.utils import timezone
+        
+        active_batches = obj.batches.filter(quantity__gt=0)
+        today = timezone.now().date()
+        
+        total_batches = active_batches.count()
+        expired_batches = active_batches.filter(expiration_date__lt=today).count()
+        near_expiry_batches = active_batches.filter(
+            expiration_date__gte=today,
+            expiration_date__lte=today + timezone.timedelta(days=30)
+        ).count()
+        valid_batches = total_batches - expired_batches - near_expiry_batches
+        
+        return {
+            'total_batches': total_batches,
+            'expired_batches': expired_batches,
+            'near_expiry_batches': near_expiry_batches,
+            'valid_batches': valid_batches
+        }
+
+    def get_display_price(self, obj):
+        return obj.sale_price if obj.sale_price and obj.sale_price > 0 else obj.product.official_price
 
 # ==========================================
 # 3. SERIALIZER DE ENTRADA (SCAN)
