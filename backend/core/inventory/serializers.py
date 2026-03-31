@@ -117,6 +117,8 @@ class InventoryBatchSerializer(serializers.ModelSerializer):
         else:
             return 'valid'
 
+# inventory/serializers.py - ATUALIZAR InventoryItemSerializer
+
 class InventoryItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     batches = serializers.SerializerMethodField()
@@ -126,17 +128,18 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
         fields = [
-            'id', 'product', 'total_quantity', 'cost_price', 'sale_price', 
-            'display_price', 'batches', 'batch_stats', 'created_at', 'updated_at'
+            'id', 'product', 'sale_price', 'cost_price', 
+            'total_quantity', 'min_quantity', 'batches', 
+            'batch_stats', 'display_price'
         ]
     
     def get_batches(self, obj):
-        # ✅ CORREÇÃO: Retornar apenas lotes com estoque, ordenados por validade
+        # Retornar apenas lotes com estoque, ordenados por validade
         active_batches = obj.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
         return InventoryBatchSerializer(active_batches, many=True).data
     
     def get_batch_stats(self, obj):
-        # ✅ NOVO: Estatísticas dos lotes
+        # Estatísticas dos lotes
         active_batches = obj.batches.filter(quantity__gt=0)
         today = timezone.now().date()
         

@@ -171,6 +171,8 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.response import Response
 
+# inventory/views.py - SUBSTITUIR o InventoryViewSet por esta versão
+
 class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Estoque Privado da Consultora - VERSÃO CORRIGIDA"""
     serializer_class = InventoryItemSerializer
@@ -181,7 +183,6 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         store = get_current_store(self.request.user)
         return InventoryItem.objects.filter(store=store).select_related('product').prefetch_related(
-            # ✅ CORREÇÃO: Ordenar lotes por validade (FIFO) e incluir apenas com estoque
             Prefetch(
                 'batches', 
                 queryset=InventoryBatch.objects.filter(quantity__gt=0).order_by('expiration_date', 'id')
@@ -189,90 +190,94 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
         )
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        ✅ CORREÇÃO: Retornar detalhes do produto com lotes organizados e totais corretos
-        """
-        instance = self.get_object()
-        
-        # ✅ Buscar lotes ativos ordenados por validade (FIFO)
-        active_batches = instance.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
-        
-        # ✅ Recalcular total real baseado nos lotes
-        total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
-        
-        # ✅ Atualizar total se estiver desatualizado
-        if instance.total_quantity != total_real:
-            print(f"🔄 Corrigindo total de {instance.product.name}: {instance.total_quantity} → {total_real}")
-            instance.total_quantity = total_real
-            instance.save()
-        
-        # ✅ Serializar com dados atualizados
-        serializer = self.get_serializer(instance)
-        data = serializer.data
-        
-        # ✅ CORREÇÃO: Substituir lotes por versão ordenada e enriquecida
-        batches_data = []
-        for batch in active_batches:
-            # Calcular informações de validade
-            is_expired = False
-            days_to_expire = None
+        try:
+            instance = self.get_object()
             
-            if batch.expiration_date:
-                today = timezone.now().date()
-                is_expired = batch.expiration_date < today
-                if not is_expired:
-                    days_to_expire = (batch.expiration_date - today).days
+            # Buscar lotes ativos ordenados por validade (FIFO)
+            active_batches = instance.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
             
-            batches_data.append({
-                'id': batch.id,
-                'batch_code': batch.batch_code or 'S/N',
-                'expiration_date': batch.expiration_date,
-                'quantity': batch.quantity,
-                'formatted_date': batch.expiration_date.strftime('%d/%m/%Y') if batch.expiration_date else 'Sem validade',
-                'is_expired': is_expired,
-                'is_near_expiry': days_to_expire is not None and days_to_expire <= 30,
-                'days_to_expire': days_to_expire,
-                'status': 'expired' if is_expired else ('near_expiry' if days_to_expire is not None and days_to_expire <= 30 else 'valid')
-            })
-        
-        # ✅ Estatísticas dos lotes
-        batch_stats = {
-            'total_batches': len(batches_data),
-            'expired_batches': len([b for b in batches_data if b['is_expired']]),
-            'near_expiry_batches': len([b for b in batches_data if b['is_near_expiry'] and not b['is_expired']]),
-            'valid_batches': len([b for b in batches_data if not b['is_expired'] and not b['is_near_expiry']])
-        }
-        
-        # ✅ Atualizar response com dados organizados
-        data['batches'] = batches_data
-        data['batch_stats'] = batch_stats
-        data['total_quantity'] = total_real
-        
-        return Response(data)
-
-    def list(self, request, *args, **kwargs):
-        """
-        ✅ CORREÇÃO: Lista com totais sempre atualizados
-        """
-        queryset = self.filter_queryset(self.get_queryset())
-        
-        # ✅ Verificar e corrigir totais desatualizados
-        for item in queryset:
-            active_batches = item.batches.filter(quantity__gt=0)
+            # Recalcular total real baseado nos lotes
             total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
             
-            if item.total_quantity != total_real:
-                print(f"🔄 Corrigindo total de {item.product.name}: {item.total_quantity} → {total_real}")
-                item.total_quantity = total_real
-                item.save()
-        
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            # Atualizar total se estiver desatualizado
+            if instance.total_quantity != total_real:
+                print(f"🔄 Corrigindo total de {instance.product.name}: {instance.total_quantity} → {total_real}")
+                instance.total_quantity = total_real
+                instance.save()
+            
+            # Serializar com dados atualizados
+            serializer = self.get_serializer(instance)
+            data = serializer.data
+            
+            # Substituir lotes por versão ordenada e enriquecida
+            batches_data = []
+            for batch in active_batches:
+                # Calcular informações de validade
+                is_expired = False
+                days_to_expire = None
+                
+                if batch.expiration_date:
+                    today = timezone.now().date()
+                    is_expired = batch.expiration_date < today
+                    if not is_expired:
+                        days_to_expire = (batch.expiration_date - today).days
+                
+                batches_data.append({
+                    'id': batch.id,
+                    'batch_code': batch.batch_code or 'S/N',
+                    'expiration_date': batch.expiration_date,
+                    'quantity': batch.quantity,
+                    'formatted_date': batch.expiration_date.strftime('%d/%m/%Y') if batch.expiration_date else 'Sem validade',
+                    'is_expired': is_expired,
+                    'is_near_expiry': days_to_expire is not None and days_to_expire <= 30,
+                    'days_to_expire': days_to_expire,
+                    'status': 'expired' if is_expired else ('near_expiry' if days_to_expire is not None and days_to_expire <= 30 else 'valid')
+                })
+            
+            # Estatísticas dos lotes
+            batch_stats = {
+                'total_batches': len(batches_data),
+                'expired_batches': len([b for b in batches_data if b['is_expired']]),
+                'near_expiry_batches': len([b for b in batches_data if b['is_near_expiry'] and not b['is_expired']]),
+                'valid_batches': len([b for b in batches_data if not b['is_expired'] and not b['is_near_expiry']])
+            }
+            
+            # Atualizar response com dados organizados
+            data['batches'] = batches_data
+            data['batch_stats'] = batch_stats
+            data['total_quantity'] = total_real
+            
+            return Response(data)
+            
+        except Exception as e:
+            print(f"❌ Erro no retrieve: {e}")
+            return Response({"error": "Erro interno do servidor"}, status=500)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            
+            # Verificar e corrigir totais desatualizados
+            for item in queryset:
+                active_batches = item.batches.filter(quantity__gt=0)
+                total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
+                
+                if item.total_quantity != total_real:
+                    print(f"🔄 Corrigindo total de {item.product.name}: {item.total_quantity} → {total_real}")
+                    item.total_quantity = total_real
+                    item.save()
+            
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            print(f"❌ Erro no list: {e}")
+            return Response({"error": "Erro interno do servidor"}, status=500)
 
     def perform_create(self, serializer):
         """
