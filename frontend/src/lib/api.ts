@@ -2,7 +2,7 @@ import {
   isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
   DEMO_PROFILE, DEMO_BATCHES
 } from "./demoData";
-
+import { api } from "../services/api";
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
     .replace(/\/$/, "");
@@ -691,7 +691,7 @@ export const debugApi = {
     console.log("🧹 Cache e configurações limpas");
   }
 };
-// ✅ NOVO: Interface para status da sessão
+// ✅ Interfaces mantidas
 export interface SessionStatus {
   has_session: boolean;
   products_count?: number;
@@ -700,7 +700,6 @@ export interface SessionStatus {
   session_id?: number;
 }
 
-// ✅ NOVO: Interface para resumo da sessão
 export interface SessionSummary {
   products_count: number;
   total_estimated_cost: number;
@@ -708,53 +707,35 @@ export interface SessionSummary {
   session_id: number;
 }
 
-// ✅ Seu sessionApi corrigido (já está correto)
+// ✅ SessionApi usando Axios (consistente com o resto da app)
 export const sessionApi = {
   getStatus: async (): Promise<SessionStatus> => {
     try {
       console.log('🔍 Verificando status da sessão...');
-      
-      const response = await fetch(`${API_BASE_URL}/session-control/`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        }
-      });
-      
-      console.log(`📊 Status da resposta: ${response.status}`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          return { has_session: false };
-        }
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('✅ Status da sessão:', data);
-      return data;
-    } catch (error) {
+      const response = await api.get('/session-control/');
+      console.log('✅ Status da sessão:', response.data);
+      return response.data;
+    } catch (error: any) {
       console.error('❌ Erro ao verificar sessão:', error);
+      if (error.response?.status === 404) {
+        return { has_session: false };
+      }
       return { has_session: false };
     }
   },
 
-  getSummary: async (): Promise<SessionSummary> => {
-    return apiRequest<SessionSummary>("/session-summary/");
+  startSession: async () => {
+    const response = await api.post('/session-control/', { action: 'start' });
+    return response.data;
   },
 
-  startSession: async (): Promise<{ session_id: number; message: string }> => {
-    return apiRequest("/session-control/", {
-      method: 'POST',
-      body: JSON.stringify({ action: 'start' })
-    });
+  finishSession: async () => {
+    const response = await api.post('/session-control/', { action: 'finish' });
+    return response.data;
   },
 
-  finishSession: async (): Promise<{ summary: SessionSummary; message: string }> => {
-    return apiRequest("/session-control/", {
-      method: 'POST',
-      body: JSON.stringify({ action: 'finish' })
-    });
+  getSummary: async () => {
+    const response = await api.get('/session-summary/');
+    return response.data;
   }
 };
