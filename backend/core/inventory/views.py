@@ -352,10 +352,10 @@ class StockEntryView(APIView):
     
 class SaleCheckoutView(APIView):
     """
-    CAIXA / PDV (SCAN DE SAÍDA)
+    CAIXA / PDV (SCAN DE SAÍDA) - FIFO CORRIGIDO
     """
     permission_classes = [IsAuthenticated]
-
+    
     def post(self, request):
         serializer = SaleSerializer(data=request.data)
         if not serializer.is_valid():
@@ -378,61 +378,126 @@ class SaleCheckoutView(APIView):
                 for item_data in data['items']:
                     product = Product.objects.get(bar_code=item_data['bar_code'])
                     inventory_item = InventoryItem.objects.get(store=store, product=product)
-                    qtd = item_data['quantity']
+                    qtd_to_sell = item_data['quantity']
                     price = item_data.get('price_sold', inventory_item.sale_price)
                     
-                    if inventory_item.total_quantity < qtd:
+                    if inventory_item.total_quantity < qtd_to_sell:
                         raise Exception(f"Estoque insuficiente para {product.name}")
                     
-                    # Lógica de Baixa (Lote Específico ou FIFO)
-                    batch_used = None
-                    if 'batch_id' in item_data:
-                        batch_used = InventoryBatch.objects.get(id=item_data['batch_id'])
-                        if batch_used.quantity < qtd: raise Exception("Lote insuficiente")
-                        batch_used.quantity -= qtd
-                        batch_used.save()
-                    else:
-                        batches = inventory_item.batches.filter(quantity__gt=0).order_by('expiration_date')
-                        remaining = qtd
-                        for b in batches:
-                            if remaining <= 0: break
-                            take = min(remaining, b.quantity)
-                            b.quantity -= take
-                            b.save()
-                            remaining -= take
-                            batch_used = b 
+                    # ✅ CORREÇÃO: FIFO Automático Melhorado
+                    print(f"🔄 Aplicando FIFO para {qtd_to_sell} unidades de {product.name}")
                     
-                    inventory_item.total_quantity -= qtd
+                    batch_used = None
+                    batches_used = []
+                    
+                    if 'batch_id' in item_data:
+                        # Venda de lote específico
+                        batch_used = InventoryBatch.objects.get(id=item_data['batch_id'])
+                        if batch_used.quantity < qtd_to_sell: 
+                            raise Exception("Lote insuficiente")
+                        
+                        print(f"🎯 Lote específico {batch_used.id}: {batch_used.quantity} → {batch_used.quantity - qtd_to_sell}")
+                        
+                        batch_used.quantity -= qtd_to_sell
+                        batch_used.save()
+                        
+                        batches_used.append({
+                            'batch': batch_used,
+                            'quantity_used': qtd_to_sell
+                        })
+                    else:
+                        # ✅ FIFO AUTOMÁTICO CORRIGIDO
+                        # Buscar lotes com estoque disponível, ordenados por validade (FIFO)
+                        available_batches = inventory_item.batches.filter(
+                            quantity__gt=0
+                        ).order_by('expiration_date', 'id')
+                        
+                        print(f"📦 Lotes disponíveis: {list(available_batches.values('id', 'batch_code', 'expiration_date', 'quantity'))}")
+                        
+                        remaining_to_sell = qtd_to_sell
+                        
+                        for batch in available_batches:
+                            if remaining_to_sell <= 0:
+                                break
+                                
+                            # Quantidade que vamos tirar deste lote
+                            qty_from_this_batch = min(remaining_to_sell, batch.quantity)
+                            
+                            print(f"🎯 Lote {batch.id} (Val: {batch.expiration_date}): {batch.quantity} → {batch.quantity - qty_from_this_batch}")
+                            
+                            # Aplicar baixa no lote
+                            batch.quantity -= qty_from_this_batch
+                            batch.save()
+                            
+                            # Registrar para histórico
+                            batches_used.append({
+                                'batch': batch,
+                                'quantity_used': qty_from_this_batch
+                            })
+                            
+                            remaining_to_sell -= qty_from_this_batch
+                            
+                            # Definir o primeiro lote como referência principal
+                            if batch_used is None:
+                                batch_used = batch
+                        
+                        if remaining_to_sell > 0:
+                            raise Exception(f"Erro no FIFO: ainda restam {remaining_to_sell} unidades para baixar")
+                    
+                    # ✅ CORREÇÃO: Recalcular total consolidado baseado nos lotes reais
+                    total_real = inventory_item.batches.aggregate(
+                        total=Sum('quantity')
+                    )['total'] or 0
+                    
+                    inventory_item.total_quantity = total_real
                     inventory_item.save()
                     
+                    print(f"📊 Total atualizado: {inventory_item.total_quantity}")
+                    
+                    # ✅ Criar item da venda (usando o primeiro lote como referência)
                     SaleItem.objects.create(
-                        sale=sale, product=product, batch=batch_used,
-                        quantity=qtd, unit_price_sold=price
+                        sale=sale, 
+                        product=product, 
+                        batch=batch_used,
+                        quantity=qtd_to_sell, 
+                        unit_price_sold=price
                     )
                     
-                    # Registrar no Extrato
-                    StockTransaction.objects.create(
-                        store=store,
-                        product=product,
-                        batch=batch_used,
-                        transaction_type=sale.transaction_type,
-                        quantity=-qtd, # Negativo = Saída
-                        unit_cost=inventory_item.cost_price,
-                        unit_price=price,
-                        description=f"Ref. Operação #{sale.id}"
-                    )
-
+                    # ✅ CORREÇÃO: Registrar transações para cada lote usado
+                    for batch_info in batches_used:
+                        StockTransaction.objects.create(
+                            store=store,
+                            product=product,
+                            batch=batch_info['batch'],
+                            transaction_type=sale.transaction_type,
+                            quantity=-batch_info['quantity_used'],  # Negativo = Saída
+                            unit_cost=inventory_item.cost_price,
+                            unit_price=price,
+                            description=f"Venda #{sale.id} - Lote {batch_info['batch'].batch_code or 'S/N'}"
+                        )
+                    
                     if sale.transaction_type == 'VENDA':
-                        total_sale += price * qtd
+                        total_sale += price * qtd_to_sell
                 
                 sale.total_amount = total_sale
                 sale.save()
                 
+                print("✅ Venda processada com sucesso!")
+                return Response({
+                    "message": "Venda registrada com sucesso!",
+                    "sale_id": sale.id,
+                    "total": total_sale
+                })
+                
+        except Product.DoesNotExist:
+            return Response({"error": "Produto não encontrado"}, status=404)
+        except InventoryItem.DoesNotExist:
+            return Response({"error": "Produto não disponível no estoque"}, status=404)
+        except InventoryBatch.DoesNotExist:
+            return Response({"error": "Lote não encontrado"}, status=404)
         except Exception as e:
+            print(f"❌ ERRO na venda: {str(e)}")
             return Response({"error": str(e)}, status=400)
-            
-        return Response({"message": "Operação realizada com sucesso!", "total": total_sale})
-
 
 # ==========================================
 # 3. BUSCA INTELIGENTE (SCRAPER)
