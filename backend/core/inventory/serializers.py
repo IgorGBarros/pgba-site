@@ -118,109 +118,21 @@ class InventoryBatchSerializer(serializers.ModelSerializer):
         else:
             return 'valid'
 
-# inventory/serializers.py - ATUALIZAR InventoryItemSerializer
-
-# inventory/serializers.py - ATUALIZAR InventoryItemSerializer
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
-    batches = serializers.SerializerMethodField()
-    batch_stats = serializers.SerializerMethodField()
+    batches = InventoryBatchSerializer(many=True, read_only=True)
     display_price = serializers.SerializerMethodField()
     
     class Meta:
         model = InventoryItem
         fields = [
             'id', 'product', 'sale_price', 'cost_price', 
-            'total_quantity', 'min_quantity', 'batches', 
-            'batch_stats', 'display_price'
+            'total_quantity', 'min_quantity', 'batches', 'display_price'
         ]
     
-    def get_batches(self, obj):
-        from collections import defaultdict
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        # ✅ CORREÇÃO: Consolidar lotes por data de validade
-        active_batches = obj.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
-        
-        # Agrupar por data de validade
-        consolidated_batches = defaultdict(lambda: {
-            'total_quantity': 0,
-            'batch_codes': [],
-            'ids': []
-        })
-        
-        for batch in active_batches:
-            # ✅ FILTRO: Remover lotes vencidos automaticamente
-            if batch.expiration_date and batch.expiration_date < timezone.now().date():
-                continue
-                
-            key = batch.expiration_date or 'no_date'
-            consolidated_batches[key]['total_quantity'] += batch.quantity
-            consolidated_batches[key]['batch_codes'].append(batch.batch_code or 'S/N')
-            consolidated_batches[key]['ids'].append(batch.id)
-        
-        # Converter para lista ordenada
-        result = []
-        for exp_date, data in sorted(consolidated_batches.items(), 
-                                   key=lambda x: x[0] if x[0] != 'no_date' else timezone.now().date() + timedelta(days=9999)):
-            
-            # Calcular informações de validade
-            is_expired = False
-            days_to_expire = None
-            
-            if exp_date != 'no_date':
-                today = timezone.now().date()
-                is_expired = exp_date < today
-                if not is_expired:
-                    days_to_expire = (exp_date - today).days
-            
-            # Consolidar códigos de lote
-            unique_codes = list(set(data['batch_codes']))
-            batch_code_display = unique_codes[0] if len(unique_codes) == 1 else f"{len(unique_codes)} lotes"
-            
-            result.append({
-                'id': f"consolidated_{data['ids'][0]}",  # ID do primeiro lote para referência
-                'batch_code': batch_code_display,
-                'expiration_date': exp_date if exp_date != 'no_date' else None,
-                'quantity': data['total_quantity'],
-                'formatted_date': exp_date.strftime('%d/%m/%Y') if exp_date != 'no_date' else 'Sem validade',
-                'is_expired': is_expired,
-                'is_near_expiry': days_to_expire is not None and days_to_expire <= 30,
-                'days_to_expire': days_to_expire,
-                'status': 'expired' if is_expired else ('near_expiry' if days_to_expire is not None and days_to_expire <= 30 else 'valid'),
-                'consolidated_ids': data['ids']  # IDs dos lotes que foram consolidados
-            })
-        
-        return result
-
-    # ✅ MÉTODO FALTANTE: get_batch_stats
-    def get_batch_stats(self, obj):
-        """Retorna estatísticas dos lotes do item"""
-        from django.utils import timezone
-        
-        active_batches = obj.batches.filter(quantity__gt=0)
-        today = timezone.now().date()
-        
-        total_batches = active_batches.count()
-        expired_batches = active_batches.filter(expiration_date__lt=today).count()
-        near_expiry_batches = active_batches.filter(
-            expiration_date__gte=today,
-            expiration_date__lte=today + timezone.timedelta(days=30)
-        ).count()
-        valid_batches = total_batches - expired_batches - near_expiry_batches
-        
-        return {
-            'total_batches': total_batches,
-            'expired_batches': expired_batches,
-            'near_expiry_batches': near_expiry_batches,
-            'valid_batches': valid_batches
-        }
-
     def get_display_price(self, obj):
         return obj.sale_price if obj.sale_price and obj.sale_price > 0 else obj.product.official_price
-
 # ==========================================
 # 3. SERIALIZER DE ENTRADA (SCAN)
 # ==========================================
