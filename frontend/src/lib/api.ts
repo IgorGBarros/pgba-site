@@ -215,7 +215,6 @@ export interface InventoryBatch {
   quantity: number;
   cost_price: number;
   batch_code?: string;
-
   expiration_date?: string | null;
   expiry_date?: string | null;
   expiry_photo_url?: string | null;
@@ -309,8 +308,6 @@ export const profileApi = {
 };
 
 // ── Storefront (public) ──
-// lib/api.ts - CORRIGIR a interface StorefrontItem
-
 export interface StorefrontItem {
   id: string;
   product_name?: string;
@@ -347,34 +344,30 @@ export interface StorefrontItem {
     display_text: string;
   };
 }
+
 // ✅ CORREÇÃO: API pública da vitrine com tratamento de erro robusto
 export const publicStorefrontApi = {
   listBySlug: async (slug: string) => {
     try {
       console.log(`🔍 Buscando vitrine por slug: ${slug}`);
       
-      // ✅ CORREÇÃO: Usar API_BASE_URL completo
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/${slug}/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-          // ✅ SEM Authorization header para endpoint público
         }
       });
       
       console.log(`📊 Status da resposta: ${response.status}`);
       
       if (!response.ok) {
-        // ✅ CORREÇÃO: Melhor tratamento de erro
         let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch {
-          const errorText = await response.text();
-          if (errorText.includes('<!doctype')) {
-            errorMessage = 'Endpoint não encontrado (retornou HTML)';
-          }
+        } catch (parseError) {
+          console.warn('Não foi possível fazer parse do erro:', parseError);
         }
         
         console.error(`❌ Erro ${response.status}:`, errorMessage);
@@ -394,7 +387,6 @@ export const publicStorefrontApi = {
     try {
       console.log(`🔍 Buscando vitrine por ID: ${sellerId}`);
       
-      // ✅ CORREÇÃO: Usar API_BASE_URL completo
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/?seller=${sellerId}`, {
         method: 'GET',
         headers: {
@@ -404,17 +396,14 @@ export const publicStorefrontApi = {
       
       if (!response.ok) {
         let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+        
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch {
-          const errorText = await response.text();
-          if (errorText.includes('<!doctype')) {
-            errorMessage = 'Endpoint não encontrado (retornou HTML)';
-          }
+        } catch (parseError) {
+          console.warn('Não foi possível fazer parse do erro:', parseError);
         }
         
-        console.error(`❌ Erro ${response.status}:`, errorMessage);
         throw new Error(errorMessage);
       }
       
@@ -439,23 +428,29 @@ export const storefrontApi = {
       const demoItems: StorefrontItem[] = DEMO_INVENTORY
         .filter((i) => i.is_available_storefront && (i.quantity ?? 0) > 0)
         .map((i) => ({
-          id: i.id, product_name: i.product?.name || i.product_name || "Produto Demo",
+          id: i.id, 
+          product_name: i.product?.name || i.product_name || "Produto Demo",
           display_name: i.custom_name || i.product?.name || i.product_name || "Produto Demo",
-          custom_name: i.custom_name || null, category: i.product?.category || i.category || "Geral",
-          sale_price: i.sale_price ?? null, barcode: i.product?.bar_code || i.barcode || "0000000000000",
-          expiry_date: i.expiry_date ?? null, seller_name: DEMO_PROFILE.display_name,
-          seller_whatsapp: DEMO_PROFILE.whatsapp_number, user_id: "demo",
-          image_url: imageMap[i.id] || i.product?.image_url || i.image_url || null, store_slug: DEMO_PROFILE.store_slug,
+          custom_name: i.custom_name || null, 
+          category: i.product?.category || i.category || "Geral",
+          brand: i.product?.brand || i.brand || null, // ✅ CORREÇÃO: Incluir brand
+          sale_price: i.sale_price ?? null, 
+          total_quantity: i.quantity ?? i.total_quantity ?? 0, // ✅ CORREÇÃO: Incluir quantity
+          barcode: i.product?.bar_code || i.barcode || "0000000000000",
+          expiry_date: i.expiry_date ?? null, 
+          seller_name: DEMO_PROFILE.display_name,
+          seller_whatsapp: DEMO_PROFILE.whatsapp_number, 
+          user_id: "demo",
+          image_url: imageMap[i.id] || i.product?.image_url || i.image_url || null, 
+          store_slug: DEMO_PROFILE.store_slug,
         }));
       return Promise.resolve(demoItems);
     }
     
-    // ✅ CORREÇÃO: Para vitrine pública, usar API pública
     if (sellerId) {
       return publicStorefrontApi.listById(sellerId);
     }
     
-    // ✅ Fallback para API autenticada (se necessário)
     return apiRequest<StorefrontItem[]>("/api/storefront/");
   },
   
@@ -498,10 +493,10 @@ export const salesApi = {
     }),
 };
 
+// ✅ FUNÇÕES HELPER PARA STOREFRONT
 export function getProductBrand(item: any): string | null {
-  // Hierarquia: brand direto > product.brand > null
-  return item.brand || 
-         item.product?.brand || 
+  return item.product?.brand ||
+         item.brand ||
          null;
 }
 
@@ -513,7 +508,6 @@ export function getProductDisplayName(item: any): string {
          "Produto sem nome";
 }
 
-// ✅ NOVA: Função para quantidade segura
 export function getProductQuantity(item: any): number {
   return item.total_quantity ?? item.quantity ?? 0;
 }
