@@ -19,6 +19,7 @@ export function clearToken() {
   localStorage.removeItem("auth_token");
 }
 
+// ✅ CORREÇÃO: Função apiRequest melhorada com logs
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -28,21 +29,44 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   
   if (token) headers["Authorization"] = `Bearer ${token}`;
   
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+  console.log(`🔄 API Request: ${options.method || 'GET'} ${API_BASE_URL}${endpoint}`);
   
-  if (response.status === 401) {
-    clearToken();
-    window.location.href = "/auth";
-    throw new Error("Sessão expirada");
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    
+    console.log(`📊 Response Status: ${response.status} for ${endpoint}`);
+    
+    if (response.status === 401) {
+      console.log("🔐 Token expirado, redirecionando para login");
+      clearToken();
+      clearAppCache(); // ✅ Limpar cache ao fazer logout
+      window.location.href = "/auth";
+      throw new Error("Sessão expirada");
+    }
+    
+    if (!response.ok) {
+      let errorMessage = `Erro ${response.status}`;
+      try {
+        const body = await response.json();
+        errorMessage = body.detail || body.error || errorMessage;
+      } catch {
+        errorMessage = `${errorMessage}: ${response.statusText}`;
+      }
+      
+      console.error(`❌ API Error ${response.status}:`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    if (response.status === 204) return null as T;
+    
+    const data = await response.json();
+    console.log(`✅ API Success: ${endpoint}`, data);
+    return data;
+    
+  } catch (error) {
+    console.error(`❌ API Request Failed: ${endpoint}`, error);
+    throw error;
   }
-  
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || body.error || `Erro ${response.status}`);
-  }
-  
-  if (response.status === 204) return null as T;
-  return response.json();
 }
 
 // ── Auth ──
@@ -108,14 +132,31 @@ export const productLookupApi = {
     }),
 };
 
-// 🚀 1. SISTEMA DE CACHE DE MEMÓRIA (STANDBY)
+// ✅ CORREÇÃO: Sistema de cache melhorado com validação
 let inventoryCache: InventoryItem[] | null = null;
 let movementsCache: Movement[] | null = null;
+let cacheTimestamp: { inventory?: number; movements?: number } = {};
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 export const clearAppCache = () => {
+  console.log("🧹 Limpando cache da aplicação");
   inventoryCache = null;
   movementsCache = null;
+  cacheTimestamp = {};
 };
+
+// ✅ Função helper para verificar se cache é válido
+function isCacheValid(type: 'inventory' | 'movements'): boolean {
+  const timestamp = cacheTimestamp[type];
+  if (!timestamp) return false;
+  
+  const isValid = Date.now() - timestamp < CACHE_DURATION;
+  if (!isValid) {
+    console.log(`⏰ Cache ${type} expirado`);
+  }
+  return isValid;
+}
 
 // ── Inventory (user_inventory) ──
 export interface InventoryItem {
@@ -126,7 +167,6 @@ export interface InventoryItem {
   cost_price: number;
   sale_price: number | null;
   
-  // ✅ CORREÇÃO: Estrutura do produto com brand incluído
   product?: {
     id: number | string;
     name: string;
@@ -135,7 +175,7 @@ export interface InventoryItem {
     category: string;
     image_url: string;
     official_price: number;
-    brand?: string; // ✅ NOVO: Campo brand no objeto product
+    brand?: string;
   };
   
   batches?: InventoryBatch[];
@@ -144,10 +184,7 @@ export interface InventoryItem {
   product_name?: string;
   custom_name?: string | null;
   category?: string;
-  
-  // ✅ CORREÇÃO: Campo brand opcional (pode vir do produto ou direto)
   brand?: string | null;
-  
   official_price?: number | null;
   sale_type?: string | null;
   expiry_date?: string | null;
@@ -172,28 +209,66 @@ export const stockApi = {
 };
 
 export const inventoryApi = {
-  // 🚀 2. USO DE CACHE NA LISTAGEM DE INVENTÁRIO
+  // ✅ CORREÇÃO: Cache melhorado com validação e fallback
   list: async (forceRefresh = false) => {
-    if (isDemoMode()) return DEMO_INVENTORY;
+    console.log(`📦 Carregando inventário (forceRefresh: ${forceRefresh})`);
     
-    // Se o cache já existe e não fomos forçados a atualizar, retorna instantâneo
-    if (!forceRefresh && inventoryCache) {
+    if (isDemoMode()) {
+      console.log("🎭 Modo demo ativo, retornando dados demo");
+      return DEMO_INVENTORY;
+    }
+    
+    // Verificar cache válido
+    if (!forceRefresh && inventoryCache && isCacheValid('inventory')) {
+      console.log("⚡ Usando cache do inventário");
       return inventoryCache;
     }
-    const data = await apiRequest<InventoryItem[]>("/api/inventory/");
-    inventoryCache = data; // Guarda em Standby
-    return data;
+    
+    try {
+      console.log("🔄 Buscando inventário da API...");
+      const data = await apiRequest<InventoryItem[]>("/api/inventory/");
+      
+      // ✅ Validar dados recebidos
+      if (!Array.isArray(data)) {
+        console.error("❌ Dados do inventário inválidos:", data);
+        throw new Error("Formato de dados inválido");
+      }
+      
+      console.log(`✅ Inventário carregado: ${data.length} itens`);
+      inventoryCache = data;
+      cacheTimestamp.inventory = Date.now();
+      return data;
+      
+    } catch (error) {
+      console.error("❌ Erro ao carregar inventário:", error);
+      
+      // ✅ Fallback: retornar cache antigo se existir
+      if (inventoryCache) {
+        console.log("🔄 Usando cache antigo como fallback");
+        return inventoryCache;
+      }
+      
+      // ✅ Último fallback: array vazio
+      console.log("📦 Retornando inventário vazio");
+      return [];
+    }
   },
+  
   get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
                                      : apiRequest<InventoryItem>(`/api/inventory/${id}/`)),
                                      
   getByBarcode: async (barcode: string) => {
     if (isDemoMode()) return DEMO_INVENTORY.find(i => i.barcode === barcode) || null;
     
-    // Usa o cache (muito mais rápido na hora do PDV)
-    const items = await inventoryApi.list();
-    return items.find(i => i.product?.bar_code === barcode || i.barcode === barcode) || null;
+    try {
+      const items = await inventoryApi.list();
+      return items.find(i => i.product?.bar_code === barcode || i.barcode === barcode) || null;
+    } catch (error) {
+      console.error("❌ Erro ao buscar por código de barras:", error);
+      return null;
+    }
   },
+  
   update: async (id: string, data: Partial<InventoryItem>) => {
     const res = await apiRequest<InventoryItem>(`/api/inventory/${id}/`, {
       method: "PATCH",
@@ -202,6 +277,7 @@ export const inventoryApi = {
     clearAppCache(); // 🧹 Limpa cache ao alterar
     return res;
   },
+  
   delete: async (id: string) => {
     await apiRequest<void>(`/api/inventory/${id}/`, { method: "DELETE" });
     clearAppCache(); // 🧹 Limpa cache ao deletar
@@ -257,18 +333,51 @@ export interface Movement {
 }
 
 export const movementsApi = {
-  // 🚀 3. USO DE CACHE NO EXTRATO DE MOVIMENTAÇÕES
+  // ✅ CORREÇÃO: Cache melhorado com validação e fallback
   list: async (forceRefresh = false) => {
-    if (isDemoMode()) return DEMO_MOVEMENTS;
+    console.log(`📈 Carregando movimentações (forceRefresh: ${forceRefresh})`);
     
-    // Devolve o histórico na hora se já estiver na memória
-    if (!forceRefresh && movementsCache) {
+    if (isDemoMode()) {
+      console.log("🎭 Modo demo ativo, retornando movimentações demo");
+      return DEMO_MOVEMENTS;
+    }
+    
+    // Verificar cache válido
+    if (!forceRefresh && movementsCache && isCacheValid('movements')) {
+      console.log("⚡ Usando cache das movimentações");
       return movementsCache;
     }
-    const data = await apiRequest<Movement[]>("/api/transactions/");
-    movementsCache = data; // Guarda em Standby
-    return data;
+    
+    try {
+      console.log("🔄 Buscando movimentações da API...");
+      const data = await apiRequest<Movement[]>("/api/transactions/");
+      
+      // ✅ Validar dados recebidos
+      if (!Array.isArray(data)) {
+        console.error("❌ Dados das movimentações inválidos:", data);
+        throw new Error("Formato de dados inválido");
+      }
+      
+      console.log(`✅ Movimentações carregadas: ${data.length} itens`);
+      movementsCache = data;
+      cacheTimestamp.movements = Date.now();
+      return data;
+      
+    } catch (error) {
+      console.error("❌ Erro ao carregar movimentações:", error);
+      
+      // ✅ Fallback: retornar cache antigo se existir
+      if (movementsCache) {
+        console.log("🔄 Usando cache antigo como fallback");
+        return movementsCache;
+      }
+      
+      // ✅ Último fallback: array vazio
+      console.log("📈 Retornando movimentações vazias");
+      return [];
+    }
   },
+  
   create: async (data: Omit<Movement, "id" | "created_at" | "profit">) => {
     if (isDemoMode()) return { id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement;
     const res = await apiRequest<Movement>("/api/transactions/", { method: "POST", body: JSON.stringify(data) });
@@ -307,6 +416,60 @@ export const profileApi = {
   update: (data: Partial<Profile>) => (isDemoMode() ? Promise.resolve({ ...DEMO_PROFILE, ...data } as Profile) : apiRequest<Profile>("/api/profile/", { method: "PATCH", body: JSON.stringify(data) })),
 };
 
+// ✅ NOVO: API para dashboard com cache
+export const dashboardApi = {
+  getStats: async (forceRefresh = false) => {
+    console.log(`📊 Carregando estatísticas do dashboard`);
+    
+    if (isDemoMode()) {
+      // Calcular stats dos dados demo
+      const totalItems = DEMO_INVENTORY.length;
+      const totalValue = DEMO_INVENTORY.reduce((sum, item) => sum + (item.sale_price || 0) * (item.quantity || 0), 0);
+      const lowStock = DEMO_INVENTORY.filter(item => (item.quantity || 0) <= (item.min_quantity || 0)).length;
+      const recentMovements = DEMO_MOVEMENTS.slice(0, 5);
+      
+      return {
+        totalItems,
+        totalValue,
+        lowStock,
+        recentMovements,
+        totalMovements: DEMO_MOVEMENTS.length
+      };
+    }
+    
+    try {
+      // Carregar dados em paralelo
+      const [inventory, movements] = await Promise.all([
+        inventoryApi.list(forceRefresh),
+        movementsApi.list(forceRefresh)
+      ]);
+      
+      const totalItems = inventory.length;
+      const totalValue = inventory.reduce((sum, item) => sum + (item.sale_price || 0) * (item.total_quantity || 0), 0);
+      const lowStock = inventory.filter(item => (item.total_quantity || 0) <= (item.min_quantity || 0)).length;
+      const recentMovements = movements.slice(0, 5);
+      
+      return {
+        totalItems,
+        totalValue,
+        lowStock,
+        recentMovements,
+        totalMovements: movements.length
+      };
+      
+    } catch (error) {
+      console.error("❌ Erro ao carregar dashboard:", error);
+      return {
+        totalItems: 0,
+        totalValue: 0,
+        lowStock: 0,
+        recentMovements: [],
+        totalMovements: 0
+      };
+    }
+  }
+};
+
 // ── Storefront (public) ──
 export interface StorefrontItem {
   id: string;
@@ -314,9 +477,9 @@ export interface StorefrontItem {
   display_name?: string;
   custom_name?: string | null;
   category?: string;
-  brand?: string | null; // ✅ Campo brand adicionado
+  brand?: string | null;
   sale_price?: number | null;
-  total_quantity?: number; // ✅ Opcional, pode ser undefined
+  total_quantity?: number;
   barcode?: string;
   expiry_date?: string | null;
   seller_name?: string | null;
@@ -325,19 +488,17 @@ export interface StorefrontItem {
   image_url?: string | null;
   store_slug?: string | null;
   
-  // ✅ Campos do produto relacionado
   product?: {
     id: number | string;
     name: string;
     bar_code: string;
     natura_sku?: string;
     category: string;
-    brand?: string | null; // ✅ Brand no produto
+    brand?: string | null;
     image_url?: string;
     official_price?: number;
   };
   
-  // ✅ Info de urgência
   stock_info?: {
     quantity: number;
     is_urgent: boolean;
@@ -345,7 +506,7 @@ export interface StorefrontItem {
   };
 }
 
-// ✅ CORREÇÃO: API pública da vitrine com tratamento de erro robusto
+// ✅ API pública da vitrine (mantida igual)
 export const publicStorefrontApi = {
   listBySlug: async (slug: string) => {
     try {
@@ -417,7 +578,6 @@ export const publicStorefrontApi = {
   }
 };
 
-// ✅ CORREÇÃO: Manter compatibilidade com API existente
 export const storefrontApi = {
   list: (sellerId?: string) => {
     if (isDemoMode() || sellerId === "demo") {
@@ -433,9 +593,9 @@ export const storefrontApi = {
           display_name: i.custom_name || i.product?.name || i.product_name || "Produto Demo",
           custom_name: i.custom_name || null, 
           category: i.product?.category || i.category || "Geral",
-          brand: i.product?.brand || i.brand || null, // ✅ CORREÇÃO: Incluir brand
+          brand: i.product?.brand || i.brand || null,
           sale_price: i.sale_price ?? null, 
-          total_quantity: i.quantity ?? i.total_quantity ?? 0, // ✅ CORREÇÃO: Incluir quantity
+          total_quantity: i.quantity ?? i.total_quantity ?? 0,
           barcode: i.product?.bar_code || i.barcode || "0000000000000",
           expiry_date: i.expiry_date ?? null, 
           seller_name: DEMO_PROFILE.display_name,
@@ -511,3 +671,21 @@ export function getProductDisplayName(item: any): string {
 export function getProductQuantity(item: any): number {
   return item.total_quantity ?? item.quantity ?? 0;
 }
+
+// ✅ NOVO: Função para debug
+export const debugApi = {
+  checkHealth: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/health/`);
+      return { status: response.status, ok: response.ok };
+    } catch (error) {
+      return { status: 0, ok: false, error };
+    }
+  },
+  
+  clearAllCache: () => {
+    clearAppCache();
+    localStorage.removeItem('demo_mode');
+    console.log("🧹 Cache e configurações limpas");
+  }
+};
