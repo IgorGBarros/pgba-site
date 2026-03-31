@@ -1153,3 +1153,15 @@ def public_storefront_view(request, slug=None, brand=None):
         import traceback
         traceback.print_exc()
         return Response({'error': 'Erro interno do servidor'}, status=500)
+    
+class StockTransactionViewSet(viewsets.ModelViewSet):
+    serializer_class = StockTransactionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    
+    # ✅ Agora o campo transaction_type existirá
+    filterset_fields = ['transaction_type', 'product', 'created_at']
+    
+    def get_queryset(self):
+        store = get_current_store(self.request.user)
+        return StockTransaction.objects.filter(store=store).select_related('product', 'batch')   
