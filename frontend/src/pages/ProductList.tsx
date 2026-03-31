@@ -17,7 +17,7 @@ function getStockStatus(qty: number, min: number): { label: string; color: strin
   return { label: "Em Estoque", color: "bg-primary/10 text-primary border-primary/20" };
 }
 
-// ✅ NOVO: Função para status de validade dos lotes
+// ✅ Função para status de validade dos lotes
 function getBatchStatus(batch: any) {
   if (!batch.expiration_date) return { status: 'no_date', color: 'text-muted-foreground', icon: Calendar };
   
@@ -38,8 +38,11 @@ function getBatchStatus(batch: any) {
 const consolidateBatchesByExpiry = (batches: any[]) => {
   if (!batches || batches.length === 0) return [];
   
+  // Filtrar apenas lotes com quantidade > 0
+  const activeBatches = batches.filter(batch => batch.quantity > 0);
+  
   // Agrupar por data de validade
-  const grouped = batches.reduce((acc: any, batch: any) => {
+  const grouped = activeBatches.reduce((acc: any, batch: any) => {
     const key = batch.expiration_date || 'no_date';
     if (!acc[key]) {
       acc[key] = {
@@ -47,7 +50,9 @@ const consolidateBatchesByExpiry = (batches: any[]) => {
         quantity: 0,
         batch_codes: [],
         ids: [],
-        first_batch: batch
+        formatted_date: batch.expiration_date 
+          ? new Date(batch.expiration_date).toLocaleDateString('pt-BR') 
+          : 'Sem validade'
       };
     }
     acc[key].quantity += batch.quantity;
@@ -57,22 +62,20 @@ const consolidateBatchesByExpiry = (batches: any[]) => {
   }, {});
   
   // Converter para array e ordenar por validade (FIFO)
-  return Object.values(grouped)
-    .map((group: any) => ({
-      id: `consolidated_${group.ids[0]}`,
-      expiration_date: group.expiration_date,
-      quantity: group.quantity,
-      batch_code: group.batch_codes.length === 1 
-        ? group.batch_codes[0] 
-        : `${group.batch_codes.length} lotes`,
-      is_consolidated: group.batch_codes.length > 1,
-      original_batches: group.batch_codes,
-      formatted_date: group.expiration_date 
-        ? new Date(group.expiration_date).toLocaleDateString('pt-BR') 
-        : 'Sem validade'
+  return Object.entries(grouped)
+    .map(([dateKey, data]: [string, any]) => ({
+      id: `consolidated_${data.ids[0]}`,
+      expiration_date: data.expiration_date,
+      quantity: data.quantity,
+      batch_code: data.batch_codes.length === 1 
+        ? data.batch_codes[0] 
+        : `${data.batch_codes.length} lotes`,
+      is_consolidated: data.batch_codes.length > 1,
+      original_batches: data.batch_codes,
+      formatted_date: data.formatted_date
     }))
     .sort((a: any, b: any) => {
-      // Ordenar por validade (FIFO)
+      // Ordenar por validade (FIFO) - sem validade vai para o final
       if (!a.expiration_date && !b.expiration_date) return 0;
       if (!a.expiration_date) return 1;
       if (!b.expiration_date) return -1;
@@ -97,7 +100,7 @@ export default function ProductList() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // ✅ CORREÇÃO: Função de carregamento melhorada com consolidação
+  // ✅ CORREÇÃO: Função de carregamento com consolidação de lotes
   const loadInventory = async () => {
     try {
       setLoading(true);
@@ -105,20 +108,19 @@ export default function ProductList() {
       
       // ✅ NOVO: Processar dados com consolidação de lotes
       const processedData = data.map((item: any) => {
-        // Filtrar apenas lotes com quantidade > 0
+        // ✅ CONSOLIDAR lotes por validade
         if (item.batches && Array.isArray(item.batches)) {
-          const activeBatches = item.batches.filter((batch: any) => batch.quantity > 0);
+          item.consolidatedBatches = consolidateBatchesByExpiry(item.batches);
           
-          // ✅ CONSOLIDAR lotes por validade
-          item.consolidatedBatches = consolidateBatchesByExpiry(activeBatches);
-          
-          // Manter batches originais para compatibilidade
-          item.batches = activeBatches.sort((a: any, b: any) => {
-            if (!a.expiration_date && !b.expiration_date) return a.id - b.id;
-            if (!a.expiration_date) return 1;
-            if (!b.expiration_date) return -1;
-            return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
-          });
+          // Manter batches originais ordenados para compatibilidade
+          item.batches = item.batches
+            .filter((batch: any) => batch.quantity > 0)
+            .sort((a: any, b: any) => {
+              if (!a.expiration_date && !b.expiration_date) return a.id - b.id;
+              if (!a.expiration_date) return 1;
+              if (!b.expiration_date) return -1;
+              return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
+            });
         } else {
           item.consolidatedBatches = [];
         }
@@ -277,12 +279,12 @@ export default function ProductList() {
               
               const isExpanded = expandedId === item.id;
               
-              // ✅ CORREÇÃO: Conversão segura de preços
+              // ✅ Conversão segura de preços
               const salePrice = Number(item.sale_price) || 0;
               const costPrice = Number(item.cost_price) || 0;
               const profitUnit = salePrice - costPrice;
 
-              // ✅ NOVO: Análise de validade usando lotes consolidados
+              // ✅ NOVO: Análise usando lotes consolidados
               const nextExpiryBatch = item.consolidatedBatches && item.consolidatedBatches.length > 0 ? 
                 item.consolidatedBatches.find((b: any) => b.expiration_date) : null;
 
@@ -351,10 +353,10 @@ export default function ProductList() {
                           );
                         })()}
 
-                        {/* ✅ NOVO: Indicador de múltiplos lotes consolidados */}
+                        {/* ✅ NOVO: Indicador de validades consolidadas */}
                         {item.consolidatedBatches && item.consolidatedBatches.length > 1 && (
                           <span className="inline-flex items-center gap-0.5 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-700 px-1.5 py-0.5 text-[10px] font-bold">
-                            <Package className="h-3 w-3" />
+                            <Calendar className="h-3 w-3" />
                             {item.consolidatedBatches.length} validades
                           </span>
                         )}
@@ -366,7 +368,7 @@ export default function ProductList() {
                   <div className="flex items-center justify-between border-t border-border/50 pt-3 mt-3">
                     <div className="flex gap-4 text-xs text-muted-foreground">
                       <p>Venda: <span className="font-bold text-foreground">{formatMoney(salePrice)}</span></p>
-                      {/* ✅ NOVO: Indicador de lucro */}
+                      {/* ✅ Indicador de lucro */}
                       <p className="flex items-center gap-1">
                         Lucro: 
                         <span className={`font-bold flex items-center gap-0.5 ${profitUnit >= 0 ? "text-emerald-600" : "text-destructive"}`}>
@@ -386,7 +388,7 @@ export default function ProductList() {
                     </div>
                   </div>
 
-                  {/* ✅ MELHORADO: Acordeão com lotes consolidados */}
+                  {/* ✅ MELHORADO: Acordeão com lotes consolidados por validade */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
@@ -418,7 +420,7 @@ export default function ProductList() {
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
                                   <Clock className="h-3 w-3" /> Validades Consolidadas (FIFO)
                                 </p>
-                                {/* ✅ NOVO: Resumo dos lotes */}
+                                {/* ✅ Resumo dos lotes */}
                                 {item.batchSummary && (
                                   <div className="flex items-center gap-1 text-[10px]">
                                     {item.batchSummary.expired > 0 && (
