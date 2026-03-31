@@ -110,13 +110,21 @@ from .scraper import search_google_shopping
 # ==========================================
 
 def get_current_store(user):
-    """
-    Retorna a loja vinculada ao usuário logado.
-    Em um cenário SaaS real, isso garante que o user só mexa na própria loja.
-    """
-    if hasattr(user, 'store'):
-        return user.store
-    return None
+    """Obtém a loja do usuário atual"""
+    try:
+        from .models import Store
+        store, created = Store.objects.get_or_create(
+            user=user,
+            defaults={
+                'name': f'Loja de {user.email}',
+                'slug': user.email.split('@')[0].replace('.', ''),
+                'storefront_enabled': True
+            }
+        )
+        return store
+    except Exception as e:
+        print(f"❌ Erro ao obter loja: {e}")
+        raise
 
 class TenantModelMixin:
     """
@@ -128,11 +136,13 @@ class TenantModelMixin:
         return get_current_store(self.request.user)
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        store = self.get_store()
-        if store:
-            return qs.filter(store=store)
-        return qs.none()
+        # ✅ ADICIONAR tratamento de erro
+        try:
+            store = get_current_store(self.request.user)
+            return InventoryItem.objects.filter(store=store).select_related('product')
+        except Exception as e:
+            print(f"❌ Erro no get_queryset: {e}")
+            return InventoryItem.objects.none()
 
     def perform_create(self, serializer):
         serializer.save(store=self.get_store())
