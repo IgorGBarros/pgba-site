@@ -193,23 +193,16 @@ class UserNestedSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "name"]
 
 class ProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializador de Perfil — baseado na Store vinculada ao usuário.
+    """
     user = UserNestedSerializer(read_only=True)
     
-    # ✅ CORREÇÃO: Validações mais robustas
-    display_name = serializers.CharField(
-        source='name', 
-        required=False, 
-        allow_blank=True, 
-        max_length=255
-    )
-    
-    store_slug = serializers.SlugField(
-        source='slug', 
-        required=False, 
-        allow_blank=True,
-        max_length=50
-    )
-    
+    # Aliases
+    display_name = serializers.CharField(source='name', required=False, allow_blank=True, allow_null=True)
+    whatsapp_number = serializers.CharField(source='whatsapp', required=False, allow_blank=True, allow_null=True)
+    store_slug = serializers.CharField(source='slug', required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = Store
         fields = [
@@ -217,28 +210,12 @@ class ProfileSerializer(serializers.ModelSerializer):
             "storefront_enabled", "created_at", "plan"
         ]
         read_only_fields = ["id", "user", "created_at", "plan"]
-    
+
+    # 🚀 CORREÇÃO 3: BLINDAGEM CONTRA O ERRO 500
+    # Se o frontend enviar null nessas chaves, o serializer converte para string vazia
+    # protegendo o banco de dados de quebrar.
     def validate_display_name(self, value):
-        """✅ CORREÇÃO: Validação mais robusta"""
-        if value is None:
-            return ""
-        # Remover caracteres especiais perigosos
-        import re
-        cleaned = re.sub(r'[<>"\']', '', str(value).strip())
-        return cleaned[:255]  # Limitar tamanho
+        return value if value is not None else ""
         
     def validate_store_slug(self, value):
-        """✅ CORREÇÃO: Validar unicidade do slug"""
-        if not value:
-            return ""
-        
-        # Verificar se slug já existe (exceto para a própria loja)
-        if self.instance:
-            existing = Store.objects.filter(slug=value).exclude(id=self.instance.id)
-        else:
-            existing = Store.objects.filter(slug=value)
-            
-        if existing.exists():
-            raise serializers.ValidationError("Este slug já está em uso")
-            
-        return value
+        return value if value is not None else ""
