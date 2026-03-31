@@ -39,7 +39,7 @@ else:
 DB_NAME = os.getenv("DB_NAME", "natura_inventory")
 DB_USER = os.getenv("DB_USER", "natura_admin")  
 DB_PASSWORD = os.getenv("DB_PASSWORD", "senha_segura_123")
-DB_AI_USER = os.getenv("DB_AI_USER", DB_USER)  # ✅ Agora DB_USER sempre existe
+DB_AI_USER = os.getenv("DB_AI_USER", DB_USER)
 DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", DB_PASSWORD)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
@@ -205,7 +205,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 
-# ✅ CORREÇÃO: Headers permitidos para vitrine pública
+# ✅ Headers permitidos para vitrine pública
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -218,7 +218,7 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# ✅ CORREÇÃO: Métodos HTTP permitidos
+# ✅ Métodos HTTP permitidos
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -236,6 +236,7 @@ CSRF_TRUSTED_ORIGINS = [
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
+# ✅ Configurações de segurança para produção
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
@@ -244,14 +245,25 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
     X_FRAME_OPTIONS = 'DENY'
-    
-# ✅ Logging para debug de CORS
+
+# ✅ NOVO: Logging melhorado para debug
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
     },
     'loggers': {
@@ -260,8 +272,19 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
+        'inventory.views': {
+            'handlers': ['console'],
+            'level': 'INFO' if DEBUG else 'ERROR',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
+
 # --------------------------------------------------------------------------
 # ✅ Cache para Vitrine (Performance)
 # --------------------------------------------------------------------------
@@ -295,8 +318,23 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",  # Rate limit para vitrine pública
         "user": "1000/hour"
-    }
+    },
+    # ✅ NOVO: Configurações para melhor debug
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ],
 }
+
+# ✅ NOVO: Configurações específicas para desenvolvimento
+if DEBUG:
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append(
+        "rest_framework.renderers.BrowsableAPIRenderer"
+    )
 
 # --------------------------------------------------------------------------
 # User model
@@ -335,6 +373,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# ✅ NOVO: Configurações de mídia para uploads
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # --------------------------------------------------------------------------
 # ✅ Configurações específicas do projeto
 # --------------------------------------------------------------------------
@@ -353,6 +395,17 @@ DEFAULT_LANGUAGE = "pt-BR"
 # Configurações específicas para vitrine
 STOREFRONT_CACHE_TIMEOUT = 300  # 5 minutos
 STOREFRONT_MAX_ITEMS = 100      # Limite de produtos por vitrine
+
+# ✅ NOVO: Configurações de sessão
+SESSION_COOKIE_AGE = 1209600  # 2 semanas
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# ✅ NOVO: Configurações de CSRF
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # --------------------------------------------------------------------------
 # ✅ Firebase (mantendo sua configuração existente)
@@ -376,7 +429,29 @@ try:
 except ImportError:
     print("⚠️ Firebase Admin SDK não instalado.")
 
+# --------------------------------------------------------------------------
+# ✅ NOVO: Health Check para Keep-Alive
+# --------------------------------------------------------------------------
+HEALTH_CHECK_ENABLED = True
+HEALTH_CHECK_URL = "/api/health/"
+
+# ✅ Informações de debug no startup
 print("✅ Settings carregado com sucesso!")
 print(f"📊 DEBUG: {DEBUG}")
 print(f"🗄️ Database: {DATABASES['default']['ENGINE']}")
 print(f"🌐 CORS Origins: {len(CORS_ALLOWED_ORIGINS)} configurados")
+print(f"🔐 ALLOWED_HOSTS: {len(ALLOWED_HOSTS)} hosts configurados")
+print(f"💾 Cache: {CACHES['default']['BACKEND']}")
+print(f"🚀 Vitrine: Cache timeout {STOREFRONT_CACHE_TIMEOUT}s, Max items {STOREFRONT_MAX_ITEMS}")
+
+# ✅ NOVO: Validação de configuração crítica
+if not SECRET_KEY or SECRET_KEY == "django-insecure-+rc4szhd0d(k@((%vp6og@k_p)y5x*$9_=214d4+p@e3^o4gj7":
+    if not DEBUG:
+        raise ValueError("❌ SECRET_KEY deve ser definida em produção!")
+    else:
+        print("⚠️ Usando SECRET_KEY padrão em desenvolvimento")
+
+if not DEBUG and not database_url:
+    print("⚠️ DATABASE_URL não definida em produção, usando configuração local")
+
+print("🎉 Configuração Django finalizada!")
