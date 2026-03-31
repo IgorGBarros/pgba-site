@@ -7,6 +7,8 @@ const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
     .replace(/\/$/, "");
 
+    
+
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
