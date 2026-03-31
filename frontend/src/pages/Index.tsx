@@ -2,332 +2,281 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   Package, TrendingDown, DollarSign, BarChart3, ScanBarcode, List,
-  ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2,
-  Clock, Check // ✅ ADICIONAR estes ícones
+  ArrowDownCircle, Settings, PieChart, Store, History, User, Bell, CheckCircle2
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { 
-  inventoryApi, 
-  movementsApi, 
-  profileApi, 
-  sessionApi, // ✅ ADICIONAR sessionApi
-  SessionStatus, // ✅ ADICIONAR interface
-  formatMoney 
-} from "../lib/api";
+import { inventoryApi, movementsApi, profileApi } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useFeatureGates } from "../hooks/useFeatureGates";
 import { ChatAssistant } from "../components/ChatAssistant";
 import ProBadge from "../components/ProBadge";
+import UpgradeModal from "../components/UpgradeModal";
+import ProfileCompletionBanner from "../components/ProfileCompletionBanner";
+import { sessionApi } from '../lib/sessionApi';
 
-// ✅ NOVO: Componente SessionHeader
-function SessionHeader() {
-  const [session, setSession] = useState<SessionStatus | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
-
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  const checkSession = async () => {
-    try {
-      const status = await sessionApi.getStatus();
-      if (status.has_session) {
-        setSession(status);
-      }
-    } catch (error) {
-      console.error('Erro ao verificar sessão:', error);
-    }
-  };
-
-  const finishSession = async () => {
-    try {
-      const result = await sessionApi.finishSession();
-      setShowSummary(true);
-      setSession(null);
-    } catch (error) {
-      console.error('Erro ao finalizar sessão:', error);
-    }
-  };
-
-  // ✅ Só renderiza se houver sessão ativa
-  if (!session?.has_session) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-blue-600 text-white px-4 py-3 flex items-center justify-between shadow-lg"
-    >
-      <div className="flex items-center gap-3">
-        <Package size={18} className="text-blue-100" />
-        <div>
-          <span className="text-sm font-semibold">
-            Cadastrando produtos...
-          </span>
-          <div className="flex items-center gap-2 text-blue-200 text-xs">
-            <span>{session.products_count || 0} produtos</span>
-            {session.duration_minutes && (
-              <>
-                <span>•</span>
-                <Clock size={12} />
-                <span>{session.duration_minutes}min</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      <button
-        onClick={finishSession}
-        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
-      >
-        <Check size={16} />
-        Finalizar Sessão
-      </button>
-    </motion.div>
-  );
+interface Stats {
+  investedValue: number;
+  potentialValue: number;
+  projectedProfit: number;
+  monthSales: number;
+  monthProfit: number;
 }
 
 export default function Index() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { gates } = useFeatureGates();
+  const { isLocked } = useFeatureGates();
   
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [movements, setMovements] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
+  const [stats, setStats] = useState<Stats>({
+    investedValue: 0,
+    potentialValue: 0,
+    projectedProfit: 0,
+    monthSales: 0,
+    monthProfit: 0,
+  });
+  
   const [loading, setLoading] = useState(true);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
+  const [storeSlug, setStoreSlug] = useState<string | null>(null);
+  
+  const [showNotif, setShowNotif] = useState(false);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    try {
-      const [inventoryData, movementsData, profileData] = await Promise.all([
-        inventoryApi.list(),
-        movementsApi.list(),
-        profileApi.get(),
-      ]);
+    if (!user) return;
+    
+    profileApi
+      .get()
+      .then((p) => setStoreSlug(p.store_slug))
+      .catch(() => setStoreSlug(null));
       
-      setInventory(inventoryData);
-      setMovements(movementsData);
-      setProfile(profileData);
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    Promise.all([inventoryApi.list(), movementsApi.list()])
+      .then(([items, movements]) => {
+        const now = new Date();
+        
+        // 🚀 LÓGICA DE MOVIMENTAÇÕES IDÊNTICA AO DO HISTÓRICO PARA PRECISÃO MÁXIMA
+        const monthMovements = movements.filter((m) => {
+          const d = new Date(m.created_at);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).map(m => {
+          const rawType = (m.transaction_type || m.movement_type || "").toUpperCase();
+          const uiType = rawType === "ENTRADA" ? "entrada" : "saida"; 
+          return {
+            ...m,
+            raw_type: rawType,
+            ui_type: uiType
+          };
+        });
 
-  // Cálculos do dashboard
-  const totalItems = inventory.reduce((sum, item) => sum + (item.total_quantity || 0), 0);
-  const totalValue = inventory.reduce((sum, item) => sum + (item.sale_price || 0) * (item.total_quantity || 0), 0);
-  const lowStock = inventory.filter(item => (item.total_quantity || 0) <= (item.min_quantity || 0)).length;
-  const recentMovements = movements.slice(0, 5);
+        // Pega apenas as VENDAS REAIS (Saídas do tipo VENDA) deste mês
+        const salesMovements = monthMovements.filter((m) => m.ui_type === "saida" && m.raw_type === "VENDA");
+        
+        // Receita Real do Mês (soma o preço unitário de venda * quantidade)
+        const monthSales = salesMovements.reduce((s, m) => s + (Number(m.unit_price) || 0) * Math.abs(m.quantity), 0);
+        
+        // Lucro Real do Mês (soma o lucro já calculado e salvo pelo backend na hora da baixa)
+        const monthProfit = salesMovements.reduce((s, m) => s + (m.profit || 0), 0);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+        // 🚀 CÁLCULO DE INVESTIMENTO (Baseado no saldo de estoque atual)
+        const totalInvested = items.reduce((s, i) => {
+          const qty = i.total_quantity ?? i.quantity ?? 0;
+          return s + (qty * i.cost_price);
+        }, 0);
+
+        const totalPotential = items.reduce((s, i) => {
+          const qty = i.total_quantity ?? i.quantity ?? 0;
+          const salePrice = i.sale_price || i.product?.official_price || 0;
+          return s + (qty * salePrice);
+        }, 0);
+
+        setStats({
+          investedValue: totalInvested,
+          potentialValue: totalPotential,
+          projectedProfit: totalPotential - totalInvested,
+          monthSales,
+          monthProfit,
+        });
+        
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [user]);
+
+  const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  
+  // 🚀 CARDS RENOMEADOS FOCADOS NO FINANCEIRO E LUCRO REAL DO MÊS
+  const statCards = [
+    { label: "Valor Investido", value: fmt(stats.investedValue), icon: Package, color: "text-muted-foreground" },
+    { label: "Potencial de Venda", value: fmt(stats.potentialValue), icon: DollarSign, color: "text-primary" },
+    { label: "Lucro Estimado Geral", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-green-600" },
+    { label: "Vendas deste Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
+    { label: "Lucro Real do Mês", value: fmt(stats.monthProfit), icon: BarChart3, color: "text-emerald-600" }, // Novo Card de Lucro do Mês!
+  ];
+// Função para iniciar sessão
+const startRegistrationSession = async () => {
+  try {
+    await sessionApi.start();
+    navigate("/add");
+  } catch (error) {
+    console.error('Erro ao iniciar sessão:', error);
+    navigate("/add"); // Vai mesmo se der erro
   }
-
+};
   return (
-    <div className="min-h-screen bg-background">
-      {/* ✅ NOVO: Header de Sessão */}
-      <SessionHeader />
-      
-      {/* Header Principal */}
-      <header className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              Bem-vinda, {user?.name || profile?.display_name || "Consultora"}!
-            </p>
-          </div>
-          
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-20 border-b border-border bg-card">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
+              <Package className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="font-display text-lg font-bold text-foreground">Estoque Natura</h1>
+              <p className="text-xs text-muted-foreground">Gestão inteligente de inventário</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 relative">
+            {/* MODAL DO SINO IMPLEMENTADO AQUI */}
             <button
-              onClick={() => navigate("/settings")}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
+              onClick={() => setShowNotif(!showNotif)}
+              className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
             >
+              <Bell className="h-5 w-5" />
+            </button>
+            <AnimatePresence>
+              {showNotif && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 top-12 mt-2 w-72 bg-card border border-border rounded-xl shadow-xl p-4 z-50"
+                >
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-foreground">Tudo tranquilo por aqui!</p>
+                      <p className="text-xs text-muted-foreground mt-1">Você não possui nenhum alerta de estoque baixo ou validade no momento.</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <button onClick={() => navigate("/profile")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
+              <User className="h-5 w-5" />
+            </button>
+            <button onClick={() => navigate("/settings")} className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
               <Settings className="h-5 w-5" />
             </button>
-            
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-sm">
-              {(user?.name || profile?.display_name || "C")[0].toUpperCase()}
-            </div>
           </div>
         </div>
       </header>
-
-      {/* Conteúdo Principal */}
-      <main className="p-6">
-        {/* Cards de Estatísticas */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl border bg-card p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total de Produtos</p>
-                <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+      
+      <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
+        <ProfileCompletionBanner />
+        
+        {/* CARDS FINANCEIROS (Com Skeleton Loading para evitar ansiedade) */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          {statCards.map((stat) => (
+            <div key={stat.label} className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase text-muted-foreground">{stat.label}</span>
+                <stat.icon className={`h-4 w-4 ${stat.color} opacity-70`} />
               </div>
-              <Package className="h-8 w-8 text-primary" />
+              <p className={`font-display text-2xl font-bold ${stat.color}`}>
+                {loading ? <span className="animate-pulse text-muted-foreground/50">R$ ...</span> : stat.value}
+              </p>
             </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="rounded-xl border bg-card p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Valor Total</p>
-                <p className="text-2xl font-bold text-foreground">{formatMoney(totalValue)}</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="rounded-xl border bg-card p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Estoque Baixo</p>
-                <p className="text-2xl font-bold text-foreground">{lowStock}</p>
-              </div>
-              <TrendingDown className="h-8 w-8 text-orange-600" />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="rounded-xl border bg-card p-6 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Movimentações</p>
-                <p className="text-2xl font-bold text-foreground">{movements.length}</p>
-              </div>
-              <BarChart3 className="h-8 w-8 text-blue-600" />
-            </div>
-          </motion.div>
+          ))}
         </div>
-
-        {/* Ações Rápidas */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <motion.button
-            onClick={() => navigate("/add-product")}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left hover:bg-accent transition-colors"
-          >
-            <ScanBarcode className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold text-foreground">Adicionar Produto</p>
-              <p className="text-xs text-muted-foreground">Escanear ou cadastrar</p>
-            </div>
-          </motion.button>
-
-          <motion.button
-            onClick={() => navigate("/inventory")}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left hover:bg-accent transition-colors"
-          >
-            <List className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold text-foreground">Ver Estoque</p>
-              <p className="text-xs text-muted-foreground">Gerenciar produtos</p>
-            </div>
-          </motion.button>
-
-          <motion.button
-            onClick={() => navigate("/movements")}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left hover:bg-accent transition-colors"
-          >
-            <History className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold text-foreground">Histórico</p>
-              <p className="text-xs text-muted-foreground">Ver movimentações</p>
-            </div>
-          </motion.button>
-
-          <motion.button
-            onClick={() => navigate("/storefront")}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left hover:bg-accent transition-colors"
-          >
-            <Store className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold text-foreground">Vitrine</p>
-              <p className="text-xs text-muted-foreground">Gerenciar loja</p>
-            </div>
-          </motion.button>
-        </div>
-
-        {/* Movimentações Recentes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="rounded-xl border bg-card p-6 shadow-sm"
-        >
-          <h2 className="text-lg font-semibold text-foreground mb-4">Movimentações Recentes</h2>
+        
+        {/* BOTÕES DE AÇÃO (Botão Manual removido) */}
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           
-          {recentMovements.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-muted-foreground">
-              <History className="h-12 w-12 opacity-20 mb-3" />
-              <p className="text-sm font-medium">Nenhuma movimentação ainda</p>
-              <p className="text-xs">As vendas e entradas aparecerão aqui</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recentMovements.map((movement, index) => (
-                <div key={movement.id || index} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-2 w-2 rounded-full ${
-                      movement.movement_type === 'entrada' ? 'bg-green-500' : 'bg-red-500'
-                    }`} />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{movement.product_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {movement.movement_type === 'entrada' ? 'Entrada' : 'Saída'} • {movement.quantity} un.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {movement.unit_price && (
-                    <span className="text-sm font-semibold text-foreground">
-                      {formatMoney(movement.unit_price * movement.quantity)}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </motion.div>
+          <ActionBtn 
+            onClick={startRegistrationSession} 
+            icon={ScanBarcode} 
+            label="Cadastrar" 
+            desc="Escanear entrada" 
+            primary 
+          />
+          <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Registrar saída" />
+          <ActionBtn onClick={() => navigate("/products")} icon={List} label="Meu Estoque" desc="Lista completa" />
+          <ActionBtn onClick={() => navigate("/history")} icon={History} label="Extrato" desc="Movimentações" />
+          <ActionBtn onClick={() => navigate("/dashboard")} icon={PieChart} label="Dashboard" desc="Gráficos e análises" proBadge={isLocked("dashboard_charts")} />
+          
+          {/* 🚀 BOTÃO VITRINE INTELIGENTE */}
+          <ActionBtn
+            onClick={() => {
+              if (isLocked("storefront")) {
+                setUpgradeCtx({ feature: "Vitrine Digital", description: "Crie sua loja online e venda pelo WhatsApp automaticamente." });
+                setShowUpgrade(true);
+              } else if (storeSlug) {
+                // Abre direto em uma nova aba se tiver slug
+                window.open(`${window.location.origin}/vitrine/${storeSlug}`, "_blank");
+              } else {
+                // Manda pro perfil pra ela criar o slug
+                navigate("/profile");
+              }
+            }}
+            icon={Store}
+            label="Vitrine"
+            desc="Sua loja online"
+            proBadge={isLocked("storefront")}
+          />
+        </div>
+        <p className="mt-10 text-center text-sm text-muted-foreground bg-secondary/30 p-4 rounded-xl border border-border/50">
+          {!isLocked("chat_assistant")
+            ? "💬 Clique no botão no canto inferior direito para conversar com a nossa Inteligência Artificial"
+            : "🔒 A Assistente de IA é uma funcionalidade exclusiva do plano PRO"}
+        </p>
       </main>
 
-      {/* Chat Assistant */}
-      <ChatAssistant />
+      {!isLocked("chat_assistant") && <ChatAssistant />}
+      
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature={upgradeCtx.feature}
+        description={upgradeCtx.description}
+      />
     </div>
+  );
+}
+
+function ActionBtn({
+  onClick,
+  icon: Icon,
+  label,
+  desc,
+  primary,
+  proBadge,
+}: {
+  onClick: () => void;
+  icon: typeof Package;
+  label: string;
+  desc: string;
+  primary?: boolean;
+  proBadge?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-xl p-4 text-left transition-all hover:scale-[1.02] hover:shadow-md ${
+        primary ? "border-2 border-primary bg-primary shadow-sm" : "border border-border bg-card hover:bg-secondary/50"
+      }`}
+    >
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${primary ? "bg-white/20" : "bg-primary/10"}`}>
+        <Icon className={`h-5 w-5 ${primary ? "text-primary-foreground" : "text-primary"}`} />
+      </div>
+      <div className="min-w-0">
+        <p className={`text-sm font-bold flex items-center gap-1.5 ${primary ? "text-primary-foreground" : "text-foreground"}`}>
+          {label}
+          {proBadge && <ProBadge />}
+        </p>
+        <p className={`text-xs truncate mt-0.5 ${primary ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+          {desc}
+        </p>
+      </div>
+    </button>
   );
 }
