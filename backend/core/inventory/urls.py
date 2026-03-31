@@ -7,7 +7,8 @@ from .views import (
     InventoryViewSet,
     SessionControlView,
     SessionSummaryView,
-    feature_gates_view, 
+    feature_gates_view,
+    inventory_item_batches_view, 
     lookup_product, 
     StockEntryView, 
     SaleCheckoutView,
@@ -52,7 +53,9 @@ urlpatterns = [
 
     path('public/storefront/<str:slug>/', public_storefront, name='public_storefront'),
     path('public/storefront/', public_storefront, name='public_storefront_by_id'),
-     path('public/storefront/<str:slug>/marca/<str:brand>/', public_storefront_view, name='public_storefront_brand'),
+    path('public/storefront/<str:slug>/marca/<str:brand>/', public_storefront_view, name='public_storefront_brand'),
+
+     path('inventory/<int:item_id>/batches/', inventory_item_batches_view, name='inventory-item-batches'),
     
 
     # --- Rotas Automáticas (Router) ---

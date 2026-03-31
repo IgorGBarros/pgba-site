@@ -1165,3 +1165,73 @@ class StockTransactionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         store = get_current_store(self.request.user)
         return StockTransaction.objects.filter(store=store).select_related('product', 'batch')   
+    
+# inventory/views.py - ADICIONAR esta view
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def inventory_item_batches_view(request, item_id):
+    """Lista lotes de um item específico do inventário"""
+    try:
+        store = get_current_store(request.user)
+        
+        # Buscar item do inventário
+        inventory_item = InventoryItem.objects.get(
+            id=item_id, 
+            store=store
+        )
+        
+        # Buscar lotes ativos ordenados por validade (FIFO)
+        batches = inventory_item.batches.filter(
+            quantity__gt=0
+        ).order_by('expiration_date', 'id')
+        
+        # Serializar lotes com informações extras
+        batches_data = []
+        today = timezone.now().date()
+        
+        for batch in batches:
+            # Calcular status de validade
+            is_expired = False
+            days_to_expire = None
+            status = 'valid'
+            
+            if batch.expiration_date:
+                is_expired = batch.expiration_date < today
+                if is_expired:
+                    status = 'expired'
+                else:
+                    days_to_expire = (batch.expiration_date - today).days
+                    if days_to_expire <= 30:
+                        status = 'near_expiry'
+            
+            batches_data.append({
+                'id': batch.id,
+                'batch_code': batch.batch_code or 'S/N',
+                'expiration_date': batch.expiration_date,
+                'quantity': batch.quantity,
+                'formatted_date': batch.expiration_date.strftime('%d/%m/%Y') if batch.expiration_date else 'Sem validade',
+                'is_expired': is_expired,
+                'is_near_expiry': status == 'near_expiry',
+                'days_to_expire': days_to_expire,
+                'status': status
+            })
+        
+        return Response({
+            'item_id': inventory_item.id,
+            'product_name': inventory_item.product.name,
+            'total_quantity': inventory_item.total_quantity,
+            'batches': batches_data,
+            'batch_stats': {
+                'total_batches': len(batches_data),
+                'expired_batches': len([b for b in batches_data if b['is_expired']]),
+                'near_expiry_batches': len([b for b in batches_data if b['status'] == 'near_expiry']),
+                'valid_batches': len([b for b in batches_data if b['status'] == 'valid'])
+            }
+        })
+        
+    except InventoryItem.DoesNotExist:
+        return Response({'error': 'Item não encontrado'}, status=404)
+    except Exception as e:
+        print(f"❌ Erro ao buscar lotes: {e}")
+        return Response({'error': 'Erro interno'}, status=500)
