@@ -889,12 +889,15 @@ class SessionSummaryView(APIView):
 
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
+# inventory/views.py - SUBSTITUA a função existente por esta versão completa
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def public_storefront_view(request, slug=None, brand=None):
     """
     Endpoint público para vitrine - não requer autenticação
     Suporta filtro por marca: /vitrine/{slug}/marca/{brand}
+    Implementa estratégia de urgência do marketing
     """
     try:
         # ✅ Validar e buscar a loja
@@ -933,7 +936,7 @@ def public_storefront_view(request, slug=None, brand=None):
         
         # ✅ NOVO: Coletar marcas disponíveis para navegação
         available_brands = items.values_list('product__brand', flat=True).distinct()
-        available_brands = [brand for brand in available_brands if brand]  # Remove None/empty
+        available_brands = [brand for brand in available_brands if brand and brand.strip()]  # Remove None/empty
         available_brands = sorted(set(available_brands))  # Remove duplicatas e ordena
         
         # ✅ Mapear dados corretamente
@@ -955,14 +958,22 @@ def public_storefront_view(request, slug=None, brand=None):
             # ✅ NOVO: Incluir marca no retorno
             brand_name = item.product.brand if item.product else None
             
+            # ✅ NOVO: Estratégia de urgência (conforme marketing)
+            stock_info = {
+                'quantity': item.total_quantity,
+                'is_urgent': item.total_quantity <= 3,  # 3 ou menos = urgência
+                'display_text': 'Em estoque' if item.total_quantity > 3 else f'Restam apenas {item.total_quantity}!'
+            }
+            
             items_data.append({
                 'id': str(item.id),
                 'product_name': product_name,
                 'display_name': product_name,
                 'category': item.product.category if item.product else 'Geral',
-                'brand': item.product.brand if item.product else None,  # ✅ Campo marca
+                'brand': brand_name,  # ✅ Campo marca
                 'sale_price': sale_price,
                 'total_quantity': item.total_quantity,
+                'stock_info': stock_info,  # ✅ NOVO: Info de urgência
                 'image_url': image_url,
             })
         
@@ -982,6 +993,11 @@ def public_storefront_view(request, slug=None, brand=None):
                 'current_filter': brand_filter,
                 'total_brands': len(available_brands),
                 'total_products': len(items_data)
+            },
+            'meta': {
+                'total_items': len(items_data),
+                'urgent_items': len([item for item in items_data if item['stock_info']['is_urgent']]),
+                'brands_count': len(available_brands)
             }
         }
         
@@ -989,4 +1005,6 @@ def public_storefront_view(request, slug=None, brand=None):
         
     except Exception as e:
         print(f"❌ Erro no endpoint público: {e}")
+        import traceback
+        traceback.print_exc()
         return Response({'error': 'Erro interno do servidor'}, status=500)

@@ -17,7 +17,8 @@ from .views import (
     AdminUserListView,
     AdminUpdatePlanView,
     AdminUpdateSubscriptionView,
-    public_storefront
+    public_storefront,
+    public_storefront_view
     # FirebaseLoginView e CustomUserCreateView foram removidos daqui pois estão comentados na view
 )
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -51,6 +52,8 @@ urlpatterns = [
 
     path('public/storefront/<str:slug>/', public_storefront, name='public_storefront'),
     path('public/storefront/', public_storefront, name='public_storefront_by_id'),
+     path('public/storefront/<str:slug>/marca/<str:brand>/', public_storefront_view, name='public_storefront_brand'),
+    
 
     # --- Rotas Automáticas (Router) ---
     path('', include(router.urls)),

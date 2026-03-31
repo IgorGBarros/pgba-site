@@ -104,65 +104,78 @@ useEffect(() => {
     console.log('🏷️ Marcas disponíveis:', uniqueBrands);
   }
 }, [items]);
+
+
   useEffect(() => {
-    console.log('🚀 Iniciando carregamento da vitrine...', { slug, sellerIdParam });
+  console.log('🚀 Iniciando carregamento da vitrine...', { slug, sellerIdParam });
+  
+  const fetchItems = slug
+    ? publicStorefrontApi.listBySlug(slug)
+    : publicStorefrontApi.listById(sellerIdParam || "");
     
-    const fetchItems = slug
-      ? publicStorefrontApi.listBySlug(slug)
-      : publicStorefrontApi.listById(sellerIdParam || "");
+  fetchItems.then((res: any) => {
+    console.log('📦 Resposta da API:', res);
+    
+    const productsList = res.items || [];
+    
+    // ✅ NOVO: Mapear dados com marca e urgência
+    const mappedItems = productsList.map((item: any) => {
+      console.log('🔍 Item raw da API:', item);
       
-    fetchItems.then((res: any) => {
-      console.log('📦 Resposta da API:', res);
+      const productName = item.product_name || item.display_name || "Produto sem nome";
+      console.log('✅ Nome mapeado:', productName);
       
-      const productsList = res.items || [];
-      
-      // Mapear dados corretamente usando a função helper
-      const mappedItems = productsList.map((item: any) => {
-        console.log('🔍 Item raw da API:', item);
-        
-        const productName = getProductDisplayName(item);
-        console.log('✅ Nome mapeado:', productName);
-        
-        return {
-          id: item.id,
-          product_name: productName,
-          display_name: productName,
-          category: item.category || item.product?.category || "Geral",
-          brand: item.brand || item.product?.brand || null, // ✅ NOVO: Campo marca
-          sale_price: item.sale_price || item.product?.official_price || 0,
-          total_quantity: item.total_quantity || 0,
-          image_url: item.image_url || item.product?.image_url || null,
-          // Campos adicionais necessários para StorefrontItem
-          custom_name: item.custom_name || null,
-          barcode: item.barcode || item.product?.bar_code || "",
-          expiry_date: item.expiry_date || null,
-          seller_name: null,
-          seller_whatsapp: null,
-          user_id: "",
-          store_slug: null,
-        };
-      });
-      
-      console.log('🎯 Produtos mapeados:', mappedItems);
-      setItems(mappedItems);
-      
-      // Definir dados da loja
-      if (res.store) {
-        console.log('🏪 Dados da loja:', res.store);
-        setSellerName(res.store.name || "Consultor(a)");
-        setSellerWhatsapp(res.store.whatsapp || "");
-        
-        // Definir slug para isolamento da sacola
-        const currentStoreSlug = res.store.slug || slug || sellerIdParam || "default";
-        setStoreSlug(currentStoreSlug);
-      }
-      
-      setLoading(false);
-    }).catch((err) => {
-      console.error("❌ Erro ao carregar vitrine:", err);
-      setLoading(false);
+      return {
+        id: item.id,
+        product_name: productName,
+        display_name: productName,
+        category: item.category || "Geral",
+        brand: item.brand || null, // ✅ NOVO: Campo marca
+        sale_price: item.sale_price || 0,
+        total_quantity: item.total_quantity || 0,
+        stock_info: item.stock_info || { // ✅ NOVO: Info de urgência
+          quantity: item.total_quantity || 0,
+          is_urgent: (item.total_quantity || 0) <= 3,
+          display_text: (item.total_quantity || 0) > 3 ? 'Em estoque' : `Restam apenas ${item.total_quantity || 0}!`
+        },
+        image_url: item.image_url || null,
+        // Campos adicionais necessários para StorefrontItem
+        custom_name: item.custom_name || null,
+        barcode: item.barcode || "",
+        expiry_date: item.expiry_date || null,
+        seller_name: null,
+        seller_whatsapp: null,
+        user_id: "",
+        store_slug: null,
+      };
     });
-  }, [slug, sellerIdParam]);
+    
+    console.log('🎯 Produtos mapeados:', mappedItems);
+    setItems(mappedItems);
+    
+    // ✅ NOVO: Processar marcas da API
+    if (res.brands && res.brands.available) {
+      setAvailableBrands(res.brands.available);
+      console.log('🏷️ Marcas da API:', res.brands.available);
+    }
+    
+    // Definir dados da loja
+    if (res.store) {
+      console.log('🏪 Dados da loja:', res.store);
+      setSellerName(res.store.name || "Consultor(a)");
+      setSellerWhatsapp(res.store.whatsapp || "");
+      
+      const currentStoreSlug = res.store.slug || slug || sellerIdParam || "default";
+      setStoreSlug(currentStoreSlug);
+    }
+    
+    setLoading(false);
+  }).catch((err) => {
+    console.error("❌ Erro ao carregar vitrine:", err);
+    setLoading(false);
+  });
+}, [slug, sellerIdParam]);
+
 
   // ✅ NOVO: Filtro que considera marca E busca
 // ✅ CORREÇÃO: Usar função helper para comparar marca
