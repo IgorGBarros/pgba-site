@@ -268,6 +268,7 @@ class StockTransaction(models.Model):
 
 
 # inventory/models.py - ADICIONAR apenas isso
+# inventory/models.py - ADICIONAR este modelo
 class RegistrationSession(models.Model):
     """Sessão de cadastro de produtos"""
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
@@ -275,18 +276,39 @@ class RegistrationSession(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     
-    # Contadores automáticos
+    # Contadores
     products_count = models.PositiveIntegerField(default=0)
     total_estimated_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     
-    # Dados do evento (preenchidos no final)
-    payment_method = models.CharField(max_length=20, null=True, blank=True)
+    # Dados de pagamento (opcionais)
+    payment_method = models.CharField(max_length=50, null=True, blank=True)
     total_paid = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     installments = models.PositiveIntegerField(default=1)
     
+    class Meta:
+        verbose_name = "Sessão de Cadastro"
+        verbose_name_plural = "Sessões de Cadastro"
+    
+    @property
+    def duration_minutes(self):
+        if self.finished_at:
+            return (self.finished_at - self.started_at).total_seconds() / 60
+        return (timezone.now() - self.started_at).total_seconds() / 60
+    
     def add_product(self, inventory_item, quantity=1):
-        """Incrementa contadores quando produto é cadastrado"""
+        """Adiciona produto à sessão"""
         self.products_count += quantity
-        cost = inventory_item.get_effective_cost() or 0
-        self.total_estimated_cost += cost * quantity
+        # Calcula custo estimado baseado no custo do item
+        cost_per_unit = inventory_item.cost_price or inventory_item.product.official_price or 0
+        self.total_estimated_cost += cost_per_unit * quantity
         self.save()
+    
+    def finish_session(self):
+        """Finaliza sessão"""
+        self.is_active = False
+        self.finished_at = timezone.now()
+        self.save()
+        return self
+    
+    def __str__(self):
+        return f"Sessão {self.id} - {self.store.name} ({self.products_count} produtos)"
