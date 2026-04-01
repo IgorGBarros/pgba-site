@@ -68,14 +68,7 @@ else:
                 "PORT": DB_PORT,
             }
         }
-    else:
-        # Fallback para SQLite se PostgreSQL não estiver configurado
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
+ 
 
 # ✅ DATABASE_URL para IA (LangChain/SQLAlchemy)
 DATABASE_URL = f"postgresql+psycopg2://{quote_plus(DB_AI_USER)}:{quote_plus(DB_AI_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
