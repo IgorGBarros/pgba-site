@@ -184,6 +184,14 @@ from rest_framework.response import Response
 
 
 
+from django.db.models import Sum, Prefetch
+from django.utils import timezone
+from django.db import transaction
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+
 class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Estoque Privado da Consultora - VERSÃO CORRIGIDA"""
     serializer_class = InventoryItemSerializer
@@ -206,33 +214,85 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             print(f"❌ Erro no get_queryset: {e}")
             return InventoryItem.objects.none()
 
+    def consolidate_batches_by_expiry(self, inventory_item):
+        """✅ NOVO: Consolida lotes com a mesma data de validade"""
+        from collections import defaultdict
+        
+        print(f"🔄 Consolidando lotes para {inventory_item.product.name}")
+        
+        # Agrupar lotes por data de validade
+        batches_by_date = defaultdict(list)
+        
+        for batch in inventory_item.batches.filter(quantity__gt=0):
+            date_key = batch.expiration_date.isoformat() if batch.expiration_date else 'no_date'
+            batches_by_date[date_key].append(batch)
+        
+        # Consolidar lotes duplicados
+        consolidated_count = 0
+        for date_key, batches in batches_by_date.items():
+            if len(batches) > 1:
+                print(f"🔄 Consolidando {len(batches)} lotes com validade {date_key}")
+                
+                # Manter o primeiro lote e somar as quantidades
+                main_batch = batches[0]
+                total_quantity = sum(batch.quantity for batch in batches)
+                
+                # Atualizar quantidade do lote principal
+                main_batch.quantity = total_quantity
+                main_batch.save()
+                
+                # Remover lotes duplicados
+                for batch in batches[1:]:
+                    print(f"🗑️ Removendo lote duplicado {batch.id}")
+                    batch.delete()
+                
+                consolidated_count += 1
+        
+        if consolidated_count > 0:
+            print(f"✅ Consolidados {consolidated_count} grupos de lotes")
+            
+            # Recalcular total
+            total_real = inventory_item.batches.aggregate(
+                total=Sum('quantity')
+            )['total'] or 0
+            
+            inventory_item.total_quantity = total_real
+            inventory_item.save()
+        
+        return inventory_item
+
     def list(self, request, *args, **kwargs):
-        """
-        ✅ CORREÇÃO: Lista com tratamento de erro robusto e totais atualizados
-        """
+        """Lista com tratamento de erro robusto e consolidação automática"""
         try:
             print("📦 Iniciando listagem do inventário...")
             
             queryset = self.filter_queryset(self.get_queryset())
             
-            # ✅ Verificar se queryset não está vazio
             if not queryset.exists():
                 print("📦 Nenhum item encontrado no inventário")
                 return Response([])
             
             print(f"📦 Encontrados {queryset.count()} itens no inventário")
             
-            # ✅ Verificar e corrigir totais desatualizados (limitado para performance)
-            items_to_check = queryset[:20]  # Limitar para evitar timeout
+            # ✅ Consolidar e corrigir totais (limitado para performance)
+            items_to_process = queryset[:15]  # Limitar para evitar timeout
             corrected_count = 0
+            consolidated_count = 0
             
-            for item in items_to_check:
+            for item in items_to_process:
                 try:
-                    # Buscar lotes ativos
+                    # ✅ NOVO: Consolidar lotes primeiro
+                    old_batch_count = item.batches.filter(quantity__gt=0).count()
+                    item = self.consolidate_batches_by_expiry(item)
+                    new_batch_count = item.batches.filter(quantity__gt=0).count()
+                    
+                    if old_batch_count != new_batch_count:
+                        consolidated_count += 1
+                    
+                    # Verificar e corrigir totais
                     active_batches = item.batches.filter(quantity__gt=0)
                     total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
                     
-                    # Corrigir se necessário
                     if item.total_quantity != total_real:
                         print(f"🔄 Corrigindo total de {item.product.name}: {item.total_quantity} → {total_real}")
                         item.total_quantity = total_real
@@ -245,14 +305,15 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             
             if corrected_count > 0:
                 print(f"✅ Corrigidos {corrected_count} totais desatualizados")
+            if consolidated_count > 0:
+                print(f"✅ Consolidados lotes em {consolidated_count} produtos")
             
-            # ✅ Paginação
+            # Paginação
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
             
-            # ✅ Serialização normal
             serializer = self.get_serializer(queryset, many=True)
             data = serializer.data
             
@@ -264,39 +325,38 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             
-            # ✅ Fallback: retornar lista vazia em vez de erro 500
             return Response({
                 'error': 'Erro ao carregar inventário',
                 'message': str(e),
                 'fallback': []
-            }, status=200)  # Retorna 200 com erro para não quebrar o frontend
+            }, status=200)
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        ✅ CORREÇÃO: Retornar detalhes do produto com lotes organizados e totais corretos
-        """
+        """Detalhes com consolidação automática e FIFO"""
         try:
             print(f"🔍 Buscando detalhes do item {kwargs.get('pk')}")
             
             instance = self.get_object()
             
-            # ✅ Buscar lotes ativos ordenados por validade (FIFO)
+            # ✅ CONSOLIDAR lotes automaticamente
+            instance = self.consolidate_batches_by_expiry(instance)
+            
+            # Buscar lotes ativos ordenados por validade (FIFO)
             active_batches = instance.batches.filter(quantity__gt=0).order_by('expiration_date', 'id')
             
-            # ✅ Recalcular total real baseado nos lotes
+            # Recalcular total real baseado nos lotes
             total_real = active_batches.aggregate(total=Sum('quantity'))['total'] or 0
             
-            # ✅ Atualizar total se estiver desatualizado
             if instance.total_quantity != total_real:
                 print(f"🔄 Corrigindo total de {instance.product.name}: {instance.total_quantity} → {total_real}")
                 instance.total_quantity = total_real
                 instance.save()
             
-            # ✅ Serializar com dados básicos
+            # Serializar com dados básicos
             serializer = self.get_serializer(instance)
             data = serializer.data
             
-            # ✅ CORREÇÃO: Substituir lotes por versão ordenada e enriquecida
+            # ✅ Substituir lotes por versão ordenada e enriquecida
             batches_data = []
             today = timezone.now().date()
             
@@ -316,7 +376,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                         'batch_code': batch.batch_code or 'S/N',
                         'expiration_date': batch.expiration_date,
                         'quantity': batch.quantity,
-                        'cost_price': float(batch.cost_price) if hasattr(batch, 'cost_price') else 0.0,
+                        'cost_price': float(getattr(batch, 'cost_price', 0)),
                         'formatted_date': batch.expiration_date.strftime('%d/%m/%Y') if batch.expiration_date else 'Sem validade',
                         'is_expired': is_expired,
                         'is_near_expiry': days_to_expire is not None and days_to_expire <= 30,
@@ -328,7 +388,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                     print(f"⚠️ Erro ao processar lote {batch.id}: {e}")
                     continue
             
-            # ✅ Estatísticas dos lotes
+            # Estatísticas dos lotes
             batch_stats = {
                 'total_batches': len(batches_data),
                 'expired_batches': len([b for b in batches_data if b['is_expired']]),
@@ -336,7 +396,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                 'valid_batches': len([b for b in batches_data if not b['is_expired'] and not b['is_near_expiry']])
             }
             
-            # ✅ Atualizar response com dados organizados
+            # Atualizar response com dados organizados
             data['batches'] = batches_data
             data['batch_stats'] = batch_stats
             data['total_quantity'] = total_real
@@ -354,9 +414,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             }, status=500)
 
     def perform_create(self, serializer):
-        """
-        ✅ Garantir que criação sempre vincula à loja correta
-        """
+        """Garantir que criação sempre vincula à loja correta"""
         try:
             store = get_current_store(self.request.user)
             serializer.save(store=store)
@@ -366,9 +424,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             raise
 
     def perform_update(self, serializer):
-        """
-        ✅ Recalcular total após atualização
-        """
+        """Recalcular total após atualização"""
         try:
             instance = serializer.save()
             
@@ -387,9 +443,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             raise
 
     def update(self, request, *args, **kwargs):
-        """
-        ✅ Override do update com tratamento de erro
-        """
+        """Override do update com tratamento de erro"""
         try:
             partial = kwargs.pop('partial', False)
             instance = self.get_object()
@@ -413,9 +467,7 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
             }, status=500)
 
     def destroy(self, request, *args, **kwargs):
-        """
-        ✅ Override do destroy com logs
-        """
+        """Override do destroy com logs"""
         try:
             instance = self.get_object()
             print(f"🗑️ Removendo item {instance.id}")
@@ -429,8 +481,6 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                 'error': 'Erro ao remover item',
                 'message': str(e)
             }, status=500)
-
-
 
 class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Extrato de Movimentações da Loja - VERSÃO CORRIGIDA"""
@@ -449,16 +499,73 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
         except Exception as e:
             print(f"❌ Erro no get_queryset StockTransaction: {e}")
             return StockTransaction.objects.none()
-    
+
+    def apply_fifo_withdrawal(self, inventory_item, quantity_to_withdraw):
+        """✅ NOVO: Aplica baixa FIFO automática nos lotes"""
+        print(f"🎯 Aplicando FIFO: {quantity_to_withdraw} unidades de {inventory_item.product.name}")
+        
+        # Buscar lotes ordenados por validade (FIFO)
+        available_batches = inventory_item.batches.filter(
+            quantity__gt=0
+        ).order_by('expiration_date', 'id')
+        
+        if not available_batches.exists():
+            raise ValueError("Não há lotes disponíveis")
+        
+        total_available = sum(batch.quantity for batch in available_batches)
+        if total_available < quantity_to_withdraw:
+            raise ValueError(f"Estoque insuficiente. Disponível: {total_available}, Solicitado: {quantity_to_withdraw}")
+        
+        # Aplicar baixas nos lotes (FIFO)
+        remaining_to_withdraw = quantity_to_withdraw
+        batches_used = []
+        
+        for batch in available_batches:
+            if remaining_to_withdraw <= 0:
+                break
+            
+            qty_from_batch = min(remaining_to_withdraw, batch.quantity)
+            
+            print(f"📦 Lote {batch.id} (Val: {batch.expiration_date}): {batch.quantity} → {batch.quantity - qty_from_batch}")
+            
+            # Aplicar baixa
+            batch.quantity -= qty_from_batch
+            batch.save()
+            
+            # Se lote zerou, pode ser removido
+            if batch.quantity == 0:
+                print(f"🗑️ Lote {batch.id} zerado - removendo")
+                batch.delete()
+            
+            batches_used.append({
+                'batch_id': batch.id,
+                'quantity_used': qty_from_batch,
+                'expiration_date': batch.expiration_date
+            })
+            
+            remaining_to_withdraw -= qty_from_batch
+        
+        # Recalcular total do inventário
+        total_real = inventory_item.batches.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        inventory_item.total_quantity = total_real
+        inventory_item.save()
+        
+        print(f"📊 Total atualizado: {inventory_item.total_quantity}")
+        
+        return batches_used
+
     def create(self, request, *args, **kwargs):
-        """Criar transação com FIFO automático para saídas"""
+        """Criar transação com FIFO automático"""
         try:
             store = get_current_store(request.user)
             data = request.data.copy()
             
             print(f"🔄 Criando transação: {data}")
             
-            # Buscar produto
+            # Buscar produto e item do inventário
             product_id = data.get('product_id') or data.get('product')
             if not product_id:
                 return Response({'error': 'product_id é obrigatório'}, status=400)
@@ -468,7 +575,6 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             except Product.DoesNotExist:
                 return Response({'error': 'Produto não encontrado'}, status=404)
             
-            # Buscar item do inventário
             try:
                 inventory_item = InventoryItem.objects.get(store=store, product=product)
             except InventoryItem.DoesNotExist:
@@ -478,61 +584,15 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             if quantity <= 0:
                 return Response({'error': 'Quantidade deve ser maior que zero'}, status=400)
             
-            # Verificar se é saída e aplicar FIFO
             transaction_type = data.get('transaction_type', '').upper()
+            
+            # Verificar se é saída e aplicar FIFO
             is_exit = transaction_type in ['VENDA', 'SAIDA'] or quantity < 0
             
             if is_exit:
-                # Aplicar FIFO automático
-                print(f"🎯 Aplicando FIFO para {quantity} unidades")
-                
-                # Buscar lotes disponíveis ordenados por validade (FIFO)
-                available_batches = inventory_item.batches.filter(
-                    quantity__gt=0
-                ).order_by('expiration_date', 'id')
-                
-                if not available_batches.exists():
-                    return Response({'error': 'Não há lotes disponíveis'}, status=400)
-                
-                total_available = sum(batch.quantity for batch in available_batches)
-                if total_available < quantity:
-                    return Response({
-                        'error': f'Estoque insuficiente. Disponível: {total_available}, Solicitado: {quantity}'
-                    }, status=400)
-                
-                # Aplicar baixas nos lotes (FIFO)
-                remaining_to_withdraw = quantity
-                batches_used = []
-                
+                # ✅ APLICAR FIFO AUTOMÁTICO
                 with transaction.atomic():
-                    for batch in available_batches:
-                        if remaining_to_withdraw <= 0:
-                            break
-                        
-                        qty_from_batch = min(remaining_to_withdraw, batch.quantity)
-                        
-                        print(f"📦 Lote {batch.id}: {batch.quantity} → {batch.quantity - qty_from_batch}")
-                        
-                        # Aplicar baixa
-                        batch.quantity -= qty_from_batch
-                        batch.save()
-                        
-                        batches_used.append({
-                            'batch': batch,
-                            'quantity_used': qty_from_batch
-                        })
-                        
-                        remaining_to_withdraw -= qty_from_batch
-                    
-                    # Recalcular total do inventário
-                    total_real = inventory_item.batches.aggregate(
-                        total=Sum('quantity')
-                    )['total'] or 0
-                    
-                    inventory_item.total_quantity = total_real
-                    inventory_item.save()
-                    
-                    print(f"📊 Total atualizado: {total_real}")
+                    batches_used = self.apply_fifo_withdrawal(inventory_item, quantity)
                     
                     # Criar transações para cada lote usado
                     transactions_created = []
@@ -540,24 +600,23 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                         transaction_obj = StockTransaction.objects.create(
                             store=store,
                             product=product,
-                            batch=batch_info['batch'],
+                            batch_id=batch_info['batch_id'],
                             transaction_type=transaction_type,
                             quantity=-batch_info['quantity_used'],  # Negativo para saída
                             unit_cost=inventory_item.cost_price,
                             unit_price=data.get('unit_price', 0),
-                            description=data.get('description', f"Saída - {transaction_type}"),
+                            description=f"Saída FIFO - Lote vencimento {batch_info['expiration_date']}",
                             notes=data.get('notes', '')
                         )
                         transactions_created.append(transaction_obj)
                     
-                    # Retornar a primeira transação como principal
-                    main_transaction = transactions_created[0] if transactions_created else None
-                    if main_transaction:
-                        serializer = self.get_serializer(main_transaction)
+                    # Retornar a primeira transação
+                    if transactions_created:
+                        serializer = self.get_serializer(transactions_created[0])
                         return Response(serializer.data, status=201)
             
             else:
-                # Entrada normal - usar serializer padrão
+                # Entrada normal
                 serializer = self.get_serializer(data=data)
                 if serializer.is_valid():
                     serializer.save(store=store, product=product)
@@ -570,7 +629,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             return Response({'error': str(e)}, status=500)
-    
+
     def perform_create(self, serializer):
         """Garantir que criação sempre vincula à loja correta"""
         try:
@@ -580,7 +639,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
         except Exception as e:
             print(f"❌ Erro ao criar transação: {e}")
             raise
-    
+
     def list(self, request, *args, **kwargs):
         """Lista com tratamento de erro robusto"""
         try:
@@ -610,13 +669,12 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             
-            # Fallback: retornar lista vazia em vez de erro 500
             return Response({
                 'error': 'Erro ao carregar transações',
                 'message': str(e),
                 'fallback': []
-            }, status=200)  # Retorna 200 com erro para não quebrar o frontend
-    
+            }, status=200)
+
     def retrieve(self, request, *args, **kwargs):
         """Detalhes com tratamento de erro"""
         try:
@@ -634,7 +692,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                 'error': 'Erro ao carregar detalhes da transação',
                 'message': str(e)
             }, status=500)
-    
+
     def destroy(self, request, *args, **kwargs):
         """Override do destroy com logs"""
         try:
@@ -680,9 +738,7 @@ class StockEntryView(APIView):
 
         try:
             with transaction.atomic():
-                
-                # 🚀 CORREÇÃO AQUI: Converte strings vazias ("") para None (NULL)
-                # Isso impede o erro de "Unique Constraint" no PostgreSQL para novos usuários.
+                # Conversão de strings vazias para None (NULL) [1]
                 raw_sku = data.get('natura_sku')
                 sku_input = raw_sku if raw_sku and str(raw_sku).strip() != "" else None
                 
@@ -692,26 +748,24 @@ class StockEntryView(APIView):
                 name_input = data.get('name', '').strip()
                 category_input = data.get('category', 'Geral')
 
-                # 🚀 PROTEÇÃO 1: Impede que o frontend suje o banco com nomes de fallback
+                # Proteção contra nomes de fallback [1]
                 if name_input in ["Produto sem nome", "Produto Novo", ""]:
                     name_input = "Produto Novo"
 
                 print(f"Buscando produto: SKU={sku_input}, Barcode={barcode_input}")
 
-                # 1. Buscar produto no catálogo protegido
+                # 1. Buscar produto no catálogo [1]
                 product = None
                 
-                # PRIORIDADE 1: Código de Barras (EAN é global e único)
                 if barcode_input:
                     product = Product.objects.filter(bar_code=barcode_input).first()
                     
-                # PRIORIDADE 2: SKU Natura (Apenas se não achar pelo EAN e o SKU for válido)
                 if not product and sku_input:
                     product = Product.objects.filter(natura_sku=sku_input).first()
 
                 print(f"Produto encontrado: {product}")
 
-                # 2. Caso produto exista, verificar se é protegido
+                # 2. Criar ou atualizar produto [1]
                 if product:
                     is_protected = getattr(product, 'is_protected', False)
                     if is_protected:
@@ -724,13 +778,11 @@ class StockEntryView(APIView):
                             product.bar_code = barcode_input
                             updated = True
                             
-                        # 🚀 ATUALIZAÇÃO SEGURA DO SKU
                         if sku_input and not product.natura_sku:
                             if not Product.objects.exclude(id=product.id).filter(natura_sku=sku_input).exists():
                                 product.natura_sku = sku_input
                                 updated = True
                         
-                        # 🚀 PROTEÇÃO 2 (CURA AUTOMÁTICA)
                         if name_input != "Produto Novo" and product.name != name_input:
                             product.name = name_input
                             updated = True
@@ -755,7 +807,7 @@ class StockEntryView(APIView):
                     )
                     print(f"Produto criado: {product}")
 
-                # 3. Gerenciar estoque da loja
+                # 3. Gerenciar estoque da loja [1]
                 print(f"Criando/atualizando InventoryItem para store={store}, product={product}")
                 item, created = InventoryItem.objects.get_or_create(
                     store=store,
@@ -775,35 +827,66 @@ class StockEntryView(APIView):
                 item.save()
                 print("InventoryItem salvo")
 
-                # 4. Criar Lote
-                print("Criando InventoryBatch")
-                new_batch = InventoryBatch.objects.create(
-                    item=item,
-                    quantity=data['quantity'],
-                    batch_code=data.get('batch_code', ''),
-                    expiration_date=data.get('expiration_date')
-                )
-                print(f"Batch criado: {new_batch}")
+                # 4. ✅ NOVO: Verificar se já existe lote com mesma validade
+                expiration_date = data.get('expiration_date')
+                existing_batch = None
+                
+                if expiration_date:
+                    existing_batch = item.batches.filter(
+                        expiration_date=expiration_date,
+                        quantity__gt=0
+                    ).first()
+                else:
+                    # Para produtos sem validade, consolidar em um lote único
+                    existing_batch = item.batches.filter(
+                        expiration_date__isnull=True,
+                        quantity__gt=0
+                    ).first()
 
-                # 5. Atualizar Total Consolidado
+                if existing_batch:
+                    # ✅ CONSOLIDAR: Somar quantidade no lote existente
+                    print(f"📦 Consolidando com lote existente {existing_batch.id}")
+                    existing_batch.quantity += data['quantity']
+                    existing_batch.save()
+                    used_batch = existing_batch
+                else:
+                    # Criar novo lote
+                    print("Criando InventoryBatch")
+                    used_batch = InventoryBatch.objects.create(
+                        item=item,
+                        quantity=data['quantity'],
+                        batch_code=data.get('batch_code', ''),
+                        expiration_date=expiration_date
+                    )
+                    print(f"Batch criado: {used_batch}")
+
+                # 5. Atualizar Total Consolidado [1]
                 total_real = item.batches.aggregate(total=Sum('quantity'))['total'] or 0
                 item.total_quantity = total_real
                 item.save()
                 print(f"Total atualizado: {total_real}")
 
-                # 6. Registrar Transação
+                # 6. Registrar Transação [1]
                 print("Criando StockTransaction")
                 StockTransaction.objects.create(
                     store=store,
                     product=product,
-                    batch=new_batch,
+                    batch=used_batch,
                     transaction_type='ENTRADA',
                     quantity=data['quantity'],
                     unit_cost=data.get('cost_price'),
                     unit_price=data.get('sale_price'),
-                    description=f"Entrada Lote {new_batch.batch_code or 'S/N'}"
+                    description=f"Entrada Lote {used_batch.batch_code or 'S/N'}"
                 )
                 print("Transação criada")
+
+                # 7. Adicionar à sessão se existir
+                try:
+                    session = RegistrationSession.objects.filter(store=store, is_active=True).first()
+                    if session:
+                        session.add_product(item, data['quantity'])
+                except:
+                    pass  # Sessão é opcional
 
         except Exception as e:
             print(f"❌ ERRO na transação: {str(e)}")
@@ -811,18 +894,14 @@ class StockEntryView(APIView):
             import traceback
             traceback.print_exc()
             return Response({"error": f"Erro interno: {str(e)}"}, status=500)
-        
-        session = RegistrationSession.objects.filter(store=store, is_active=True).first()
-        if session:
-            session.add_product(item, data['quantity'])
 
         print("✅ Sucesso!")
         return Response({
             "message": "Estoque atualizado com sucesso!", 
             "product": product.name,
-            "new_total": item.total_quantity
+            "new_total": item.total_quantity,
+            "batch_consolidated": existing_batch is not None
         })
-    
 # inventory/views.py - CORRIGIR SaleCheckoutView
 
 class SaleCheckoutView(APIView):
