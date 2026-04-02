@@ -484,8 +484,11 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                 'message': str(e)
             }, status=500)
 
+from django.db import transaction
+from django.db.models import Sum
+
 class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
-    """Extrato de Movimentações da Loja - VERSÃO CORRIGIDA"""
+    """Extrato de Movimentações da Loja - VERSÃO CORRIGIDA FINAL"""
     serializer_class = StockTransactionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
@@ -495,6 +498,9 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
         """Queryset com tratamento de erro robusto"""
         try:
             store = get_current_store(self.request.user)
+            if not store:
+                return StockTransaction.objects.none()
+                
             return StockTransaction.objects.filter(
                 store=store
             ).select_related('product', 'batch').order_by('-created_at')
@@ -502,8 +508,24 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             print(f"❌ Erro no get_queryset StockTransaction: {e}")
             return StockTransaction.objects.none()
 
+    # ✅ CORREÇÃO: Override do perform_create para garantir store_id
+    def perform_create(self, serializer):
+        """Garantir que store_id seja sempre definido"""
+        try:
+            store = get_current_store(self.request.user)
+            print(f"🏪 Definindo store_id: {store.id}")
+            
+            # ✅ FORÇAR store_id na criação
+            serializer.save(store=store)
+            
+            print(f"✅ StockTransaction criada para store {store.id}")
+            
+        except Exception as e:
+            print(f"❌ Erro ao criar StockTransaction: {e}")
+            raise
+
     def apply_fifo_withdrawal(self, inventory_item, quantity_to_withdraw):
-        """✅ NOVO: Aplica baixa FIFO automática nos lotes"""
+        """✅ FIFO automático com correções"""
         print(f"🎯 Aplicando FIFO: {quantity_to_withdraw} unidades de {inventory_item.product.name}")
         
         # Buscar lotes ordenados por validade (FIFO)
@@ -534,10 +556,9 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             batch.quantity -= qty_from_batch
             batch.save()
             
-            # Se lote zerou, pode ser removido
-            if batch.quantity == 0:
-                print(f"🗑️ Lote {batch.id} zerado - removendo")
-                batch.delete()
+            # ✅ CORREÇÃO: Não deletar lotes zerados (manter histórico)
+            # if batch.quantity == 0:
+            #     batch.delete()
             
             batches_used.append({
                 'batch_id': batch.id,
@@ -560,19 +581,30 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
         return batches_used
 
     def create(self, request, *args, **kwargs):
-        """Criar transação com FIFO automático"""
+        """✅ VERSÃO CORRIGIDA: Criar transação com validações robustas"""
         try:
             store = get_current_store(request.user)
+            if not store:
+                return Response({'error': 'Loja não encontrada para o usuário'}, status=400)
+            
             data = request.data.copy()
+            print(f"🔄 Criando transação para store {store.id}: {data}")
             
-            print(f"🔄 Criando transação: {data}")
+            # ✅ VALIDAÇÕES OBRIGATÓRIAS
+            if not data.get('product') and not data.get('product_id'):
+                return Response({'error': 'Campo product ou product_id é obrigatório'}, status=400)
             
-            # ✅ CORREÇÃO: Melhorar busca do produto
+            if not data.get('quantity'):
+                return Response({'error': 'Campo quantity é obrigatório'}, status=400)
+            
+            if not data.get('transaction_type'):
+                return Response({'error': 'Campo transaction_type é obrigatório'}, status=400)
+            
+            # ✅ BUSCA MELHORADA DO PRODUTO
             product_id = data.get('product_id') or data.get('product')
             barcode = data.get('barcode') or data.get('bar_code')
             
             product = None
-            inventory_item = None
             
             # Buscar produto por ID primeiro
             if product_id:
@@ -586,21 +618,21 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             if not product and barcode:
                 try:
                     product = Product.objects.get(bar_code=barcode)
-                    print(f"✅ Produto encontrado por código de barras: {product.name}")
+                    print(f"✅ Produto encontrado por código: {product.name}")
                 except Product.DoesNotExist:
                     print(f"❌ Produto com código {barcode} não encontrado")
             
             if not product:
                 return Response({'error': 'Produto não encontrado no catálogo'}, status=404)
             
-            # ✅ CORREÇÃO: Buscar item no inventário da loja
+            # ✅ BUSCAR ITEM NO INVENTÁRIO
             try:
                 inventory_item = InventoryItem.objects.get(store=store, product=product)
                 print(f"✅ Item encontrado no inventário: {inventory_item.id}")
             except InventoryItem.DoesNotExist:
                 return Response({
                     'error': 'Produto não encontrado no seu estoque',
-                    'message': f'O produto "{product.name}" não está cadastrado no seu estoque. Adicione-o primeiro através da entrada de estoque.'
+                    'message': f'O produto "{product.name}" não está no seu estoque.'
                 }, status=404)
             
             quantity = abs(int(data.get('quantity', 0)))
@@ -608,50 +640,77 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                 return Response({'error': 'Quantidade deve ser maior que zero'}, status=400)
             
             transaction_type = data.get('transaction_type', '').upper()
+            unit_price = float(data.get('unit_price', 0))
             
-            # Verificar se é saída e aplicar FIFO
+            # ✅ VERIFICAR SE É SAÍDA E APLICAR FIFO
             is_exit = transaction_type in ['VENDA', 'USO_PROPRIO', 'PRESENTE', 'BRINDE', 'PERDA', 'SAIDA']
             
             if is_exit:
-                # ✅ APLICAR FIFO AUTOMÁTICO
+                # Verificar estoque suficiente
+                if inventory_item.total_quantity < quantity:
+                    return Response({
+                        'error': 'Estoque insuficiente',
+                        'available': inventory_item.total_quantity,
+                        'requested': quantity
+                    }, status=400)
+                
+                # ✅ APLICAR FIFO COM TRANSAÇÃO ATÔMICA
                 with transaction.atomic():
-                    batches_used = self.apply_fifo_withdrawal(inventory_item, quantity)
-                    
-                    # Criar transações para cada lote usado
-                    transactions_created = []
-                    for batch_info in batches_used:
+                    try:
+                        batches_used = self.apply_fifo_withdrawal(inventory_item, quantity)
+                        
+                        # ✅ CRIAR APENAS UMA TRANSAÇÃO CONSOLIDADA
                         transaction_obj = StockTransaction.objects.create(
                             store=store,
                             product=product,
-                            batch_id=batch_info['batch_id'],
                             transaction_type=transaction_type,
-                            quantity=-batch_info['quantity_used'],  # Negativo para saída
-                            unit_price=data.get('unit_price', 0),
-                            unit_cost=data.get('unit_cost', 0),
-                            description=data.get('description', f"{transaction_type} - {product.name}"),
-                            notes=data.get('notes', '')
+                            quantity=-quantity,  # Negativo para saída
+                            unit_price=unit_price,
+                            unit_cost=inventory_item.cost_price,
+                            description=data.get('description', f"{transaction_type} - {product.name}")
                         )
-                        transactions_created.append(transaction_obj)
-                    
-                    print(f"✅ Criadas {len(transactions_created)} transações FIFO")
-                    
-                    # Retornar a primeira transação como referência
-                    serializer = self.get_serializer(transactions_created[0])
-                    return Response(serializer.data, status=201)
+                        
+                        print(f"✅ Transação FIFO criada: {transaction_obj.id}")
+                        
+                        serializer = self.get_serializer(transaction_obj)
+                        return Response({
+                            'message': 'Baixa FIFO aplicada com sucesso',
+                            'transaction': serializer.data,
+                            'batches_used': batches_used,
+                            'new_total_quantity': inventory_item.total_quantity
+                        }, status=201)
+                        
+                    except ValueError as ve:
+                        return Response({'error': str(ve)}, status=400)
             
             else:
-                # Entrada normal
-                serializer = self.get_serializer(data=data)
-                if serializer.is_valid():
-                    serializer.save(store=store, product=product)
-                    return Response(serializer.data, status=201)
-                else:
-                    return Response(serializer.errors, status=400)
+                # ✅ ENTRADA NORMAL (sem FIFO)
+                transaction_obj = StockTransaction.objects.create(
+                    store=store,
+                    product=product,
+                    transaction_type=transaction_type,
+                    quantity=quantity,  # Positivo para entrada
+                    unit_price=unit_price,
+                    unit_cost=data.get('unit_cost', 0),
+                    description=data.get('description', f"{transaction_type} - {product.name}")
+                )
+                
+                # Atualizar estoque (entrada)
+                inventory_item.total_quantity += quantity
+                inventory_item.save()
+                
+                serializer = self.get_serializer(transaction_obj)
+                return Response(serializer.data, status=201)
             
         except Exception as e:
-            print(f"❌ Erro ao criar transação: {e}")
-            return Response({'error': str(e)}, status=500)
-
+            print(f"❌ Erro geral ao criar transação: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            return Response({
+                'error': 'Erro interno do servidor',
+                'message': str(e)
+            }, status=500)
 # ==========================================
 # 2. OPERAÇÕES COMPLEXAS (ENTRADA E SAÍDA)
 # ==========================================
