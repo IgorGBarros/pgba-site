@@ -118,65 +118,129 @@ export default function WithdrawProduct() {
     setShowScanner(true);
   };
 
-  const handleBarcodeScan = async (barcode: string) => {
-    if (!barcode.trim()) return;
+const handleBarcodeScan = async (barcode: string) => {
+  if (!barcode.trim()) return;
+  
+  console.log(`🔍 Buscando produto por código: ${barcode}`);
+  
+  setShowScanner(false);
+  setNotFound(false);
+  setData((p) => ({ ...p, barcode }));
+  
+  try {
+    // ✅ CORREÇÃO: Tentar múltiplas estratégias de busca
+    let item = null;
     
-    setShowScanner(false);
-    setNotFound(false);
-    setData((p) => ({ ...p, barcode }));
-    
+    // Estratégia 1: Busca direta por código
     try {
-      const item = await inventoryApi.getByBarcode(barcode);
-      if (!item) { setNotFound(true); return; }
-      
-      const qty = item.total_quantity ?? item.quantity ?? 0;
-      if (qty <= 0) {
-          toast({ title: "Produto esgotado", description: "Você não tem estoque deste item.", variant: "destructive"});
-          setNotFound(true);
-          return;
-      }
-
-      let batches: InventoryBatch[] = [];
-      try {
-        batches = await batchApi.listByItem(item.id);
-        batches = batches.filter((b) => b.quantity > 0);
-      } catch { /* fallback */ }
-      
-      // ✅ CORREÇÃO: Ordenar lotes por FIFO (validade primeiro)
-      const sortedBatches = batches.sort((a, b) => {
-        if (!a.expiration_date) return 1;
-        if (!b.expiration_date) return -1;
-        return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
-      });
-
-      const batchCost = sortedBatches.length > 0
-        ? sortedBatches[0].cost_price // ✅ Usar o lote mais antigo para custo
-        : item.cost_price;
-
-      setData((p) => ({
-        ...p,
-        product_id: String(item.product?.id || item.id), 
-        inventory_id: item.id,
-        product_name: item.product?.name || item.product_name || "Produto sem nome",
-        category: item.product?.category || item.category || "Geral",
-        current_quantity: qty,
-        cost_price: batchCost,
-        sale_price: item.sale_price || item.product?.official_price || null,
-        batches: sortedBatches, // ✅ Usar lotes já ordenados por FIFO
-        selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null, // ✅ Selecionar automaticamente o mais antigo
-      }));
-
-      if (batches.length > 1) {
-        setShowBatchModal(true);
-      } else {
-        setStep(1);
-      }
-      
-      toast({ title: "Produto encontrado!", description: `${item.product?.name || item.product_name || "Produto"} — ${qty} un.` });
-    } catch {
-      setNotFound(true);
+      item = await inventoryApi.getByBarcode(barcode);
+      console.log('✅ Produto encontrado via getByBarcode:', item);
+    } catch (error) {
+      console.log('⚠️ getByBarcode falhou, tentando busca na lista...');
     }
-  };
+    
+    // Estratégia 2: Buscar na lista completa se não encontrou
+    if (!item) {
+      const allItems = await inventoryApi.list();
+      item = allItems.find(i => 
+        i.product?.bar_code === barcode || 
+        i.barcode === barcode ||
+        String(i.product?.bar_code).trim() === barcode.trim() ||
+        String(i.barcode).trim() === barcode.trim()
+      );
+      console.log('🔍 Busca na lista:', item ? 'Encontrado' : 'Não encontrado');
+    }
+    
+    if (!item) { 
+      console.log('❌ Produto não encontrado em nenhuma estratégia');
+      setNotFound(true); 
+      return; 
+    }
+    
+    const qty = item.total_quantity ?? item.quantity ?? 0;
+    if (qty <= 0) {
+      toast({ 
+        title: "Produto esgotado", 
+        description: "Você não tem estoque deste item.", 
+        variant: "destructive"
+      });
+      setNotFound(true);
+      return;
+    }
+
+    // ✅ CORREÇÃO: Buscar lotes com tratamento de erro
+    let batches: InventoryBatch[] = [];
+    try {
+      console.log(`📦 Buscando lotes para item ${item.id}...`);
+      batches = await batchApi.listByItem(item.id);
+      batches = batches.filter((b) => b.quantity > 0);
+      console.log(`📦 Encontrados ${batches.length} lotes ativos`);
+    } catch (error) {
+      console.warn('⚠️ Erro ao buscar lotes, continuando sem lotes:', error);
+      batches = [];
+    }
+    
+    // ✅ CORREÇÃO: Ordenar lotes por FIFO (validade primeiro)
+    const sortedBatches = batches.sort((a, b) => {
+      if (!a.expiration_date) return 1;
+      if (!b.expiration_date) return -1;
+      return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
+    });
+
+    // ✅ CORREÇÃO: Usar custo do lote mais antigo (FIFO)
+    const batchCost = sortedBatches.length > 0
+      ? sortedBatches[0].cost_price
+      : item.cost_price;
+
+    // ✅ CORREÇÃO: Garantir que product_id seja string
+    const productId = String(item.product?.id || item.id || '');
+    
+    if (!productId) {
+      console.error('❌ Não foi possível determinar product_id');
+      setNotFound(true);
+      return;
+    }
+
+    console.log('✅ Configurando dados do produto:', {
+      product_id: productId,
+      inventory_id: item.id,
+      product_name: item.product?.name || item.product_name,
+      current_quantity: qty,
+      batches_count: sortedBatches.length
+    });
+
+    setData((p) => ({
+      ...p,
+      product_id: productId,
+      inventory_id: item.id,
+      product_name: item.product?.name || item.product_name || "Produto sem nome",
+      category: item.product?.category || item.category || "Geral",
+      current_quantity: qty,
+      cost_price: batchCost,
+      sale_price: item.sale_price || item.product?.official_price || null,
+      batches: sortedBatches,
+      selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null,
+    }));
+
+    // ✅ Decidir próximo passo
+    if (sortedBatches.length > 1) {
+      console.log('📦 Múltiplos lotes encontrados, abrindo modal de seleção');
+      setShowBatchModal(true);
+    } else {
+      console.log('➡️ Avançando para próximo passo');
+      setStep(1);
+    }
+    
+    toast({ 
+      title: "Produto encontrado!", 
+      description: `${item.product?.name || item.product_name || "Produto"} — ${qty} un.` 
+    });
+
+  } catch (error) {
+    console.error('❌ Erro geral na busca:', error);
+    setNotFound(true);
+  }
+};
 
   const handleBatchSelect = (batch: InventoryBatch) => {
     setShowBatchModal(false);
@@ -212,48 +276,67 @@ export default function WithdrawProduct() {
                     new Date(data.selected_batch.expiration_date) < new Date();
 
   // ✅ FUNÇÃO PRINCIPAL CORRIGIDA: Usar FIFO automático
-  const handleSave = async () => {
-    if (!user) return;
-    setLoading(true);
+// ✅ FUNÇÃO PRINCIPAL CORRIGIDA: Usar FIFO automático
+const handleSave = async () => {
+  if (!user) return;
+  setLoading(true);
+  
+  try {
+    console.log('🎯 Iniciando baixa com dados:', {
+      product_id: data.product_id,
+      quantity: data.withdraw_qty,
+      transaction_type: data.sale_type,
+      has_batches: data.batches.length > 0,
+      selected_batch: data.selected_batch?.id
+    });
     
-    try {
-      console.log('🎯 Iniciando baixa FIFO automática...');
-      
-      // ✅ USAR FIFO AUTOMÁTICO EM VEZ DE DUAS OPERAÇÕES SEPARADAS
-      const result = await fifoApi.applyWithdrawal({
-        product_id: data.product_id,
-        quantity: data.withdraw_qty,
-        transaction_type: data.sale_type.toUpperCase(),
-        unit_price: currentSaleType.hasRevenue ? (data.sale_price || 0) : 0,
-        notes: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
-        batch_id: data.selected_batch?.id || null // ✅ Enviar lote selecionado se houver
-      });
-      
-      console.log('✅ Baixa FIFO realizada:', result);
-      
-      toast({
-        title: "Baixa realizada!",
-        description: `${result.quantity_withdrawn || data.withdraw_qty} unidades de ${result.product_name || data.product_name}. Estoque atual: ${result.new_total_quantity}`,
-      });
-      
-      setIsSuccess(true);
-      
-      setTimeout(() => {
-        navigate("/");
-      }, 2000);
-      
-    } catch (err: any) {
-      console.error('❌ Erro na baixa FIFO:', err);
-      toast({ 
-        title: "Erro", 
-        description: err.message || "Erro ao processar baixa", 
-        variant: "destructive" 
-      });
-    } finally {
-      setLoading(false);
+    // ✅ VALIDAÇÕES ANTES DE ENVIAR
+    if (!data.product_id) {
+      throw new Error('ID do produto não encontrado');
     }
-  };
+    
+    if (data.withdraw_qty <= 0) {
+      throw new Error('Quantidade deve ser maior que zero');
+    }
+    
+    if (data.withdraw_qty > data.current_quantity) {
+      throw new Error('Quantidade maior que o estoque disponível');
+    }
 
+    // ✅ USAR FIFO AUTOMÁTICO
+    const result = await fifoApi.applyWithdrawal({
+      product_id: data.product_id,
+      quantity: data.withdraw_qty,
+      transaction_type: data.sale_type.toUpperCase(),
+      unit_price: currentSaleType.hasRevenue ? (data.sale_price || 0) : 0,
+      notes: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
+      batch_id: data.selected_batch?.id ? String(data.selected_batch.id) : null
+    });
+    
+    console.log('✅ Baixa FIFO realizada:', result);
+    
+    toast({
+      title: "Baixa realizada!",
+      description: `${result.quantity_withdrawn || data.withdraw_qty} unidades de ${result.product_name || data.product_name}. Estoque atual: ${result.new_total_quantity}`,
+    });
+    
+    setIsSuccess(true);
+    
+    setTimeout(() => {
+      navigate("/");
+    }, 2000);
+    
+  } catch (err: any) {
+    console.error('❌ Erro na baixa FIFO:', err);
+    toast({ 
+      title: "Erro", 
+      description: err.message || "Erro ao processar baixa", 
+      variant: "destructive" 
+    });
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
