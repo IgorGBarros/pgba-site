@@ -34,12 +34,12 @@ else:
 DB_NAME = os.getenv("DB_NAME", "natura_inventory")
 DB_USER = os.getenv("DB_USER", "natura_admin")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "senha_segura_123")
-DB_AI_USER = os.getenv("DB_AI_USER", os.getenv("DB_USER", "natura_admin"))
-DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", os.getenv("DB_PASSWORD", "senha_segura_123"))
+DB_AI_USER = os.getenv("DB_AI_USER", DB_USER)  # ✅ Agora DB_USER sempre existe
+DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", DB_PASSWORD)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
-# ✅ CORREÇÃO: Configuração de banco única
+# ✅ Configuração de banco única
 database_url = os.getenv("DATABASE_URL")
 if database_url:
     import dj_database_url
@@ -52,7 +52,7 @@ if database_url:
     }
     print("✅ PostgreSQL configurado via DATABASE_URL")
 else:
-    if all([DB_NAME, DB_USER, DB_PASSWORD]) and not DEBUG:
+    if all([DB_NAME, DB_USER, DB_PASSWORD]):
         DATABASES = {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
@@ -72,8 +72,6 @@ else:
             }
         }
         print("✅ SQLite configurado para desenvolvimento")
-
-DATABASE_URL = f"postgresql+psycopg2://{DB_AI_USER}:{DB_AI_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-+rc4szhd0d(k@((%vp6og@k_p)y5x*$9_=214d4+p@e3^o4gj7")
 
@@ -96,7 +94,7 @@ INSTALLED_APPS = [
     # ✅ Libs essenciais na ordem correta
     'corsheaders',
     'rest_framework',
-    'rest_framework_simplejwt',
+    'rest_framework_simplejwt',  # ✅ ADICIONADO
     'django_filters',
     
     # Apps do projeto
@@ -134,7 +132,7 @@ TEMPLATES = [
     },
 ]
 
-# ✅ CORS corrigido para Firebase
+# ✅ CORS corrigido
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -156,7 +154,6 @@ CORS_ALLOW_ALL_ORIGINS = False
 # ✅ CORREÇÃO: Configuração para Firebase popup
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
-# ✅ CSRF para produção
 CSRF_TRUSTED_ORIGINS = [
     "https://gestao-estoque-one.vercel.app",
     "https://gestao-estoque-k5vy.onrender.com",
