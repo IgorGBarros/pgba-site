@@ -192,6 +192,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 
+# inventory/views.py - IMPLEMENTAR ESTAS CORREÇÕES
+
 class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
     """Estoque Privado da Consultora - VERSÃO CORRIGIDA"""
     serializer_class = InventoryItemSerializer
@@ -209,9 +211,9 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
                     'batches', 
                     queryset=InventoryBatch.objects.filter(quantity__gt=0).order_by('expiration_date', 'id')
                 )
-            )
+            ).order_by('-updated_at')
         except Exception as e:
-            print(f"❌ Erro no get_queryset: {e}")
+            print(f"❌ Erro no get_queryset Inventory: {e}")
             return InventoryItem.objects.none()
 
     def consolidate_batches_by_expiry(self, inventory_item):
@@ -565,20 +567,41 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             
             print(f"🔄 Criando transação: {data}")
             
-            # Buscar produto e item do inventário
+            # ✅ CORREÇÃO: Melhorar busca do produto
             product_id = data.get('product_id') or data.get('product')
-            if not product_id:
-                return Response({'error': 'product_id é obrigatório'}, status=400)
+            barcode = data.get('barcode') or data.get('bar_code')
             
-            try:
-                product = Product.objects.get(id=product_id)
-            except Product.DoesNotExist:
-                return Response({'error': 'Produto não encontrado'}, status=404)
+            product = None
+            inventory_item = None
             
+            # Buscar produto por ID primeiro
+            if product_id:
+                try:
+                    product = Product.objects.get(id=product_id)
+                    print(f"✅ Produto encontrado por ID: {product.name}")
+                except Product.DoesNotExist:
+                    print(f"❌ Produto com ID {product_id} não encontrado")
+            
+            # Se não encontrou por ID, buscar por código de barras
+            if not product and barcode:
+                try:
+                    product = Product.objects.get(bar_code=barcode)
+                    print(f"✅ Produto encontrado por código de barras: {product.name}")
+                except Product.DoesNotExist:
+                    print(f"❌ Produto com código {barcode} não encontrado")
+            
+            if not product:
+                return Response({'error': 'Produto não encontrado no catálogo'}, status=404)
+            
+            # ✅ CORREÇÃO: Buscar item no inventário da loja
             try:
                 inventory_item = InventoryItem.objects.get(store=store, product=product)
+                print(f"✅ Item encontrado no inventário: {inventory_item.id}")
             except InventoryItem.DoesNotExist:
-                return Response({'error': 'Produto não está no estoque'}, status=404)
+                return Response({
+                    'error': 'Produto não encontrado no seu estoque',
+                    'message': f'O produto "{product.name}" não está cadastrado no seu estoque. Adicione-o primeiro através da entrada de estoque.'
+                }, status=404)
             
             quantity = abs(int(data.get('quantity', 0)))
             if quantity <= 0:
@@ -587,7 +610,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             transaction_type = data.get('transaction_type', '').upper()
             
             # Verificar se é saída e aplicar FIFO
-            is_exit = transaction_type in ['VENDA', 'SAIDA'] or quantity < 0
+            is_exit = transaction_type in ['VENDA', 'USO_PROPRIO', 'PRESENTE', 'BRINDE', 'PERDA', 'SAIDA']
             
             if is_exit:
                 # ✅ APLICAR FIFO AUTOMÁTICO
@@ -603,17 +626,18 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                             batch_id=batch_info['batch_id'],
                             transaction_type=transaction_type,
                             quantity=-batch_info['quantity_used'],  # Negativo para saída
-                            unit_cost=inventory_item.cost_price,
                             unit_price=data.get('unit_price', 0),
-                            description=f"Saída FIFO - Lote vencimento {batch_info['expiration_date']}",
+                            unit_cost=data.get('unit_cost', 0),
+                            description=data.get('description', f"{transaction_type} - {product.name}"),
                             notes=data.get('notes', '')
                         )
                         transactions_created.append(transaction_obj)
                     
-                    # Retornar a primeira transação
-                    if transactions_created:
-                        serializer = self.get_serializer(transactions_created[0])
-                        return Response(serializer.data, status=201)
+                    print(f"✅ Criadas {len(transactions_created)} transações FIFO")
+                    
+                    # Retornar a primeira transação como referência
+                    serializer = self.get_serializer(transactions_created[0])
+                    return Response(serializer.data, status=201)
             
             else:
                 # Entrada normal
@@ -626,88 +650,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             
         except Exception as e:
             print(f"❌ Erro ao criar transação: {e}")
-            import traceback
-            traceback.print_exc()
             return Response({'error': str(e)}, status=500)
-
-    def perform_create(self, serializer):
-        """Garantir que criação sempre vincula à loja correta"""
-        try:
-            store = get_current_store(self.request.user)
-            serializer.save(store=store)
-            print(f"✅ Transação criada para a loja {store.id}")
-        except Exception as e:
-            print(f"❌ Erro ao criar transação: {e}")
-            raise
-
-    def list(self, request, *args, **kwargs):
-        """Lista com tratamento de erro robusto"""
-        try:
-            print("📈 Iniciando listagem das transações...")
-            
-            queryset = self.filter_queryset(self.get_queryset())
-            
-            if not queryset.exists():
-                print("📈 Nenhuma transação encontrada")
-                return Response([])
-            
-            print(f"📈 Encontradas {queryset.count()} transações")
-            
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
-            
-            serializer = self.get_serializer(queryset, many=True)
-            data = serializer.data
-            
-            print(f"✅ Transações serializadas: {len(data)} itens")
-            return Response(data)
-            
-        except Exception as e:
-            print(f"❌ Erro crítico no list das transações: {e}")
-            import traceback
-            traceback.print_exc()
-            
-            return Response({
-                'error': 'Erro ao carregar transações',
-                'message': str(e),
-                'fallback': []
-            }, status=200)
-
-    def retrieve(self, request, *args, **kwargs):
-        """Detalhes com tratamento de erro"""
-        try:
-            print(f"🔍 Buscando detalhes da transação {kwargs.get('pk')}")
-            
-            instance = self.get_object()
-            serializer = self.get_serializer(instance)
-            
-            print(f"✅ Detalhes da transação {instance.id} carregados")
-            return Response(serializer.data)
-            
-        except Exception as e:
-            print(f"❌ Erro no retrieve da transação {kwargs.get('pk')}: {e}")
-            return Response({
-                'error': 'Erro ao carregar detalhes da transação',
-                'message': str(e)
-            }, status=500)
-
-    def destroy(self, request, *args, **kwargs):
-        """Override do destroy com logs"""
-        try:
-            instance = self.get_object()
-            print(f"🗑️ Removendo transação {instance.id}")
-            
-            self.perform_destroy(instance)
-            return Response(status=status.HTTP_204_NO_CONTENT)
-            
-        except Exception as e:
-            print(f"❌ Erro ao remover transação: {e}")
-            return Response({
-                'error': 'Erro ao remover transação',
-                'message': str(e)
-            }, status=500)
 
 # ==========================================
 # 2. OPERAÇÕES COMPLEXAS (ENTRADA E SAÍDA)
