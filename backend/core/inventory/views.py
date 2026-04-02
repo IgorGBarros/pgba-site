@@ -5,7 +5,7 @@ from rest_framework import viewsets,status, permissions, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from django.db.models import Q, Sum, F
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -49,32 +49,26 @@ User = get_user_model()
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
 class CustomUserCreateView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
-    permission_classes = [AllowAny]  # ✅ Permite GET sem login
+    permission_classes = [AllowAny]
+
 
 class FirebaseLoginView(APIView):
     permission_classes = [AllowAny]
-
+    
     def post(self, request):
         firebase_token = request.data.get('token')
-        
         if not firebase_token:
             return Response({'error': 'Token ausente'}, status=status.HTTP_400_BAD_REQUEST)
-            
+        
         try:
-            # 1. Usa o método Elegante do seu Manager
             user = CustomUser.objects.create_user_with_firebase(firebase_token)
-            
-            # 2. Inicia sessão tradicional do Django (Opcional, mas estava no seu código)
             login(request, user)  
-            
-            # 3. Gera os Tokens JWT para o Frontend moderno (React/Vite) usar no Bearer
             refresh = RefreshToken.for_user(user)
             
-            # Retorna o payload combinando a simplicidade do seu código antigo
-            # com a necessidade de JWT do projeto atual.
             return Response({
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
@@ -82,9 +76,7 @@ class FirebaseLoginView(APIView):
                 'name': getattr(user, 'name', user.email),
                 'is_authenticated': True
             }, status=status.HTTP_200_OK)
-            
         except Exception as e:
-            # Mantive a impressão para debug no Render, facilita muito a vida!
             print(f"🔥 ERRO FIREBASE VIEW: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -109,15 +101,10 @@ from .scraper import search_google_shopping
 # 0. HELPERS & MIXINS MULTI-TENANT
 # ==========================================
 
-# inventory/views.py - MELHORAR a função get_current_store
-
-# inventory/views.py - CORRIGIR função get_current_store
-
-# inventory/views.py - CORRIGIR função get_current_store
 
 def get_current_store(user):
     """
-    Versão corrigida com logs detalhados e fallback
+    ✅ VERSÃO CORRIGIDA: Usa relacionamento OneToOne consistente
     """
     try:
         print(f"🔍 get_current_store para usuário: {user.id} ({user.email})")
@@ -128,14 +115,22 @@ def get_current_store(user):
         
         from .models import Store
         
-        # Buscar loja por owner_id
-        stores = Store.objects.filter(owner_id=user.id)
+        # ✅ ESTRATÉGIA 1: Tentar via relacionamento OneToOne
+        try:
+            store = user.store
+            if store:
+                print(f"✅ Loja encontrada via user.store: {store.id} - {store.name}")
+                return store
+        except Store.DoesNotExist:
+            print("⚠️ Não encontrou via user.store")
+        except AttributeError:
+            print("⚠️ Relacionamento user.store não existe")
         
-        print(f"📊 Encontradas {stores.count()} lojas para owner_id={user.id}")
+        # ✅ ESTRATÉGIA 2: Buscar diretamente por owner
+        store = Store.objects.filter(owner=user).first()
         
-        if stores.exists():
-            store = stores.first()
-            print(f"✅ Loja encontrada: {store.id} - {store.name}")
+        if store:
+            print(f"✅ Loja encontrada via Store.objects: {store.id} - {store.name}")
             return store
         
         print(f"❌ Nenhuma loja encontrada para usuário {user.id}")
@@ -147,8 +142,12 @@ def get_current_store(user):
         traceback.print_exc()
         return None
 
+# inventory/views.py - CORRIGIR a função
+
 def ensure_user_has_store(user):
-    """Garantir que o usuário tenha uma loja"""
+    """
+    ✅ VERSÃO CORRIGIDA: Garantir que o usuário tenha uma loja
+    """
     try:
         store = get_current_store(user)
         
@@ -156,40 +155,59 @@ def ensure_user_has_store(user):
             print(f"🏪 Criando loja para usuário {user.email}")
             
             from .models import Store
-            store = Store.objects.create(
-                owner=user,
-                name=f"Loja de {user.email}",
-                # Adicionar outros campos obrigatórios se necessário
-            )
+            from django.utils.text import slugify
             
-            print(f"✅ Loja criada: {store.id} - {store.name}")
+            # ✅ CORREÇÃO: Criar loja com campos corretos
+            try:
+                store = Store.objects.create(
+                    owner=user,
+                    name=f"Loja de {user.email}",
+                    slug=slugify(f"loja-{user.id}"),
+                    storefront_enabled=True,
+                    plan="free"
+                )
+                print(f"✅ Loja criada: {store.id} - {store.name}")
+            except Exception as create_error:
+                print(f"❌ Erro ao criar loja: {create_error}")
+                
+                # ✅ FALLBACK: Tentar criar com campos mínimos
+                try:
+                    store = Store.objects.create(
+                        owner=user,
+                        name=f"Loja de {user.email}"
+                    )
+                    print(f"✅ Loja criada via fallback: {store.id}")
+                except Exception as fallback_error:
+                    print(f"❌ Erro no fallback: {fallback_error}")
+                    raise
         
         return store
-        
+    
     except Exception as e:
-        print(f"❌ Erro ao criar loja: {e}")
+        print(f"❌ Erro ao garantir loja: {e}")
+        import traceback
+        traceback.print_exc()
         raise
-
 class TenantModelMixin:
     """
     Mixin para ViewSets. Filtra automaticamente os dados pela loja do usuário.
     """
     permission_classes = [IsAuthenticated]
-
+    
     def get_store(self):
-        return get_current_store(self.request.user)
-
+        return ensure_user_has_store(self.request.user)
+    
     def get_queryset(self):
-        # ✅ ADICIONAR tratamento de erro
         try:
-            store = get_current_store(self.request.user)
+            store = ensure_user_has_store(self.request.user)
             return InventoryItem.objects.filter(store=store).select_related('product')
         except Exception as e:
             print(f"❌ Erro no get_queryset: {e}")
             return InventoryItem.objects.none()
-
+    
     def perform_create(self, serializer):
         serializer.save(store=self.get_store())
+
 
 # ==========================================
 # 1. VIEWSETS BASE (CRUD)
@@ -1302,73 +1320,73 @@ def feature_gates_view(request):
 @permission_classes([IsAuthenticated])
 def profile_view(request):
     """
-    Retorna ou atualiza as informações da loja (perfil da consultora).
+    ✅ VERSÃO CORRIGIDA: Retorna ou atualiza as informações da loja
     """
-    # Cada usuário tem uma Store vinculada; cria se não existir
-    store, _ = Store.objects.get_or_create(user=request.user)
-
-    if request.method == "GET":
-        serializer = ProfileSerializer(store)
-        return Response(serializer.data)
-
-    if request.method == "PATCH":
-        serializer = ProfileSerializer(store, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
+    try:
+        # ✅ CORREÇÃO: Usar ensure_user_has_store em vez de get_or_create
+        store = ensure_user_has_store(request.user)
+        
+        if request.method == "GET":
+            serializer = ProfileSerializer(store)
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-
-from rest_framework.permissions import IsAdminUser
+            
+        if request.method == "PATCH":
+            serializer = ProfileSerializer(store, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        print(f"❌ Erro no profile_view: {e}")
+        return Response({
+            'error': 'Erro ao carregar perfil',
+            'message': str(e)
+        }, status=500)
 
 # ==========================================
 # 5. PAINEL ADMIN (Gestão de Assinaturas)
 # ==========================================
 
-class AdminUserListView(APIView):
-    """Lista todos os usuários e dados de suas lojas para o painel admin."""
-    permission_classes = [IsAuthenticated, IsAdminUser] # 🔒 Apenas Administradores!
-
-    def get(self, request):
-        users = CustomUser.objects.select_related('store').all()
-        data = []
-        for u in users:
-            store = getattr(u, 'store', None)
-            
-            # Conta quantos produtos diferentes essa loja tem em estoque
-            product_count = InventoryItem.objects.filter(store=store).count() if store else 0
-            
-            data.append({
-                "id": u.id,
-                "email": u.email,
-                "display_name": getattr(store, 'name', u.name),
-                "plan": getattr(store, 'plan', 'free'),
-                "store_slug": getattr(store, 'slug', None),
-                "storefront_enabled": getattr(store, 'storefront_enabled', False),
-                "whatsapp_number": getattr(store, 'whatsapp', None),
-                "product_count": product_count,
-                "created_at": getattr(store, 'created_at', u.last_login),
-                "last_sign_in": u.last_login,
-                "subscription_started_at": getattr(store, 'subscription_started_at', None),
-                "subscription_expires_at": getattr(store, 'subscription_expires_at', None),
-                "payment_provider": getattr(store, 'payment_provider', None),
-                "payment_external_id": getattr(store, 'payment_external_id', None),
-            })
-        return Response(data)
 
 class AdminUpdatePlanView(APIView):
-    """Muda o plano de um usuário rapidamente (Toggle Free/Pro)."""
+    """✅ CORRIGIDO: Muda o plano de um usuário rapidamente"""
     permission_classes = [IsAuthenticated, IsAdminUser]
-
+    
     def patch(self, request, pk):
         try:
-            store = Store.objects.get(user__id=pk)
+            # ✅ CORREÇÃO: Usar owner em vez de user
+            store = Store.objects.get(owner__id=pk)
             new_plan = request.data.get("plan")
+            
             if new_plan in ["free", "pro"]:
                 store.plan = new_plan
                 store.save()
                 return Response({"message": f"Plano alterado para {new_plan}", "plan": store.plan})
             return Response({"error": "Plano inválido"}, status=400)
+        except Store.DoesNotExist:
+            return Response({"error": "Loja não encontrada para este usuário"}, status=404)
+
+class AdminUpdateSubscriptionView(APIView):
+    """✅ CORRIGIDO: Salva os dados completos de uma assinatura"""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def patch(self, request, pk):
+        try:
+            # ✅ CORREÇÃO: Usar owner em vez de user
+            store = Store.objects.get(owner__id=pk)
+            data = request.data
+            
+            store.payment_provider = data.get("provider", store.payment_provider)
+            store.payment_external_id = data.get("external_id", store.payment_external_id)
+            store.subscription_started_at = data.get("started_at", store.subscription_started_at)
+            store.subscription_expires_at = data.get("expires_at", store.subscription_expires_at)
+            
+            if data.get("plan"):
+                store.plan = data.get("plan")
+            
+            store.save()
+            return Response({"message": "Assinatura e plano atualizados com sucesso!"})
         except Store.DoesNotExist:
             return Response({"error": "Loja não encontrada para este usuário"}, status=404)
 
@@ -2007,3 +2025,44 @@ def associate_user_store(request):
     except Exception as e:
         print(f"❌ Erro ao associar loja: {e}")
         return Response({'error': str(e)}, status=500)
+    
+    # inventory/views.py - ADICIONAR função de debug
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def fix_user_store(request):
+    """✅ CORRIGIDO: Corrigir associação usuário-loja"""
+    try:
+        user = request.user
+        
+        # Verificar se já tem loja
+        from .models import Store
+        existing_stores = Store.objects.filter(owner=user)
+        
+        if existing_stores.exists():
+            store = existing_stores.first()
+            return Response({
+                'message': 'Usuário já tem loja',
+                'store_id': store.id,
+                'store_name': store.name
+            })
+        
+        # Criar nova loja
+        store = Store.objects.create(
+            owner=user,
+            name=f"Loja de {user.email}",
+            storefront_enabled=True,
+            plan="free"
+        )
+        
+        return Response({
+            'message': 'Loja criada com sucesso',
+            'store_id': store.id,
+            'store_name': store.name
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': str(e),
+            'message': 'Erro ao corrigir loja'
+        }, status=500)

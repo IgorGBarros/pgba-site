@@ -64,23 +64,19 @@ class CrawlerLog(models.Model):
 # ==========================================
 
 class Store(models.Model):
-    """
-    Representa o negócio da Consultora.
-    """
-    user = models.OneToOneField(
-                settings.AUTH_USER_MODEL, 
-                on_delete=models.CASCADE, 
-                related_name="store",
-                null=True, 
-                blank=True
-            )
-        
-    name = models.CharField(max_length=100, default="Minha Loja Natura")
-    slug = models.SlugField(unique=True, blank=True)
-    whatsapp = models.CharField(max_length=20, blank=True, null=True)
+    """Loja da consultora"""
+    name = models.CharField(max_length=255)
+    owner = models.OneToOneField(  # ✅ ADICIONAR este campo se não existir
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='store'
+    )
+    slug = models.SlugField(max_length=100, unique=True, blank=True)
+    whatsapp = models.CharField(max_length=20, blank=True)
     storefront_enabled = models.BooleanField(default=False)
-
+    plan = models.CharField(max_length=20, default='free')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     PLAN_CHOICES = [
         ('free', 'Free'),
@@ -98,9 +94,13 @@ class Store(models.Model):
     subscription_started_at = models.DateTimeField(blank=True, null=True)
     subscription_expires_at = models.DateTimeField(blank=True, null=True)
     def __str__(self):
-            # Se for usar CustomUser que não tem username nativo, proteja a chamada
-            username = getattr(self.user, 'name', getattr(self.user, 'email', 'Desconhecido')) if self.user else "Sem Usuário"
-            return f"Loja de {username}"
+        return f"{self.name} ({self.owner.email if self.owner else 'Sem dono'})"
+
+    def save(self, *args, **kwargs):
+        if not self.slug and self.name:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
 class InventoryItem(models.Model):
     """
