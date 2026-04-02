@@ -18,6 +18,9 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
+# ✅ CORREÇÃO: Definir DEBUG primeiro
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+
 # Carrega chave Fernet (mantendo sua lógica existente)
 env_key_path = BASE_DIR / ".env.key"
 fernet_key = None
@@ -34,13 +37,14 @@ else:
     f = None
 
 # --------------------------------------------------------------------------
-# ✅ CORREÇÃO: Banco de Dados com fallbacks seguros
+# ✅ CORREÇÃO: Variáveis de banco com fallbacks seguros
 # --------------------------------------------------------------------------
 DB_NAME = os.getenv("DB_NAME", "natura_inventory")
 DB_USER = os.getenv("DB_USER", "natura_admin")  
 DB_PASSWORD = os.getenv("DB_PASSWORD", "senha_segura_123")
-DB_AI_USER = os.getenv("DB_AI_USER", DB_USER)
-DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", DB_PASSWORD)
+# ✅ CORREÇÃO: Usar fallbacks seguros em vez de variáveis que podem ser None
+DB_AI_USER = os.getenv("DB_AI_USER", os.getenv("DB_USER", "natura_admin"))
+DB_AI_PASSWORD = os.getenv("DB_AI_PASSWORD", os.getenv("DB_PASSWORD", "senha_segura_123"))
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
@@ -55,9 +59,10 @@ if database_url:
             conn_health_checks=True,
         )
     }
+    print(f"✅ PostgreSQL configurado via DATABASE_URL")
 else:
     # Desenvolvimento: PostgreSQL local ou SQLite
-    if all([DB_NAME, DB_USER, DB_PASSWORD]):
+    if all([DB_NAME, DB_USER, DB_PASSWORD]) and not DEBUG:
         DATABASES = {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
@@ -68,16 +73,27 @@ else:
                 "PORT": DB_PORT,
             }
         }
- 
+        print(f"✅ PostgreSQL local configurado: {DB_NAME}")
+    else:
+        # ✅ CORREÇÃO: Fallback para SQLite se PostgreSQL não disponível
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+        print("✅ SQLite configurado para desenvolvimento")
 
 # ✅ DATABASE_URL para IA (LangChain/SQLAlchemy)
-DATABASE_URL = f"postgresql+psycopg2://{quote_plus(DB_AI_USER)}:{quote_plus(DB_AI_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+if database_url or all([DB_NAME, DB_USER, DB_PASSWORD]):
+    DATABASE_URL = f"postgresql+psycopg2://{quote_plus(DB_AI_USER)}:{quote_plus(DB_AI_PASSWORD)}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+else:
+    DATABASE_URL = f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
 
 # --------------------------------------------------------------------------
 # Segurança / Hosts
 # --------------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-+rc4szhd0d(k@((%vp6og@k_p)y5x*$9_=214d4+p@e3^o4gj7")
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 # ✅ ALLOWED_HOSTS dinâmico para vitrine
 def get_allowed_hosts():
@@ -106,6 +122,8 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
 }
 
 # --------------------------------------------------------------------------
@@ -118,18 +136,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Libs adicionais
-    'django_filters',
+    
+    # ✅ Libs essenciais
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
+    'django_filters',
+    
     # Apps do projeto
     'inventory',
     'ai',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # ✅ CORS primeiro
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -333,6 +353,11 @@ if DEBUG:
 # User model
 # --------------------------------------------------------------------------
 AUTH_USER_MODEL = "inventory.CustomUser"
+
+# --------------------------------------------------------------------------
+# ✅ CORREÇÃO: DEFAULT_AUTO_FIELD obrigatório
+# --------------------------------------------------------------------------
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --------------------------------------------------------------------------
 # Validação de senhas
