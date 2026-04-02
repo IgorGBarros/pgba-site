@@ -30,18 +30,12 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     ...(options.headers as Record<string, string>),
   };
   
-if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   
-  // ✅ CORREÇÃO: NÃO adicionar /api/ se já estiver no endpoint
-  let fullUrl: string;
-  if (endpoint.startsWith('/api/')) {
-    // Se endpoint já tem /api/, usar direto com base URL
-    fullUrl = `${API_BASE_URL}${endpoint}`;
-  } else {
-    // Se não tem /api/, adicionar
-    fullUrl = `${API_BASE_URL}/api${endpoint}`;
-  }
-    console.log(`🔄 API Request: ${options.method || 'GET'} ${fullUrl}`);
+  // ✅ CORREÇÃO: Adicionar /api/ aqui já que foi removido do services/api.ts
+  const fullUrl = `${API_BASE_URL}/api${endpoint}`;
+  console.log(`🔄 API Request: ${options.method || 'GET'} ${fullUrl}`);
+  
   try {
     const response = await fetch(fullUrl, { ...options, headers });
     
