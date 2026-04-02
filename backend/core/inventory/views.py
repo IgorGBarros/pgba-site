@@ -873,110 +873,112 @@ class SaleCheckoutView(APIView):
                 )
                 
                 for item_data in data['items']:
-                    product = Product.objects.get(bar_code=item_data['bar_code'])
+                    product = Product.objects.get(id=item_data['product_id'])
                     inventory_item = InventoryItem.objects.get(store=store, product=product)
-                    qtd_to_sell = item_data['quantity']
-                    price = item_data.get('price_sold', inventory_item.sale_price)
                     
-                    if inventory_item.total_quantity < qtd_to_sell:
-                        raise Exception(f"Estoque insuficiente para {product.name}")
-                    
-                    # ✅ CORREÇÃO: FIFO Automático Melhorado
-                    print(f"🔄 Aplicando FIFO para {qtd_to_sell} unidades de {product.name}")
-                    
-                    # Buscar lotes com estoque disponível, ordenados por validade (FIFO)
-                    # ✅ FILTRO: Excluir lotes vencidos automaticamente
-                    available_batches = inventory_item.batches.filter(
-                        quantity__gt=0,
-                        expiration_date__gte=timezone.now().date()  # Apenas lotes válidos
-                    ).order_by('expiration_date', 'id')
-                    
-                    # ✅ FALLBACK: Se não houver lotes válidos, usar lotes sem data
-                    if not available_batches.exists():
-                        available_batches = inventory_item.batches.filter(
-                            quantity__gt=0,
-                            expiration_date__isnull=True
-                        ).order_by('id')
-                    
-                    print(f"📦 Lotes disponíveis: {list(available_batches.values('id', 'batch_code', 'expiration_date', 'quantity'))}")
-                    
-                    remaining_to_sell = qtd_to_sell
-                    batches_used = []
-                    
-                    for batch in available_batches:
-                        if remaining_to_sell <= 0:
-                            break
-                            
-                        # Quantidade que vamos tirar deste lote
-                        qty_from_this_batch = min(remaining_to_sell, batch.quantity)
-                        
-                        print(f"🎯 Lote {batch.id} (Val: {batch.expiration_date}): {batch.quantity} → {batch.quantity - qty_from_this_batch}")
-                        
-                        # ✅ CORREÇÃO: Aplicar baixa no lote
-                        batch.quantity -= qty_from_this_batch
-                        batch.save()
-                        
-                        # Registrar para histórico
-                        batches_used.append({
-                            'batch': batch,
-                            'quantity_used': qty_from_this_batch
-                        })
-                        
-                        remaining_to_sell -= qty_from_this_batch
-                    
-                    if remaining_to_sell > 0:
-                        raise Exception(f"Erro no FIFO: ainda restam {remaining_to_sell} unidades para baixar")
-                    
-                    # ✅ CORREÇÃO: Recalcular total consolidado
-                    total_real = inventory_item.batches.filter(quantity__gt=0).aggregate(
-                        total=Sum('quantity')
-                    )['total'] or 0
-                    
-                    inventory_item.total_quantity = total_real
-                    inventory_item.save()
-                    
-                    print(f"📊 Total atualizado: {inventory_item.total_quantity}")
-                    
-                    # ✅ Criar item da venda (usando o primeiro lote como referência)
-                    main_batch = batches_used[0]['batch'] if batches_used else None
-                    
-                    SaleItem.objects.create(
-                        sale=sale, 
-                        product=product, 
-                        batch=main_batch,
-                        quantity=qtd_to_sell, 
-                        unit_price_sold=price
+                    # ✅ APLICAR FIFO AUTOMÁTICO
+                    batches_used = self.apply_fifo_withdrawal(
+                        inventory_item, 
+                        item_data['quantity']
                     )
                     
-                    # ✅ CORREÇÃO: Registrar transações para cada lote usado
+                    # Criar item de venda
+                    sale_item = SaleItem.objects.create(
+                        sale=sale,
+                        product=product,
+                        quantity=item_data['quantity'],
+                        unit_price=item_data['unit_price'],
+                        total_price=item_data['quantity'] * item_data['unit_price']
+                    )
+                    
+                    # Registrar transações para cada lote usado
                     for batch_info in batches_used:
                         StockTransaction.objects.create(
                             store=store,
                             product=product,
-                            batch=batch_info['batch'],
-                            transaction_type=sale.transaction_type,
-                            quantity=-batch_info['quantity_used'],  # Negativo = Saída
+                            batch_id=batch_info['batch_id'],
+                            transaction_type='VENDA',
+                            quantity=-batch_info['quantity_used'],
                             unit_cost=inventory_item.cost_price,
-                            unit_price=price,
-                            description=f"Venda #{sale.id} - Lote {batch_info['batch'].batch_code or 'S/N'}"
+                            unit_price=item_data['unit_price'],
+                            description=f"Venda FIFO - Lote {batch_info['expiration_date']}",
+                            notes=f"Venda #{sale.id}"
                         )
                     
-                    total_sale += qtd_to_sell * price
+                    total_sale += sale_item.total_price
                 
                 sale.total_amount = total_sale
                 sale.save()
                 
-                print("✅ Venda processada com sucesso!")
                 return Response({
-                    "message": "Venda registrada com sucesso!",
-                    "sale_id": sale.id,
-                    "total": total_sale
+                    'message': 'Venda registrada com sucesso',
+                    'sale_id': sale.id,
+                    'total_amount': total_sale
                 })
                 
         except Exception as e:
-            print(f"❌ ERRO na venda: {str(e)}")
-            return Response({"error": str(e)}, status=500)
-
+            print(f"❌ Erro na venda: {e}")
+            return Response({
+                'error': 'Erro ao processar venda',
+                'message': str(e)
+            }, status=500)
+    
+    def apply_fifo_withdrawal(self, inventory_item, quantity_to_withdraw):
+        """✅ NOVO: Aplica baixa FIFO automática nos lotes"""
+        print(f"🎯 Aplicando FIFO: {quantity_to_withdraw} unidades de {inventory_item.product.name}")
+        
+        # Buscar lotes ordenados por validade (FIFO)
+        available_batches = inventory_item.batches.filter(
+            quantity__gt=0
+        ).order_by('expiration_date', 'id')
+        
+        if not available_batches.exists():
+            raise ValueError("Não há lotes disponíveis")
+        
+        total_available = sum(batch.quantity for batch in available_batches)
+        if total_available < quantity_to_withdraw:
+            raise ValueError(f"Estoque insuficiente. Disponível: {total_available}, Solicitado: {quantity_to_withdraw}")
+        
+        # Aplicar baixas nos lotes (FIFO)
+        remaining_to_withdraw = quantity_to_withdraw
+        batches_used = []
+        
+        for batch in available_batches:
+            if remaining_to_withdraw <= 0:
+                break
+            
+            qty_from_batch = min(remaining_to_withdraw, batch.quantity)
+            
+            print(f"📦 Lote {batch.id} (Val: {batch.expiration_date}): {batch.quantity} → {batch.quantity - qty_from_batch}")
+            
+            # Aplicar baixa
+            batch.quantity -= qty_from_batch
+            batch.save()
+            
+            # Se lote zerou, pode ser removido
+            if batch.quantity == 0:
+                print(f"🗑️ Lote {batch.id} zerado - removendo")
+                batch.delete()
+            
+            batches_used.append({
+                'batch_id': batch.id,
+                'quantity_used': qty_from_batch,
+                'expiration_date': batch.expiration_date
+            })
+            
+            remaining_to_withdraw -= qty_from_batch
+        
+        # Recalcular total do inventário
+        total_real = inventory_item.batches.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        inventory_item.total_quantity = total_real
+        inventory_item.save()
+        
+        print(f"📊 Total atualizado: {inventory_item.total_quantity}")
+        
+        return batches_used
 # ==========================================
 # 3. BUSCA INTELIGENTE (SCRAPER)
 # ==========================================
@@ -1579,3 +1581,176 @@ def inventory_item_batches_view(request, item_id):
     except Exception as e:
         print(f"❌ Erro ao buscar lotes: {e}")
         return Response({'error': 'Erro interno'}, status=500)
+    
+
+
+
+    # inventory/views.py - IMPLEMENTAR FIFO AUTOMÁTICO
+
+from django.db.models import Sum, F
+from django.db import transaction
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from datetime import datetime
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def apply_fifo_withdrawal(request):
+    """Aplicar baixa FIFO automática nos lotes"""
+    try:
+        store = get_current_store(request.user)
+        data = request.data
+        
+        product_id = data.get('product_id')
+        quantity_to_withdraw = int(data.get('quantity', 0))
+        transaction_type = data.get('transaction_type', 'SAIDA')
+        unit_price = data.get('unit_price', 0)
+        notes = data.get('notes', '')
+        
+        print(f"🎯 Iniciando FIFO: {quantity_to_withdraw} unidades do produto {product_id}")
+        
+        # Buscar produto e item do inventário
+        product = Product.objects.get(id=product_id)
+        inventory_item = InventoryItem.objects.get(store=store, product=product)
+        
+        # ✅ CONSOLIDAR lotes com mesma validade primeiro
+        inventory_item = consolidate_batches_by_expiry(inventory_item)
+        
+        # Buscar lotes ordenados por validade (FIFO)
+        available_batches = inventory_item.batches.filter(
+            quantity__gt=0
+        ).order_by('expiration_date', 'id')
+        
+        if not available_batches.exists():
+            return Response({
+                'error': 'Não há lotes disponíveis para este produto'
+            }, status=400)
+        
+        # Verificar estoque total
+        total_available = sum(batch.quantity for batch in available_batches)
+        if total_available < quantity_to_withdraw:
+            return Response({
+                'error': f'Estoque insuficiente. Disponível: {total_available}, Solicitado: {quantity_to_withdraw}'
+            }, status=400)
+        
+        # ✅ APLICAR FIFO AUTOMÁTICO
+        with transaction.atomic():
+            remaining_to_withdraw = quantity_to_withdraw
+            batches_used = []
+            transactions_created = []
+            
+            for batch in available_batches:
+                if remaining_to_withdraw <= 0:
+                    break
+                
+                qty_from_batch = min(remaining_to_withdraw, batch.quantity)
+                
+                print(f"📦 Lote {batch.id} (Val: {batch.expiration_date}): {batch.quantity} → {batch.quantity - qty_from_batch}")
+                
+                # Aplicar baixa no lote
+                batch.quantity -= qty_from_batch
+                batch.save()
+                
+                # Registrar transação para este lote
+                stock_transaction = StockTransaction.objects.create(
+                    store=store,
+                    product=product,
+                    batch=batch,
+                    transaction_type=transaction_type,
+                    quantity=-qty_from_batch,  # Negativo para saída
+                    unit_cost=inventory_item.cost_price,
+                    unit_price=unit_price,
+                    description=f"Saída FIFO - Lote vencimento {batch.expiration_date}",
+                    notes=notes
+                )
+                transactions_created.append(stock_transaction)
+                
+                # Se lote zerou, remover
+                if batch.quantity == 0:
+                    print(f"🗑️ Lote {batch.id} zerado - removendo")
+                    batch.delete()
+                
+                batches_used.append({
+                    'batch_id': batch.id,
+                    'quantity_used': qty_from_batch,
+                    'expiration_date': batch.expiration_date,
+                    'remaining_quantity': batch.quantity
+                })
+                
+                remaining_to_withdraw -= qty_from_batch
+            
+            # ✅ RECALCULAR TOTAL CONSOLIDADO
+            total_real = inventory_item.batches.aggregate(
+                total=Sum('quantity')
+            )['total'] or 0
+            
+            inventory_item.total_quantity = total_real
+            inventory_item.save()
+            
+            print(f"📊 Total atualizado: {inventory_item.total_quantity}")
+            
+            return Response({
+                'message': 'Baixa FIFO aplicada com sucesso',
+                'product_name': product.name,
+                'quantity_withdrawn': quantity_to_withdraw,
+                'new_total_quantity': inventory_item.total_quantity,
+                'batches_used': batches_used,
+                'transactions_created': len(transactions_created)
+            })
+            
+    except Exception as e:
+        print(f"❌ Erro no FIFO: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': 'Erro interno do servidor',
+            'message': str(e)
+        }, status=500)
+
+def consolidate_batches_by_expiry(inventory_item):
+    """Consolida lotes com a mesma data de validade"""
+    from collections import defaultdict
+    
+    print(f"🔄 Consolidando lotes para {inventory_item.product.name}")
+    
+    # Agrupar lotes por data de validade
+    batches_by_date = defaultdict(list)
+    
+    for batch in inventory_item.batches.filter(quantity__gt=0):
+        date_key = batch.expiration_date.isoformat() if batch.expiration_date else 'no_date'
+        batches_by_date[date_key].append(batch)
+    
+    # Consolidar lotes duplicados
+    consolidated_count = 0
+    for date_key, batches in batches_by_date.items():
+        if len(batches) > 1:
+            print(f"🔄 Consolidando {len(batches)} lotes com validade {date_key}")
+            
+            # Manter o primeiro lote e somar as quantidades
+            main_batch = batches[0]
+            total_quantity = sum(batch.quantity for batch in batches)
+            
+            # Atualizar quantidade do lote principal
+            main_batch.quantity = total_quantity
+            main_batch.save()
+            
+            # Remover lotes duplicados
+            for batch in batches[1:]:
+                print(f"🗑️ Removendo lote duplicado {batch.id}")
+                batch.delete()
+            
+            consolidated_count += 1
+    
+    if consolidated_count > 0:
+        print(f"✅ Consolidados {consolidated_count} grupos de lotes")
+        
+        # Recalcular total
+        total_real = inventory_item.batches.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        inventory_item.total_quantity = total_real
+        inventory_item.save()
+    
+    return inventory_item

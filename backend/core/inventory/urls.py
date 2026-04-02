@@ -7,6 +7,7 @@ from .views import (
     InventoryViewSet,
     SessionControlView,
     SessionSummaryView,
+    apply_fifo_withdrawal,
     feature_gates_view,
     inventory_item_batches_view, 
     lookup_product, 
@@ -55,7 +56,8 @@ urlpatterns = [
     path('public/storefront/', public_storefront, name='public_storefront_by_id'),
     path('public/storefront/<str:slug>/marca/<str:brand>/', public_storefront_view, name='public_storefront_brand'),
 
-     path('inventory/<int:item_id>/batches/', inventory_item_batches_view, name='inventory-item-batches'),
+    path('inventory/<int:item_id>/batches/', inventory_item_batches_view, name='inventory-item-batches'),
+    path('fifo-withdrawal/', apply_fifo_withdrawal, name='fifo-withdrawal'),
     
 
     # --- Rotas Automáticas (Router) ---

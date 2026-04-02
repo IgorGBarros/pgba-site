@@ -12,13 +12,57 @@ import InventorySearchModal from "../components/InventorySearchModal";
 import UpgradeModal from "../components/UpgradeModal";
 import ProBadge from "../components/ProBadge";
 import {
-  inventoryApi, movementsApi, batchApi,
-  InventoryBatch, TransactionType, formatMoney
+  inventoryApi, batchApi, InventoryBatch, TransactionType, formatMoney,
+  clearAppCache // ✅ ADICIONADO: Importar função de limpeza de cache
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
-import { usePlan } from "../hooks/usePlan";
 import { useFeatureGates } from "../hooks/useFeatureGates";
 import { useToast } from "../hooks/use-toast";
+
+// ✅ NOVO: API FIFO para baixas automáticas
+const fifoApi = {
+  applyWithdrawal: async (data: {
+    product_id: string;
+    quantity: number;
+    transaction_type: string;
+    unit_price?: number;
+    notes?: string;
+    batch_id?: string | null;
+  }) => {
+    try {
+      console.log('🎯 Aplicando baixa FIFO:', data);
+      
+      const token = localStorage.getItem("auth_token");
+      const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
+        .replace(/\/$/, "");
+      
+      const response = await fetch(`${API_BASE_URL}/api/fifo-withdrawal/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `Erro ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ FIFO aplicado com sucesso:', result);
+      
+      // ✅ Limpar cache após baixa
+      clearAppCache();
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Erro ao aplicar FIFO:', error);
+      throw error;
+    }
+  }
+};
 
 const SALE_TYPES: { value: TransactionType; label: string; emoji: string; icon: typeof ShoppingBag; desc: string; hasRevenue: boolean }[] = [
   { value: "venda", label: "Venda", emoji: "💰", icon: ShoppingBag, desc: "Gera receita e lucro", hasRevenue: true },
@@ -30,7 +74,7 @@ const SALE_TYPES: { value: TransactionType; label: string; emoji: string; icon: 
 
 interface WithdrawData {
   barcode: string;
-  product_id: string; // Garantido como string
+  product_id: string;
   inventory_id: string;
   product_name: string;
   category: string;
@@ -98,19 +142,19 @@ export default function WithdrawProduct() {
         batches = batches.filter((b) => b.quantity > 0);
       } catch { /* fallback */ }
       
-      const batchCost = batches.length > 0
-        ? batches.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0].cost_price
-        : item.cost_price;
-
+      // ✅ CORREÇÃO: Ordenar lotes por FIFO (validade primeiro)
       const sortedBatches = batches.sort((a, b) => {
         if (!a.expiration_date) return 1;
         if (!b.expiration_date) return -1;
         return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
       });
 
+      const batchCost = sortedBatches.length > 0
+        ? sortedBatches[0].cost_price // ✅ Usar o lote mais antigo para custo
+        : item.cost_price;
+
       setData((p) => ({
         ...p,
-        // 🚀 CORREÇÃO: Envolvendo o ID com String() para evitar o erro do TypeScript
         product_id: String(item.product?.id || item.id), 
         inventory_id: item.id,
         product_name: item.product?.name || item.product_name || "Produto sem nome",
@@ -118,8 +162,8 @@ export default function WithdrawProduct() {
         current_quantity: qty,
         cost_price: batchCost,
         sale_price: item.sale_price || item.product?.official_price || null,
-        batches,
-        selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null,
+        batches: sortedBatches, // ✅ Usar lotes já ordenados por FIFO
+        selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null, // ✅ Selecionar automaticamente o mais antigo
       }));
 
       if (batches.length > 1) {
@@ -127,6 +171,7 @@ export default function WithdrawProduct() {
       } else {
         setStep(1);
       }
+      
       toast({ title: "Produto encontrado!", description: `${item.product?.name || item.product_name || "Produto"} — ${qty} un.` });
     } catch {
       setNotFound(true);
@@ -151,14 +196,12 @@ export default function WithdrawProduct() {
   const margin = data.sale_price && data.cost_price && data.cost_price > 0
     ? (((data.sale_price - data.cost_price) / data.cost_price) * 100).toFixed(1)
     : null;
+
   const currentSaleType = SALE_TYPES.find((t) => t.value === data.sale_type)!;
 
+  // ✅ MELHORADO: Lógica FIFO mais precisa
   const oldestBatch = data.batches?.length > 0 
-    ? [...data.batches].sort((a, b) => {
-        if (!a.expiration_date) return 1;
-        if (!b.expiration_date) return -1;
-        return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
-      })[0]
+    ? data.batches[0] // Já está ordenado por FIFO
     : null;
 
   const isViolatingFifo = data.selected_batch && oldestBatch && 
@@ -168,41 +211,44 @@ export default function WithdrawProduct() {
   const isExpired = data.selected_batch?.expiration_date && 
                     new Date(data.selected_batch.expiration_date) < new Date();
 
+  // ✅ FUNÇÃO PRINCIPAL CORRIGIDA: Usar FIFO automático
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
+    
     try {
-      const newQty = data.current_quantity - data.withdraw_qty;
-      await inventoryApi.update(data.inventory_id,  { // Atualiza o estoque 
-        total_quantity: newQty, // Força o formato novo do backend
-        quantity: newQty,       // Força o formato antigo
-        sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
-        sale_type: data.sale_type,
+      console.log('🎯 Iniciando baixa FIFO automática...');
+      
+      // ✅ USAR FIFO AUTOMÁTICO EM VEZ DE DUAS OPERAÇÕES SEPARADAS
+      const result = await fifoApi.applyWithdrawal({
+        product_id: data.product_id,
+        quantity: data.withdraw_qty,
+        transaction_type: data.sale_type.toUpperCase(),
+        unit_price: currentSaleType.hasRevenue ? (data.sale_price || 0) : 0,
+        notes: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
+        batch_id: data.selected_batch?.id || null // ✅ Enviar lote selecionado se houver
       });
       
-      const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
+      console.log('✅ Baixa FIFO realizada:', result);
       
-      await movementsApi.create({
-        product: data.product_id, // Enviando exato como o Django espera
-        transaction_type: data.sale_type ? data.sale_type.toUpperCase() : "SAIDA",
-        product_id: data.product_id,
-        batch_id: data.selected_batch?.id || null,
-        product_name: data.product_name,
-        barcode: data.barcode,
-        movement_type: "saida",
-        quantity: data.withdraw_qty,
-        sale_type: data.sale_type,
-        unit_price: unitPrice,
-        description: data.notes.trim() || "", 
-        notes: data.notes.trim() || "",
-      } as any);
-
+      toast({
+        title: "Baixa realizada!",
+        description: `${result.quantity_withdrawn || data.withdraw_qty} unidades de ${result.product_name || data.product_name}. Estoque atual: ${result.new_total_quantity}`,
+      });
+      
       setIsSuccess(true);
+      
       setTimeout(() => {
         navigate("/");
       }, 2000);
+      
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      console.error('❌ Erro na baixa FIFO:', err);
+      toast({ 
+        title: "Erro", 
+        description: err.message || "Erro ao processar baixa", 
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }
@@ -258,13 +304,11 @@ export default function WithdrawProduct() {
                       className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:border-primary"
                     />
                   </div>
-
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-border"></div>
                     <span className="text-xs text-muted-foreground">OU</span>
                     <div className="h-px flex-1 bg-border"></div>
                   </div>
-
                   <button onClick={handleScannerClick} className={`w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all ${isLocked("barcode_scanner") ? "opacity-80" : ""}`}>
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${!isLocked("barcode_scanner") ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
@@ -282,7 +326,6 @@ export default function WithdrawProduct() {
                     </div>
                     <ChevronRight className="text-muted-foreground/30 group-hover:text-primary transition-colors" />
                   </button>
-
                   <button onClick={() => setIsSearchOpen(true)} className="w-full flex items-center justify-between p-4 border border-border rounded-xl hover:bg-secondary text-left group transition-all">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-primary/10 text-primary rounded-lg"><Search size={20} /></div>
@@ -318,11 +361,11 @@ export default function WithdrawProduct() {
                     )}
                   </div>
                   
-                  {/* ALERTAS DE VALIDADE E FIFO */}
+                  {/* ✅ ALERTAS MELHORADOS */}
                   {isExpired && (
                     <div className="mt-2 flex items-start gap-2 rounded-lg bg-destructive/10 p-2 text-destructive border border-destructive/20">
                       <AlertIcon className="h-4 w-4 shrink-0 mt-0.5" />
-                      <p className="text-xs font-medium">Atenção: Este lote já está vencido!</p>
+                      <p className="text-xs font-medium">⚠️ Atenção: Este lote já está vencido!</p>
                     </div>
                   )}
                   
@@ -330,13 +373,25 @@ export default function WithdrawProduct() {
                     <div className="mt-2 flex items-start gap-2 rounded-lg bg-orange-100 p-2 text-orange-800 border border-orange-200">
                       <AlertIcon className="h-4 w-4 shrink-0 mt-0.5" />
                       <p className="text-xs">
-                        <span className="font-bold">Aviso (FIFO):</span> Existe um lote mais antigo vencendo em <b>{new Date(oldestBatch!.expiration_date!).toLocaleDateString('pt-BR')}</b>. É recomendado dar saída nele primeiro.
+                        <span className="font-bold">💡 Sugestão FIFO:</span> Existe um lote mais antigo vencendo em <b>{new Date(oldestBatch!.expiration_date!).toLocaleDateString('pt-BR')}</b>. É recomendado dar saída nele primeiro.
                       </p>
                     </div>
                   )}
 
+                  {/* ✅ NOVO: Indicador de FIFO automático */}
+                  {data.batches.length > 0 && !data.selected_batch && (
+                    <div className="mt-2 flex items-start gap-2 rounded-lg bg-blue-50 p-2 text-blue-800 border border-blue-200">
+                      <Layers className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p className="text-xs">
+                        <span className="font-bold">🤖 FIFO Automático:</span> O sistema selecionará automaticamente os lotes mais antigos para baixa.
+                      </p>
+                    </div>
+                  )}
+                  
                   {data.batches.length > 1 && (
-                    <button type="button" onClick={() => setShowBatchModal(true)} className="mt-2 text-xs text-primary font-bold hover:underline">Trocar lote</button>
+                    <button type="button" onClick={() => setShowBatchModal(true)} className="mt-2 text-xs text-primary font-bold hover:underline">
+                      Escolher lote específico (opcional)
+                    </button>
                   )}
                 </div>
                 
@@ -397,7 +452,6 @@ export default function WithdrawProduct() {
                     className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
                   />
                 </div>
-
               </div>
             </motion.div>
           )}
@@ -410,7 +464,7 @@ export default function WithdrawProduct() {
                     <motion.div key="summary" exit={{ opacity: 0, scale: 0.9 }}>
                       <div className="flex items-center gap-3 mb-4">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Package className="h-5 w-5 text-primary" /></div>
-                        <p className="text-sm font-semibold text-foreground">Confirmar Baixa</p>
+                        <p className="text-sm font-semibold text-foreground">Confirmar Baixa FIFO</p>
                       </div>
                       <div className="space-y-2 rounded-lg bg-secondary/50 p-4">
                         <Row label="Produto" value={data.product_name} />
@@ -418,6 +472,14 @@ export default function WithdrawProduct() {
                         <Row label="Quantidade Saída" value={`${data.withdraw_qty} un.`} />
                         <Row label="Estoque Restante" value={`${data.current_quantity - data.withdraw_qty} un.`} />
                         <Row label="Tipo" value={`${currentSaleType.emoji} ${currentSaleType.label}`} />
+                        
+                        {/* ✅ NOVO: Indicador do método FIFO */}
+                        {data.batches.length > 0 && (
+                          <Row 
+                            label="Método" 
+                            value={data.selected_batch ? "Lote específico" : "FIFO Automático"} 
+                          />
+                        )}
                         
                         {data.notes && (
                           <Row label="Descrição" value={data.notes} />

@@ -281,7 +281,46 @@ export const inventoryApi = {
     clearAppCache();
   },
 };
-
+// lib/api.ts - ADICIONAR API FIFO
+// lib/api.ts - ADICIONAR API FIFO
+export const fifoApi = {
+  applyWithdrawal: async (data: {
+    product_id: string;
+    quantity: number;
+    transaction_type: string;
+    unit_price?: number;
+    notes?: string;
+  }) => {
+    try {
+      console.log('🎯 Aplicando baixa FIFO:', data);
+      
+      const response = await apiRequest<{
+        message: string;
+        product_name: string;
+        quantity_withdrawn: number;
+        new_total_quantity: number;
+        batches_used: Array<{
+          batch_id: number;
+          quantity_used: number;
+          expiration_date: string;
+        }>;
+      }>('/fifo-withdrawal/', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      
+      console.log('✅ FIFO aplicado com sucesso:', response);
+      
+      // ✅ Limpar cache após baixa
+      clearAppCache();
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Erro ao aplicar FIFO:', error);
+      throw error;
+    }
+  }
+};
 // ── Inventory Batches ──
 export interface InventoryBatch {
   id: string;
