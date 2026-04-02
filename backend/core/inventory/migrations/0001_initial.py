@@ -130,6 +130,10 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('user', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='store', to=settings.AUTH_USER_MODEL)),
             ],
+            options={
+                'verbose_name': 'Loja',
+                'verbose_name_plural': 'Lojas',
+            },
         ),
         migrations.CreateModel(
             name='StockTransaction',
