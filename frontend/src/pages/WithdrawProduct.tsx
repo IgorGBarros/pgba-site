@@ -13,56 +13,14 @@ import UpgradeModal from "../components/UpgradeModal";
 import ProBadge from "../components/ProBadge";
 import {
   inventoryApi, batchApi, InventoryBatch, TransactionType, formatMoney,
-  clearAppCache // ✅ ADICIONADO: Importar função de limpeza de cache
+  clearAppCache, // ✅ ADICIONADO: Importar função de limpeza de cache
+  movementsApi
 } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useFeatureGates } from "../hooks/useFeatureGates";
 import { useToast } from "../hooks/use-toast";
 
-// ✅ NOVO: API FIFO para baixas automáticas
-const fifoApi = {
-  applyWithdrawal: async (data: {
-    product_id: string;
-    quantity: number;
-    transaction_type: string;
-    unit_price?: number;
-    notes?: string;
-    batch_id?: string | null;
-  }) => {
-    try {
-      console.log('🎯 Aplicando baixa FIFO:', data);
-      
-      const token = localStorage.getItem("auth_token");
-      const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
-        .replace(/\/$/, "");
-      
-      const response = await fetch(`${API_BASE_URL}/api/fifo-withdrawal/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || errorData.error || `Erro ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log('✅ FIFO aplicado com sucesso:', result);
-      
-      // ✅ Limpar cache após baixa
-      clearAppCache();
-      
-      return result;
-    } catch (error) {
-      console.error('❌ Erro ao aplicar FIFO:', error);
-      throw error;
-    }
-  }
-};
+
 
 const SALE_TYPES: { value: TransactionType; label: string; emoji: string; icon: typeof ShoppingBag; desc: string; hasRevenue: boolean }[] = [
   { value: "venda", label: "Venda", emoji: "💰", icon: ShoppingBag, desc: "Gera receita e lucro", hasRevenue: true },
@@ -118,6 +76,8 @@ export default function WithdrawProduct() {
     setShowScanner(true);
   };
 
+// WithdrawProduct.tsx - CORREÇÃO na função handleBarcodeScan
+
 const handleBarcodeScan = async (barcode: string) => {
   if (!barcode.trim()) return;
   
@@ -128,34 +88,24 @@ const handleBarcodeScan = async (barcode: string) => {
   setData((p) => ({ ...p, barcode }));
   
   try {
-    // ✅ CORREÇÃO: Tentar múltiplas estratégias de busca
-    let item = null;
+    // ✅ CORREÇÃO: Usar busca na lista em vez de endpoint inexistente
+    console.log('🔄 Buscando na lista completa do inventário...');
+    const allItems = await inventoryApi.list();
     
-    // Estratégia 1: Busca direta por código
-    try {
-      item = await inventoryApi.getByBarcode(barcode);
-      console.log('✅ Produto encontrado via getByBarcode:', item);
-    } catch (error) {
-      console.log('⚠️ getByBarcode falhou, tentando busca na lista...');
-    }
-    
-    // Estratégia 2: Buscar na lista completa se não encontrou
-    if (!item) {
-      const allItems = await inventoryApi.list();
-      item = allItems.find(i => 
-        i.product?.bar_code === barcode || 
-        i.barcode === barcode ||
-        String(i.product?.bar_code).trim() === barcode.trim() ||
-        String(i.barcode).trim() === barcode.trim()
-      );
-      console.log('🔍 Busca na lista:', item ? 'Encontrado' : 'Não encontrado');
-    }
+    const item = allItems.find(i => 
+      i.product?.bar_code === barcode || 
+      i.barcode === barcode ||
+      String(i.product?.bar_code).trim() === barcode.trim() ||
+      String(i.barcode).trim() === barcode.trim()
+    );
     
     if (!item) { 
-      console.log('❌ Produto não encontrado em nenhuma estratégia');
+      console.log('❌ Produto não encontrado na lista');
       setNotFound(true); 
       return; 
     }
+    
+    console.log('✅ Produto encontrado:', item);
     
     const qty = item.total_quantity ?? item.quantity ?? 0;
     if (qty <= 0) {
@@ -168,7 +118,7 @@ const handleBarcodeScan = async (barcode: string) => {
       return;
     }
 
-    // ✅ CORREÇÃO: Buscar lotes com tratamento de erro
+    // ✅ Buscar lotes com tratamento de erro
     let batches: InventoryBatch[] = [];
     try {
       console.log(`📦 Buscando lotes para item ${item.id}...`);
@@ -180,19 +130,17 @@ const handleBarcodeScan = async (barcode: string) => {
       batches = [];
     }
     
-    // ✅ CORREÇÃO: Ordenar lotes por FIFO (validade primeiro)
+    // ✅ Ordenar lotes por FIFO (validade primeiro)
     const sortedBatches = batches.sort((a, b) => {
       if (!a.expiration_date) return 1;
       if (!b.expiration_date) return -1;
       return new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime();
     });
 
-    // ✅ CORREÇÃO: Usar custo do lote mais antigo (FIFO)
     const batchCost = sortedBatches.length > 0
       ? sortedBatches[0].cost_price
       : item.cost_price;
 
-    // ✅ CORREÇÃO: Garantir que product_id seja string
     const productId = String(item.product?.id || item.id || '');
     
     if (!productId) {
@@ -200,14 +148,6 @@ const handleBarcodeScan = async (barcode: string) => {
       setNotFound(true);
       return;
     }
-
-    console.log('✅ Configurando dados do produto:', {
-      product_id: productId,
-      inventory_id: item.id,
-      product_name: item.product?.name || item.product_name,
-      current_quantity: qty,
-      batches_count: sortedBatches.length
-    });
 
     setData((p) => ({
       ...p,
@@ -222,12 +162,9 @@ const handleBarcodeScan = async (barcode: string) => {
       selected_batch: sortedBatches.length > 0 ? sortedBatches[0] : null,
     }));
 
-    // ✅ Decidir próximo passo
     if (sortedBatches.length > 1) {
-      console.log('📦 Múltiplos lotes encontrados, abrindo modal de seleção');
       setShowBatchModal(true);
     } else {
-      console.log('➡️ Avançando para próximo passo');
       setStep(1);
     }
     
@@ -275,22 +212,16 @@ const handleBarcodeScan = async (barcode: string) => {
   const isExpired = data.selected_batch?.expiration_date && 
                     new Date(data.selected_batch.expiration_date) < new Date();
 
-  // ✅ FUNÇÃO PRINCIPAL CORRIGIDA: Usar FIFO automático
-// ✅ FUNÇÃO PRINCIPAL CORRIGIDA: Usar FIFO automático
+// WithdrawProduct.tsx - CORREÇÃO: Usar método tradicional em vez de FIFO automático
+
 const handleSave = async () => {
   if (!user) return;
   setLoading(true);
   
   try {
-    console.log('🎯 Iniciando baixa com dados:', {
-      product_id: data.product_id,
-      quantity: data.withdraw_qty,
-      transaction_type: data.sale_type,
-      has_batches: data.batches.length > 0,
-      selected_batch: data.selected_batch?.id
-    });
+    console.log('🎯 Iniciando baixa tradicional...');
     
-    // ✅ VALIDAÇÕES ANTES DE ENVIAR
+    // ✅ VALIDAÇÕES
     if (!data.product_id) {
       throw new Error('ID do produto não encontrado');
     }
@@ -303,21 +234,50 @@ const handleSave = async () => {
       throw new Error('Quantidade maior que o estoque disponível');
     }
 
-    // ✅ USAR FIFO AUTOMÁTICO
-    const result = await fifoApi.applyWithdrawal({
-      product_id: data.product_id,
-      quantity: data.withdraw_qty,
-      transaction_type: data.sale_type.toUpperCase(),
-      unit_price: currentSaleType.hasRevenue ? (data.sale_price || 0) : 0,
-      notes: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
-      batch_id: data.selected_batch?.id ? String(data.selected_batch.id) : null
-    });
+    // ✅ PASSO 1: Atualizar estoque do inventário
+    const newQty = data.current_quantity - data.withdraw_qty;
     
-    console.log('✅ Baixa FIFO realizada:', result);
+    console.log(`📦 Atualizando estoque: ${data.current_quantity} → ${newQty}`);
+    
+    await inventoryApi.update(data.inventory_id, {
+      total_quantity: newQty,
+      quantity: newQty,
+      sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
+    });
+
+    // ✅ PASSO 2: Registrar movimentação
+    const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
+    
+    console.log('📝 Criando movimentação...');
+    
+    await movementsApi.create({
+      product: data.product_id,
+      transaction_type: data.sale_type.toUpperCase(),
+      product_id: data.product_id,
+      batch_id: data.selected_batch?.id ? String(data.selected_batch.id) : null,
+      product_name: data.product_name,
+      barcode: data.barcode,
+      movement_type: "saida",
+      quantity: data.withdraw_qty,
+      sale_type: data.sale_type,
+      unit_price: unitPrice,
+      description: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
+      // ✅ REMOVIDO: notes (causava erro no backend)
+    });
+
+    // ✅ PASSO 3: Atualizar lote se selecionado
+    if (data.selected_batch) {
+      console.log(`📦 Atualizando lote ${data.selected_batch.id}...`);
+      
+      // Aqui você pode implementar a atualização do lote se necessário
+      // Por enquanto, vamos apenas logar
+    }
+    
+    console.log('✅ Baixa realizada com sucesso');
     
     toast({
       title: "Baixa realizada!",
-      description: `${result.quantity_withdrawn || data.withdraw_qty} unidades de ${result.product_name || data.product_name}. Estoque atual: ${result.new_total_quantity}`,
+      description: `${data.withdraw_qty} unidades de ${data.product_name}. Estoque atual: ${newQty}`,
     });
     
     setIsSuccess(true);
@@ -327,7 +287,7 @@ const handleSave = async () => {
     }, 2000);
     
   } catch (err: any) {
-    console.error('❌ Erro na baixa FIFO:', err);
+    console.error('❌ Erro na baixa:', err);
     toast({ 
       title: "Erro", 
       description: err.message || "Erro ao processar baixa", 
