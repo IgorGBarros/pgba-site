@@ -1,11 +1,12 @@
-// lib/api.ts - VERSÃO CORRIGIDA
+// lib/api.ts - VERSÃO CORRIGIDA (REMOVER A PRIMEIRA sessionApi)
+
 import {
   isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
   DEMO_PROFILE, DEMO_BATCHES
 } from "./demoData";
 import { api } from "../services/api";
 
-// ✅ CORREÇÃO: Base URL sem /api/ (será adicionado pelo services/api.ts)
+// ✅ Base URL sem /api/ (será adicionado pelo services/api.ts)
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
     .replace(/\/$/, "");
@@ -461,7 +462,7 @@ export const dashboardApi = {
   }
 };
 
-// ── Storefront (public) - CORRIGIDO ──
+// ── Storefront (public) ──
 export interface StorefrontItem {
   id: string;
   product_name?: string;
@@ -497,13 +498,11 @@ export interface StorefrontItem {
   };
 }
 
-// ✅ CORREÇÃO: API pública usando URL completa (sem duplicação)
 export const publicStorefrontApi = {
   listBySlug: async (slug: string) => {
     try {
       console.log(`🔍 Buscando vitrine por slug: ${slug}`);
       
-      // ✅ CORREÇÃO: URL completa para endpoint público
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/${slug}/`, {
         method: 'GET',
         headers: {
@@ -540,7 +539,6 @@ export const publicStorefrontApi = {
     try {
       console.log(`🔍 Buscando vitrine por ID: ${sellerId}`);
       
-      // ✅ CORREÇÃO: URL completa para endpoint público
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/?seller=${sellerId}`, {
         method: 'GET',
         headers: {
@@ -680,7 +678,7 @@ export const debugApi = {
   }
 };
 
-// ✅ Session API usando Axios (corrigido)
+// ✅ INTERFACES PARA SESSION API
 export interface SessionStatus {
   has_session: boolean;
   products_count?: number;
@@ -696,6 +694,7 @@ export interface SessionSummary {
   session_id: number;
 }
 
+// ✅ SESSION API USANDO AXIOS (ÚNICA DECLARAÇÃO)
 export const sessionApi = {
   getStatus: async (): Promise<SessionStatus> => {
     try {
