@@ -113,31 +113,29 @@ from .scraper import search_google_shopping
 
 # inventory/views.py - CORRIGIR função get_current_store
 
+# inventory/views.py - CORRIGIR função get_current_store
+
 def get_current_store(user):
     """
-    Versão corrigida com logs detalhados para debug
+    Versão corrigida com logs detalhados e fallback
     """
     try:
         print(f"🔍 get_current_store para usuário: {user.id} ({user.email})")
         
-        # Verificar se user tem ID válido
         if not user or not user.id:
             print("❌ Usuário inválido ou sem ID")
             return None
         
-        # Estratégia 1: Buscar por owner_id na tabela Store
         from .models import Store
+        
+        # Buscar loja por owner_id
         stores = Store.objects.filter(owner_id=user.id)
         
         print(f"📊 Encontradas {stores.count()} lojas para owner_id={user.id}")
         
-        for store in stores:
-            print(f"  - Store {store.id}: {store.name} (slug: {store.slug})")
-        
-        # Retornar a primeira loja encontrada
         if stores.exists():
             store = stores.first()
-            print(f"✅ Loja selecionada: {store.id} - {store.name}")
+            print(f"✅ Loja encontrada: {store.id} - {store.name}")
             return store
         
         print(f"❌ Nenhuma loja encontrada para usuário {user.id}")
@@ -148,6 +146,29 @@ def get_current_store(user):
         import traceback
         traceback.print_exc()
         return None
+
+def ensure_user_has_store(user):
+    """Garantir que o usuário tenha uma loja"""
+    try:
+        store = get_current_store(user)
+        
+        if not store:
+            print(f"🏪 Criando loja para usuário {user.email}")
+            
+            from .models import Store
+            store = Store.objects.create(
+                owner=user,
+                name=f"Loja de {user.email}",
+                # Adicionar outros campos obrigatórios se necessário
+            )
+            
+            print(f"✅ Loja criada: {store.id} - {store.name}")
+        
+        return store
+        
+    except Exception as e:
+        print(f"❌ Erro ao criar loja: {e}")
+        raise
 
 class TenantModelMixin:
     """
@@ -1375,66 +1396,123 @@ class AdminUpdateSubscriptionView(APIView):
         
 
 # inventory/views.py - ADICIONAR
+# inventory/views.py - CORRIGIR SessionControlView
+
 class SessionControlView(APIView):
-    """Controla sessão de cadastro"""
+    """Controle de Sessão de Registro - VERSÃO CORRIGIDA"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        """Status da sessão atual"""
-        store = get_current_store(request.user)
-        session = RegistrationSession.objects.filter(
-            store=store, is_active=True
-        ).first()
-        
-        if not session:
-            return Response({'has_session': False})
+        """Verificar status da sessão atual"""
+        try:
+            # ✅ GARANTIR que usuário tenha loja
+            store = ensure_user_has_store(request.user)
             
-        return Response({
-            'has_session': True,
-            'session_id': session.id,
-            'products_count': session.products_count,
-            'total_estimated_cost': session.total_estimated_cost,
-            'duration_minutes': int((timezone.now() - session.started_at).total_seconds() / 60)
-        })
-    
-    def post(self, request):
-        """Inicia ou finaliza sessão"""
-        action = request.data.get('action')  # 'start' ou 'finish'
-        store = get_current_store(request.user)
-        
-        if action == 'start':
-            # Finaliza sessão anterior se existir
-            RegistrationSession.objects.filter(
-                store=store, is_active=True
-            ).update(is_active=False, finished_at=timezone.now())
+            if not store:
+                return Response({
+                    'error': 'Não foi possível obter loja para o usuário'
+                }, status=400)
             
-            # Cria nova
-            session = RegistrationSession.objects.create(store=store)
-            return Response({
-                'session_id': session.id,
-                'message': 'Sessão iniciada'
-            })
+            print(f"🔍 Verificando sessão para store {store.id}")
             
-        elif action == 'finish':
+            # Buscar sessão ativa
             session = RegistrationSession.objects.filter(
-                store=store, is_active=True
+                store=store,
+                is_active=True
             ).first()
             
-            if not session:
-                return Response({'error': 'Nenhuma sessão ativa'}, status=400)
+            if session:
+                return Response({
+                    'has_session': True,
+                    'session_id': session.id,
+                    'started_at': session.started_at,
+                    'products_count': session.products_count,
+                    'total_estimated_cost': session.total_estimated_cost
+                })
+            else:
+                return Response({
+                    'has_session': False
+                })
                 
-            session.is_active = False
-            session.finished_at = timezone.now()
-            session.save()
+        except Exception as e:
+            print(f"❌ Erro ao verificar sessão: {e}")
+            return Response({
+                'error': 'Erro interno do servidor',
+                'message': str(e)
+            }, status=500)
+    
+    def post(self, request):
+        """Iniciar ou finalizar sessão"""
+        try:
+            # ✅ GARANTIR que usuário tenha loja
+            store = ensure_user_has_store(request.user)
+            
+            if not store:
+                return Response({
+                    'error': 'Não foi possível obter loja para o usuário'
+                }, status=400)
+            
+            action = request.data.get('action')
+            print(f"🎬 Ação da sessão: {action} para store {store.id}")
+            
+            if action == 'start':
+                # Finalizar sessão anterior se existir
+                RegistrationSession.objects.filter(
+                    store=store,
+                    is_active=True
+                ).update(is_active=False)
+                
+                # ✅ CRIAR nova sessão COM store definido
+                session = RegistrationSession.objects.create(
+                    store=store  # ✅ GARANTIR que store seja definido
+                )
+                
+                print(f"✅ Sessão {session.id} iniciada para store {store.id}")
+                
+                return Response({
+                    'message': 'Sessão iniciada',
+                    'session_id': session.id
+                })
+                
+            elif action == 'finish':
+                session = RegistrationSession.objects.filter(
+                    store=store,
+                    is_active=True
+                ).first()
+                
+                if not session:
+                    return Response({
+                        'error': 'Nenhuma sessão ativa encontrada'
+                    }, status=404)
+                
+                # Finalizar sessão
+                session.is_active = False
+                session.finished_at = timezone.now()
+                session.save()
+                
+                return Response({
+                    'message': 'Sessão finalizada',
+                    'summary': {
+                        'products_count': session.products_count,
+                        'total_estimated_cost': session.total_estimated_cost,
+                        'duration_minutes': session.duration_minutes
+                    }
+                })
+            
+            else:
+                return Response({
+                    'error': 'Ação inválida. Use "start" ou "finish"'
+                }, status=400)
+                
+        except Exception as e:
+            print(f"❌ Erro no controle de sessão: {e}")
+            import traceback
+            traceback.print_exc()
             
             return Response({
-                'session_summary': {
-                    'products_count': session.products_count,
-                    'total_estimated_cost': session.total_estimated_cost,
-                    'session_id': session.id
-                }
-            })
-
+                'error': 'Erro interno do servidor',
+                'message': str(e)
+            }, status=500)
 class SessionSummaryView(APIView):
     """Confirma investimento da sessão"""
     permission_classes = [IsAuthenticated]
@@ -1853,37 +1931,20 @@ def consolidate_batches_by_expiry(inventory_item):
 
 
     # inventory/views.py - ADICIONAR função de debug
+# inventory/views.py - ADICIONAR função de debug e associação
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def debug_user_store(request):
-    """Debug completo: verificar usuário e loja"""
+    """Debug: verificar se usuário tem loja"""
     try:
         user = request.user
-        print(f"🔍 Debug usuário logado: {user.id} - {user.email}")
+        print(f"🔍 Debug usuário: {user.id} - {user.email}")
         
         # Verificar todas as lojas
         from .models import Store
         all_stores = Store.objects.all()
-        print(f"📊 Total de lojas no sistema: {all_stores.count()}")
-        
-        for store in all_stores:
-            print(f"  - Loja {store.id}: {store.name} (owner: {store.owner_id})")
-        
-        # Verificar se usuário tem loja via owner
         user_stores = Store.objects.filter(owner=user)
-        print(f"🎯 Lojas do usuário {user.email}: {user_stores.count()}")
-        
-        for store in user_stores:
-            print(f"  - Loja {store.id}: {store.name}")
-        
-        # Testar get_current_store
-        try:
-            current_store = get_current_store(user)
-            print(f"🏪 get_current_store retornou: {current_store}")
-        except Exception as e:
-            print(f"❌ Erro em get_current_store: {e}")
-            current_store = None
         
         return Response({
             'user_id': user.id,
@@ -1893,18 +1954,17 @@ def debug_user_store(request):
                     'id': s.id, 
                     'name': s.name, 
                     'owner_id': s.owner_id,
-                    'slug': s.slug
+                    'slug': getattr(s, 'slug', 'N/A')
                 } for s in all_stores
             ],
             'user_stores': [
                 {
                     'id': s.id, 
                     'name': s.name, 
-                    'slug': s.slug
+                    'slug': getattr(s, 'slug', 'N/A')
                 } for s in user_stores
             ],
-            'current_store_id': current_store.id if current_store else None,
-            'current_store_name': current_store.name if current_store else None
+            'current_store_function': get_current_store(user).id if get_current_store(user) else None
         })
         
     except Exception as e:
@@ -1912,8 +1972,6 @@ def debug_user_store(request):
             'error': str(e),
             'user_id': request.user.id if request.user else None
         }, status=500)
-
-# inventory/views.py - ADICIONAR função para associar loja
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -1928,7 +1986,6 @@ def associate_user_store(request):
         
         from .models import Store
         
-        # Verificar se a loja existe
         try:
             store = Store.objects.get(id=store_id)
         except Store.DoesNotExist:
