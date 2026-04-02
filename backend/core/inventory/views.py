@@ -109,22 +109,33 @@ from .scraper import search_google_shopping
 # 0. HELPERS & MIXINS MULTI-TENANT
 # ==========================================
 
+# inventory/views.py - MELHORAR a função get_current_store
+
 def get_current_store(user):
-    """Obtém a loja do usuário atual"""
+    """
+    ✅ Versão melhorada com logs e tratamento de erro
+    """
     try:
+        print(f"🔍 Buscando loja para usuário: {user.id} ({user.email})")
+        
+        if hasattr(user, 'store') and user.store:
+            print(f"✅ Loja encontrada via user.store: {user.store.id}")
+            return user.store
+        
+        # ✅ Fallback: buscar na tabela Store
         from .models import Store
-        store, created = Store.objects.get_or_create(
-            user=user,
-            defaults={
-                'name': f'Loja de {user.email}',
-                'slug': user.email.split('@')[0].replace('.', ''),
-                'storefront_enabled': True
-            }
-        )
-        return store
+        store = Store.objects.filter(owner=user).first()
+        
+        if store:
+            print(f"✅ Loja encontrada via Store.objects: {store.id}")
+            return store
+        
+        print(f"❌ Nenhuma loja encontrada para usuário {user.id}")
+        return None
+        
     except Exception as e:
-        print(f"❌ Erro ao obter loja: {e}")
-        raise
+        print(f"❌ Erro ao buscar loja: {e}")
+        return None
 
 class TenantModelMixin:
     """
@@ -488,7 +499,7 @@ from django.db import transaction
 from django.db.models import Sum
 
 class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
-    """Extrato de Movimentações da Loja - VERSÃO CORRIGIDA FINAL"""
+    """Extrato de Movimentações da Loja - VERSÃO FINAL CORRIGIDA"""
     serializer_class = StockTransactionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
@@ -510,9 +521,12 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
 
     # ✅ CORREÇÃO: Override do perform_create para garantir store_id
     def perform_create(self, serializer):
-        """Garantir que store_id seja sempre definido"""
+        """✅ GARANTIR que store_id seja SEMPRE definido"""
         try:
             store = get_current_store(self.request.user)
+            if not store:
+                raise ValueError("Loja não encontrada para o usuário")
+            
             print(f"🏪 Definindo store_id: {store.id}")
             
             # ✅ FORÇAR store_id na criação
@@ -585,20 +599,30 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
         try:
             store = get_current_store(request.user)
             if not store:
-                return Response({'error': 'Loja não encontrada para o usuário'}, status=400)
+                return Response({
+                    'error': 'Loja não encontrada para o usuário',
+                    'message': 'Usuário não possui loja associada'
+                }, status=400)
+            
             
             data = request.data.copy()
             print(f"🔄 Criando transação para store {store.id}: {data}")
             
             # ✅ VALIDAÇÕES OBRIGATÓRIAS
-            if not data.get('product') and not data.get('product_id'):
-                return Response({'error': 'Campo product ou product_id é obrigatório'}, status=400)
+            if not request.data.get('product'):
+                return Response({
+                    'error': 'Campo product é obrigatório'
+                }, status=400)
             
-            if not data.get('quantity'):
-                return Response({'error': 'Campo quantity é obrigatório'}, status=400)
+            if not request.data.get('quantity'):
+                return Response({
+                    'error': 'Campo quantity é obrigatório'
+                }, status=400)
             
-            if not data.get('transaction_type'):
-                return Response({'error': 'Campo transaction_type é obrigatório'}, status=400)
+            if not request.data.get('transaction_type'):
+                return Response({
+                    'error': 'Campo transaction_type é obrigatório'
+                }, status=400)
             
             # ✅ BUSCA MELHORADA DO PRODUTO
             product_id = data.get('product_id') or data.get('product')
