@@ -8,6 +8,8 @@ from .views import (
     SessionControlView,
     SessionSummaryView,
     apply_fifo_withdrawal,
+    associate_user_store,
+    debug_user_store,
     feature_gates_view,
     inventory_item_batches_view, 
     lookup_product, 
@@ -58,6 +60,9 @@ urlpatterns = [
 
     path('inventory/<int:item_id>/batches/', inventory_item_batches_view, name='inventory-item-batches'),
     path('fifo-withdrawal/', apply_fifo_withdrawal, name='fifo-withdrawal'),
+
+    path('debug/user-store/', debug_user_store, name='debug-user-store'),
+    path('debug/associate-store/', associate_user_store, name='associate-store'),
     
 
     # --- Rotas Automáticas (Router) ---

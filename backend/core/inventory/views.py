@@ -111,30 +111,42 @@ from .scraper import search_google_shopping
 
 # inventory/views.py - MELHORAR a função get_current_store
 
+# inventory/views.py - CORRIGIR função get_current_store
+
 def get_current_store(user):
     """
-    ✅ Versão melhorada com logs e tratamento de erro
+    Versão corrigida com logs detalhados para debug
     """
     try:
-        print(f"🔍 Buscando loja para usuário: {user.id} ({user.email})")
+        print(f"🔍 get_current_store para usuário: {user.id} ({user.email})")
         
-        if hasattr(user, 'store') and user.store:
-            print(f"✅ Loja encontrada via user.store: {user.store.id}")
-            return user.store
+        # Verificar se user tem ID válido
+        if not user or not user.id:
+            print("❌ Usuário inválido ou sem ID")
+            return None
         
-        # ✅ Fallback: buscar na tabela Store
+        # Estratégia 1: Buscar por owner_id na tabela Store
         from .models import Store
-        store = Store.objects.filter(owner=user).first()
+        stores = Store.objects.filter(owner_id=user.id)
         
-        if store:
-            print(f"✅ Loja encontrada via Store.objects: {store.id}")
+        print(f"📊 Encontradas {stores.count()} lojas para owner_id={user.id}")
+        
+        for store in stores:
+            print(f"  - Store {store.id}: {store.name} (slug: {store.slug})")
+        
+        # Retornar a primeira loja encontrada
+        if stores.exists():
+            store = stores.first()
+            print(f"✅ Loja selecionada: {store.id} - {store.name}")
             return store
         
         print(f"❌ Nenhuma loja encontrada para usuário {user.id}")
         return None
         
     except Exception as e:
-        print(f"❌ Erro ao buscar loja: {e}")
+        print(f"❌ Erro geral em get_current_store: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 class TenantModelMixin:
@@ -1837,3 +1849,104 @@ def consolidate_batches_by_expiry(inventory_item):
         inventory_item.save()
     
     return inventory_item
+    
+
+
+    # inventory/views.py - ADICIONAR função de debug
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def debug_user_store(request):
+    """Debug completo: verificar usuário e loja"""
+    try:
+        user = request.user
+        print(f"🔍 Debug usuário logado: {user.id} - {user.email}")
+        
+        # Verificar todas as lojas
+        from .models import Store
+        all_stores = Store.objects.all()
+        print(f"📊 Total de lojas no sistema: {all_stores.count()}")
+        
+        for store in all_stores:
+            print(f"  - Loja {store.id}: {store.name} (owner: {store.owner_id})")
+        
+        # Verificar se usuário tem loja via owner
+        user_stores = Store.objects.filter(owner=user)
+        print(f"🎯 Lojas do usuário {user.email}: {user_stores.count()}")
+        
+        for store in user_stores:
+            print(f"  - Loja {store.id}: {store.name}")
+        
+        # Testar get_current_store
+        try:
+            current_store = get_current_store(user)
+            print(f"🏪 get_current_store retornou: {current_store}")
+        except Exception as e:
+            print(f"❌ Erro em get_current_store: {e}")
+            current_store = None
+        
+        return Response({
+            'user_id': user.id,
+            'user_email': user.email,
+            'all_stores': [
+                {
+                    'id': s.id, 
+                    'name': s.name, 
+                    'owner_id': s.owner_id,
+                    'slug': s.slug
+                } for s in all_stores
+            ],
+            'user_stores': [
+                {
+                    'id': s.id, 
+                    'name': s.name, 
+                    'slug': s.slug
+                } for s in user_stores
+            ],
+            'current_store_id': current_store.id if current_store else None,
+            'current_store_name': current_store.name if current_store else None
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': str(e),
+            'user_id': request.user.id if request.user else None
+        }, status=500)
+
+# inventory/views.py - ADICIONAR função para associar loja
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def associate_user_store(request):
+    """Associar usuário logado a uma loja específica"""
+    try:
+        user = request.user
+        store_id = request.data.get('store_id')
+        
+        if not store_id:
+            return Response({'error': 'store_id é obrigatório'}, status=400)
+        
+        from .models import Store
+        
+        # Verificar se a loja existe
+        try:
+            store = Store.objects.get(id=store_id)
+        except Store.DoesNotExist:
+            return Response({'error': 'Loja não encontrada'}, status=404)
+        
+        # Associar usuário à loja
+        store.owner = user
+        store.save()
+        
+        print(f"✅ Usuário {user.email} associado à loja {store.name}")
+        
+        return Response({
+            'message': f'Usuário associado à loja {store.name}',
+            'store_id': store.id,
+            'store_name': store.name,
+            'user_email': user.email
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao associar loja: {e}")
+        return Response({'error': str(e)}, status=500)
