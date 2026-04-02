@@ -7,9 +7,8 @@ import {
 import { api } from "../services/api";
 
 // ✅ Base URL sem /api/ (será adicionado pelo services/api.ts)
-const API_BASE_URL =
-  ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
-    .replace(/\/$/, "");
+const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
+  .replace(/\/$/, "") + "/api";
     
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
@@ -34,7 +33,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   if (token) headers["Authorization"] = `Bearer ${token}`;
   
   // ✅ CORREÇÃO: Adicionar /api/ aqui já que foi removido do services/api.ts
-  const fullUrl = `${API_BASE_URL}/api${endpoint}`;
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
   console.log(`🔄 API Request: ${options.method || 'GET'} ${fullUrl}`);
   
   try {
