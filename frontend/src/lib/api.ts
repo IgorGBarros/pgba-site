@@ -694,18 +694,31 @@ export interface SessionSummary {
 }
 
 // ✅ SESSION API USANDO AXIOS (ÚNICA DECLARAÇÃO)
+// lib/api.ts - ALTERNATIVA: Usar apenas o Axios do services/api.ts
+
+
 export const sessionApi = {
   getStatus: async (): Promise<SessionStatus> => {
     try {
       console.log('🔍 Verificando status da sessão...');
+      
+      // ✅ USAR AXIOS: Já tem a configuração correta
       const response = await api.get('/session-control/');
+      
       console.log('✅ Status da sessão:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ Erro ao verificar sessão:', error);
+      
       if (error.response?.status === 404) {
+        console.warn('🔍 Endpoint session-control não encontrado');
         return { has_session: false };
       }
+      if (error.response?.status === 401) {
+        console.warn('🔐 Token inválido ou expirado');
+        return { has_session: false };
+      }
+      
       return { has_session: false };
     }
   },
