@@ -214,6 +214,8 @@ const handleBarcodeScan = async (barcode: string) => {
 
 // WithdrawProduct.tsx - CORREÇÃO: Usar método tradicional em vez de FIFO automático
 
+// WithdrawProduct.tsx - CORREÇÃO na função handleSave
+
 const handleSave = async () => {
   if (!user) return;
   setLoading(true);
@@ -245,33 +247,39 @@ const handleSave = async () => {
       sale_price: data.sale_type === "venda" ? data.sale_price : undefined,
     });
 
-    // ✅ PASSO 2: Registrar movimentação
+    // ✅ PASSO 2: Registrar movimentação COM CAMPOS CORRETOS
     const unitPrice = currentSaleType.hasRevenue ? (data.sale_price || 0) : 0;
     
-    console.log('📝 Criando movimentação...');
-    
-    await movementsApi.create({
+    console.log('📝 Criando movimentação com dados:', {
       product: data.product_id,
       transaction_type: data.sale_type.toUpperCase(),
       product_id: data.product_id,
-      batch_id: data.selected_batch?.id ? String(data.selected_batch.id) : null,
+      product_name: data.product_name,
+      barcode: data.barcode,
+      quantity: data.withdraw_qty,
+      unit_price: unitPrice,
+      description: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`
+    });
+    
+    await movementsApi.create({
+      // ✅ CAMPOS OBRIGATÓRIOS
+      product: data.product_id,
+      transaction_type: data.sale_type.toUpperCase(),
+      product_id: data.product_id,
       product_name: data.product_name,
       barcode: data.barcode,
       movement_type: "saida",
       quantity: data.withdraw_qty,
       sale_type: data.sale_type,
       unit_price: unitPrice,
-      description: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
-      // ✅ REMOVIDO: notes (causava erro no backend)
-    });
-
-    // ✅ PASSO 3: Atualizar lote se selecionado
-    if (data.selected_batch) {
-      console.log(`📦 Atualizando lote ${data.selected_batch.id}...`);
       
-      // Aqui você pode implementar a atualização do lote se necessário
-      // Por enquanto, vamos apenas logar
-    }
+      // ✅ CAMPOS OPCIONAIS (apenas se necessários)
+      description: data.notes.trim() || `${currentSaleType.label} - ${data.product_name}`,
+      
+      // ✅ REMOVIDOS: campos que podem causar erro
+      // batch_id: removido temporariamente
+      // notes: removido (estava causando erro)
+    });
     
     console.log('✅ Baixa realizada com sucesso');
     
@@ -297,6 +305,7 @@ const handleSave = async () => {
     setLoading(false);
   }
 };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
