@@ -1,4 +1,4 @@
-// lib/api.ts - VERSÃO CORRIGIDA (REMOVER A PRIMEIRA sessionApi)
+// lib/api.ts - VERSÃO CORRIGIDA E PADRONIZADA
 
 import {
   isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
@@ -6,9 +6,9 @@ import {
 } from "./demoData";
 import { api } from "../services/api";
 
-// ✅ Base URL sem /api/ (será adicionado pelo services/api.ts)
+// ✅ CORREÇÃO: Base URL SEM /api/ (services/api.ts já adiciona)
 const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
-  .replace(/\/$/, "") + "/api";
+  .replace(/\/$/, "");
     
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
@@ -22,7 +22,7 @@ export function clearToken() {
   localStorage.removeItem("auth_token");
 }
 
-// ✅ CORREÇÃO: Função apiRequest atualizada para usar Axios quando possível
+// ✅ CORREÇÃO: Função apiRequest SEM duplicar /api/
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -32,8 +32,8 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   
   if (token) headers["Authorization"] = `Bearer ${token}`;
   
-  // ✅ CORREÇÃO: Adicionar /api/ aqui já que foi removido do services/api.ts
-  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  // ✅ CORREÇÃO: Usar API_BASE_URL + /api/ + endpoint
+  const fullUrl = `${API_BASE_URL}/api${endpoint}`;
   console.log(`🔄 API Request: ${options.method || 'GET'} ${fullUrl}`);
   
   try {
@@ -497,11 +497,13 @@ export interface StorefrontItem {
   };
 }
 
+// ✅ CORREÇÃO: API pública usando URL completa (sem duplicação)
 export const publicStorefrontApi = {
   listBySlug: async (slug: string) => {
     try {
       console.log(`🔍 Buscando vitrine por slug: ${slug}`);
       
+      // ✅ CORREÇÃO: URL completa para endpoint público
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/${slug}/`, {
         method: 'GET',
         headers: {
@@ -538,6 +540,7 @@ export const publicStorefrontApi = {
     try {
       console.log(`🔍 Buscando vitrine por ID: ${sellerId}`);
       
+      // ✅ CORREÇÃO: URL completa para endpoint público
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/?seller=${sellerId}`, {
         method: 'GET',
         headers: {
@@ -694,31 +697,18 @@ export interface SessionSummary {
 }
 
 // ✅ SESSION API USANDO AXIOS (ÚNICA DECLARAÇÃO)
-// lib/api.ts - ALTERNATIVA: Usar apenas o Axios do services/api.ts
-
-
 export const sessionApi = {
   getStatus: async (): Promise<SessionStatus> => {
     try {
       console.log('🔍 Verificando status da sessão...');
-      
-      // ✅ USAR AXIOS: Já tem a configuração correta
       const response = await api.get('/session-control/');
-      
       console.log('✅ Status da sessão:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ Erro ao verificar sessão:', error);
-      
       if (error.response?.status === 404) {
-        console.warn('🔍 Endpoint session-control não encontrado');
         return { has_session: false };
       }
-      if (error.response?.status === 401) {
-        console.warn('🔐 Token inválido ou expirado');
-        return { has_session: false };
-      }
-      
       return { has_session: false };
     }
   },
