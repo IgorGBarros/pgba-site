@@ -16,13 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from inventory.views import session_control_view 
+#from backend.core.inventory.views import session_control_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/chat/", include("ai.urls")),
     path("api/", include("inventory.urls")),
-    path('session-control/', session_control_view, name='session-control-direct'),
-    path('session-summary/', session_control_view, name='session-summary-direct'),
+   # path('session-control/', session_control_view, name='session-control-direct'),
+   # path('session-summary/', session_control_view, name='session-summary-direct'),
 
 ]
