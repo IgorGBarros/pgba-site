@@ -1,12 +1,11 @@
-// lib/api.ts - VERSÃO CORRIGIDA E PADRONIZADA
-
+// lib/api.ts - VERSÃO FINAL CORRIGIDA
 import {
   isDemoMode, DEMO_INVENTORY, DEMO_MOVEMENTS,
   DEMO_PROFILE, DEMO_BATCHES
 } from "./demoData";
 import { api } from "../services/api";
 
-// ✅ CORREÇÃO: Base URL SEM /api/ (services/api.ts já adiciona)
+// ✅ CORREÇÃO: Base URL limpa (services/api.ts já adiciona /api/)
 const API_BASE_URL = ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com")
   .replace(/\/$/, "");
     
@@ -32,7 +31,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   
   if (token) headers["Authorization"] = `Bearer ${token}`;
   
-  // ✅ CORREÇÃO: Usar API_BASE_URL + /api/ + endpoint
+  // ✅ CORREÇÃO: Usar API_BASE_URL + /api/ + endpoint (sem duplicação)
   const fullUrl = `${API_BASE_URL}/api${endpoint}`;
   console.log(`🔄 API Request: ${options.method || 'GET'} ${fullUrl}`);
   
@@ -74,7 +73,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   }
 }
 
-// ── Auth (usando apiRequest para consistência) ──
+// ── Auth (endpoints sem /api/ duplicado) ──
 export interface AuthUser {
   id: number | string;
   email: string;
@@ -137,7 +136,7 @@ export const productLookupApi = {
     }),
 };
 
-// ✅ Sistema de cache (mantido igual)
+// ✅ Sistema de cache melhorado
 let inventoryCache: InventoryItem[] | null = null;
 let movementsCache: Movement[] | null = null;
 let cacheTimestamp: { inventory?: number; movements?: number } = {};
@@ -161,7 +160,7 @@ function isCacheValid(type: 'inventory' | 'movements'): boolean {
   return isValid;
 }
 
-// ── Inventory (usando endpoints corretos) ──
+// ── Inventory (endpoints corrigidos) ──
 export interface InventoryItem {
   product_id: string | number | undefined;
   id: string;
@@ -216,73 +215,119 @@ export const inventoryApi = {
     console.log(`📦 Carregando inventário (forceRefresh: ${forceRefresh})`);
     
     if (isDemoMode()) {
-      console.log("🎭 Modo demo ativo, retornando dados demo");
+      console.log("🎭 Modo demo ativo - retornando dados mock");
       return DEMO_INVENTORY;
     }
     
-    if (!forceRefresh && inventoryCache && isCacheValid('inventory')) {
+    // ✅ Usar cache se válido e não forçar refresh
+    if (!forceRefresh && isCacheValid('inventory') && inventoryCache) {
       console.log("⚡ Usando cache do inventário");
       return inventoryCache;
     }
     
     try {
-      console.log("🔄 Buscando inventário da API...");
       const data = await apiRequest<InventoryItem[]>("/inventory/");
       
-      if (!Array.isArray(data)) {
-        console.error("❌ Dados do inventário inválidos:", data);
-        throw new Error("Formato de dados inválido");
-      }
-      
-      console.log(`✅ Inventário carregado: ${data.length} itens`);
+      // ✅ Atualizar cache
       inventoryCache = data;
       cacheTimestamp.inventory = Date.now();
-      return data;
       
+      console.log(`✅ Inventário carregado: ${data.length} itens`);
+      return data;
     } catch (error) {
       console.error("❌ Erro ao carregar inventário:", error);
       
+      // ✅ Fallback para cache se houver erro
       if (inventoryCache) {
-        console.log("🔄 Usando cache antigo como fallback");
+        console.log("🔄 Usando cache como fallback");
         return inventoryCache;
       }
       
-      console.log("📦 Retornando inventário vazio");
-      return [];
+      throw error;
     }
   },
-  
-  get: (id: string) => (isDemoMode() ? Promise.resolve(DEMO_INVENTORY.find(i => i.id === id) || DEMO_INVENTORY[0])
-                                     : apiRequest<InventoryItem>(`/inventory/${id}/`)),
-                                     
-  getByBarcode: async (barcode: string) => {
-    if (isDemoMode()) return DEMO_INVENTORY.find(i => i.barcode === barcode) || null;
+
+  // ✅ CORREÇÃO: Busca por código de barras melhorada
+  getByBarcode: async (barcode: string): Promise<InventoryItem | null> => {
+    console.log(`🔍 Buscando produto por código: ${barcode}`);
+    
+    if (isDemoMode()) {
+      const found = DEMO_INVENTORY.find(item => 
+        item.product?.bar_code === barcode || 
+        item.barcode === barcode
+      );
+      console.log(found ? "✅ Produto encontrado no demo" : "❌ Produto não encontrado no demo");
+      return found || null;
+    }
     
     try {
-      const items = await inventoryApi.list();
-      return items.find(i => i.product?.bar_code === barcode || i.barcode === barcode) || null;
-    } catch (error) {
-      console.error("❌ Erro ao buscar por código de barras:", error);
-      return null;
+      // ✅ CORREÇÃO: Endpoint correto para busca por código
+      const data = await apiRequest<InventoryItem>(`/inventory/by-barcode/${encodeURIComponent(barcode)}/`);
+      console.log("✅ Produto encontrado:", data);
+      return data;
+    } catch (error: any) {
+      console.error(`❌ Erro ao buscar produto ${barcode}:`, error);
+      
+      // ✅ Se erro 404, retornar null em vez de lançar erro
+      if (error.message?.includes('404') || error.message?.includes('Não encontrado')) {
+        console.log("📝 Produto não encontrado no estoque (404)");
+        return null;
+      }
+      
+      throw error;
     }
   },
-  
+
   update: async (id: string, data: Partial<InventoryItem>) => {
-    const res = await apiRequest<InventoryItem>(`/inventory/${id}/`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-    clearAppCache();
-    return res;
+    console.log(`📝 Atualizando item ${id}:`, data);
+    
+    if (isDemoMode()) {
+      console.log("🎭 Modo demo - simulando atualização");
+      return { ...DEMO_INVENTORY[0], ...data };
+    }
+    
+    try {
+      const result = await apiRequest<InventoryItem>(`/inventory/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+      
+      // ✅ Limpar cache após atualização
+      clearAppCache();
+      
+      console.log("✅ Item atualizado:", result);
+      return result;
+    } catch (error) {
+      console.error(`❌ Erro ao atualizar item ${id}:`, error);
+      throw error;
+    }
   },
-  
+
   delete: async (id: string) => {
-    await apiRequest<void>(`/inventory/${id}/`, { method: "DELETE" });
-    clearAppCache();
+    console.log(`🗑️ Removendo item ${id}`);
+    
+    if (isDemoMode()) {
+      console.log("🎭 Modo demo - simulando remoção");
+      return;
+    }
+    
+    try {
+      await apiRequest<void>(`/inventory/${id}/`, {
+        method: "DELETE",
+      });
+      
+      // ✅ Limpar cache após remoção
+      clearAppCache();
+      
+      console.log("✅ Item removido");
+    } catch (error) {
+      console.error(`❌ Erro ao remover item ${id}:`, error);
+      throw error;
+    }
   },
 };
-// lib/api.ts - ADICIONAR API FIFO
-// lib/api.ts - ADICIONAR API FIFO
+
+// ✅ API FIFO para baixas automáticas
 export const fifoApi = {
   applyWithdrawal: async (data: {
     product_id: string;
@@ -290,6 +335,7 @@ export const fifoApi = {
     transaction_type: string;
     unit_price?: number;
     notes?: string;
+    batch_id?: string | null;
   }) => {
     try {
       console.log('🎯 Aplicando baixa FIFO:', data);
@@ -321,100 +367,106 @@ export const fifoApi = {
     }
   }
 };
-// ── Inventory Batches ──
+
+// ── Batches ──
 export interface InventoryBatch {
-  id: string;
-  inventory_item_id: string;
+  id: string; // ✅ CORREÇÃO: Mudar de number para string
   quantity: number;
   cost_price: number;
-  batch_code?: string;
-  expiration_date?: string | null;
-  expiry_date?: string | null;
-  expiry_photo_url?: string | null;
+  expiration_date: string | null;
   created_at: string;
+  updated_at?: string;
 }
-
 export const batchApi = {
-  listByItem: (itemId: string) => {
-    if (isDemoMode()) return Promise.resolve(DEMO_BATCHES[itemId] || []);
-    return apiRequest<InventoryBatch[]>(`/inventory/${itemId}/batches/`);
-  },
-  create: async (itemId: string, data: Omit<InventoryBatch, "id" | "inventory_item_id" | "created_at">) => {
-    if (isDemoMode()) return { id: "b-new", inventory_item_id: itemId, created_at: new Date().toISOString(), ...data } as InventoryBatch;
-    const res = await apiRequest<InventoryBatch>(`/inventory/${itemId}/batches/`, { method: "POST", body: JSON.stringify(data) });
-    clearAppCache();
-    return res;
+  listByItem: async (inventoryItemId: string): Promise<InventoryBatch[]> => {
+    console.log(`📦 Carregando lotes para item ${inventoryItemId}`);
+    
+
+    
+    try {
+      const data = await apiRequest<InventoryBatch[]>(`/inventory/${inventoryItemId}/batches/`);
+      console.log(`✅ ${data.length} lotes carregados`);
+      return data;
+    } catch (error) {
+      console.error(`❌ Erro ao carregar lotes:`, error);
+      return []; // ✅ Fallback para array vazio
+    }
   },
 };
 
 // ── Movements ──
-export type TransactionType = "venda" | "uso_proprio" | "presente" | "brinde" | "perda";
-
 export interface Movement {
-  id: string | number;
-  transaction_type?: string; 
-  description?: string | null; 
-  unit_cost?: number | null;
-  batch_code?: string | null;
-  product_id?: string | null;
-  batch_id?: string | null;
+  id: string;
   product_name: string;
-  barcode: string;
-  movement_type?: "entrada" | "saida";
+  transaction_type: string;
   quantity: number;
-  unit_price: number | null;
-  sale_type?: TransactionType | null;
-  notes?: string | null;
-  profit?: number | null;
+  unit_price: number;
   created_at: string;
+  description?: string;
+  notes?: string;
 }
+
+export type TransactionType = "venda" | "presente" | "brinde" | "perda" | "uso_proprio";
 
 export const movementsApi = {
   list: async (forceRefresh = false) => {
-    console.log(`📈 Carregando movimentações (forceRefresh: ${forceRefresh})`);
+    console.log(`📊 Carregando movimentações (forceRefresh: ${forceRefresh})`);
     
     if (isDemoMode()) {
-      console.log("🎭 Modo demo ativo, retornando movimentações demo");
       return DEMO_MOVEMENTS;
     }
     
-    if (!forceRefresh && movementsCache && isCacheValid('movements')) {
+    // ✅ Usar cache se válido
+    if (!forceRefresh && isCacheValid('movements') && movementsCache) {
       console.log("⚡ Usando cache das movimentações");
       return movementsCache;
     }
     
     try {
-      console.log("🔄 Buscando movimentações da API...");
       const data = await apiRequest<Movement[]>("/transactions/");
       
-      if (!Array.isArray(data)) {
-        console.error("❌ Dados das movimentações inválidos:", data);
-        throw new Error("Formato de dados inválido");
-      }
-      
-      console.log(`✅ Movimentações carregadas: ${data.length} itens`);
+      // ✅ Atualizar cache
       movementsCache = data;
       cacheTimestamp.movements = Date.now();
-      return data;
       
+      console.log(`✅ ${data.length} movimentações carregadas`);
+      return data;
     } catch (error) {
       console.error("❌ Erro ao carregar movimentações:", error);
       
+      // ✅ Fallback para cache
       if (movementsCache) {
-        console.log("🔄 Usando cache antigo como fallback");
+        console.log("🔄 Usando cache como fallback");
         return movementsCache;
       }
       
-      console.log("📈 Retornando movimentações vazias");
-      return [];
+      throw error;
     }
   },
-  
-  create: async (data: Omit<Movement, "id" | "created_at" | "profit">) => {
-    if (isDemoMode()) return { id: "m-new", created_at: new Date().toISOString(), profit: null, ...data } as Movement;
-    const res = await apiRequest<Movement>("/transactions/", { method: "POST", body: JSON.stringify(data) });
-    clearAppCache();
-    return res;
+
+  create: async (data: any) => {
+    console.log("📝 Criando movimentação:", data);
+    
+    if (isDemoMode()) {
+      console.log("🎭 Modo demo - simulando criação");
+      return { ...data, id: Date.now().toString() };
+    }
+    
+    try {
+      const result = await apiRequest<Movement>("/transactions/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      
+      // ✅ Limpar cache após criação
+      clearAppCache();
+      
+      console.log("✅ Movimentação criada:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ Erro ao criar movimentação:", error);
+      throw error;
+    }
   },
 };
 
@@ -448,7 +500,7 @@ export const profileApi = {
   update: (data: Partial<Profile>) => (isDemoMode() ? Promise.resolve({ ...DEMO_PROFILE, ...data } as Profile) : apiRequest<Profile>("/profile/", { method: "PATCH", body: JSON.stringify(data) })),
 };
 
-// ✅ Dashboard API (mantido igual)
+// ✅ Dashboard API
 export const dashboardApi = {
   getStats: async (forceRefresh = false) => {
     console.log(`📊 Carregando estatísticas do dashboard`);
@@ -500,7 +552,7 @@ export const dashboardApi = {
   }
 };
 
-// ── Storefront (public) ──
+// ── Storefront (public) - URLs completas mantidas ──
 export interface StorefrontItem {
   id: string;
   product_name?: string;
@@ -536,13 +588,13 @@ export interface StorefrontItem {
   };
 }
 
-// ✅ CORREÇÃO: API pública usando URL completa (sem duplicação)
+// ✅ API pública mantém URL completa (endpoints públicos)
 export const publicStorefrontApi = {
   listBySlug: async (slug: string) => {
     try {
       console.log(`🔍 Buscando vitrine por slug: ${slug}`);
       
-      // ✅ CORREÇÃO: URL completa para endpoint público
+      // ✅ URL completa para endpoint público (sem mudanças)
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/${slug}/`, {
         method: 'GET',
         headers: {
@@ -579,7 +631,7 @@ export const publicStorefrontApi = {
     try {
       console.log(`🔍 Buscando vitrine por ID: ${sellerId}`);
       
-      // ✅ CORREÇÃO: URL completa para endpoint público
+      // ✅ URL completa para endpoint público (sem mudanças)
       const response = await fetch(`${API_BASE_URL}/api/public/storefront/?seller=${sellerId}`, {
         method: 'GET',
         headers: {
@@ -643,6 +695,7 @@ export const storefrontApi = {
       return publicStorefrontApi.listById(sellerId);
     }
     
+    // ✅ CORREÇÃO: Endpoint interno sem /api/ duplicado
     return apiRequest<StorefrontItem[]>("/storefront/");
   },
   
@@ -652,7 +705,7 @@ export const storefrontApi = {
   },
 };
 
-// ── Outros serviços (mantidos iguais) ──
+// ── Outros serviços ──
 export { productService } from "./productService";
 
 export const ocrApi = {
@@ -683,7 +736,7 @@ export const salesApi = {
     }),
 };
 
-// ✅ FUNÇÕES HELPER (mantidas iguais)
+// ✅ FUNÇÕES HELPER
 export function getProductBrand(item: any): string | null {
   return item.product?.brand ||
          item.brand ||
@@ -719,7 +772,7 @@ export const debugApi = {
   }
 };
 
-// ✅ INTERFACES PARA SESSION API
+// ✅ Session Control (usando Axios para consistência)
 export interface SessionStatus {
   has_session: boolean;
   products_count?: number;
@@ -735,7 +788,7 @@ export interface SessionSummary {
   session_id: number;
 }
 
-// ✅ SESSION API USANDO AXIOS (ÚNICA DECLARAÇÃO)
+// ✅ CORREÇÃO: SessionApi usando Axios (consistente com o resto da app) [1]
 export const sessionApi = {
   getStatus: async (): Promise<SessionStatus> => {
     try {
