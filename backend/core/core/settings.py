@@ -181,7 +181,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # --------------------------------------------------------------------------
-# ✅ CORS DINÂMICO para Vitrine
+# ✅ CORS DINÂMICO para Vitrine - CORRIGIDO PARA FIREBASE
 # --------------------------------------------------------------------------
 def get_cors_allowed_origins():
     """Configura CORS dinamicamente para suportar vitrines por consultora"""
@@ -248,8 +248,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://gestao-estoque-k5vy.onrender.com",
 ]
 
-# ✅ CORREÇÃO: Configuração para Firebase popup
-SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+# ✅ CORREÇÃO CRÍTICA: Configuração para Firebase popup
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # ✅ Permite popups do Firebase
 
 # ✅ Configurações de segurança para produção
 if not DEBUG:
