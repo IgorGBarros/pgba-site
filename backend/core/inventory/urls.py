@@ -48,8 +48,8 @@ urlpatterns = [
     path('admin/users/<int:pk>/plan/', AdminUpdatePlanView.as_view(), name='admin-update-plan'),
     path('admin/users/<int:pk>/subscription/', AdminUpdateSubscriptionView.as_view(), name='admin-update-sub'),
 
-    #path('session-control/', SessionControlView.as_view(), name='session-control'),
-    #path('session-summary/', SessionSummaryView.as_view(), name='session-summary'),
+    path('session-control/', SessionControlView.as_view(), name='session-control'),
+    path('session-summary/', SessionSummaryView.as_view(), name='session-summary'),
 
     path('public/storefront/<str:slug>/', public_storefront, name='public_storefront'),
     path('public/storefront/', public_storefront, name='public_storefront_by_id'),
