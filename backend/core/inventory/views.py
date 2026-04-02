@@ -1347,7 +1347,35 @@ def profile_view(request):
 # ==========================================
 # 5. PAINEL ADMIN (Gestão de Assinaturas)
 # ==========================================
+class AdminUserListView(APIView):
+    """Lista todos os usuários e dados de suas lojas para o painel admin."""
+    permission_classes = [IsAuthenticated, IsAdminUser] # 🔒 Apenas Administradores!
 
+    def get(self, request):
+        users = CustomUser.objects.select_related('store').all()
+        data = []
+        for u in users:
+            store = getattr(u, 'store', None)
+            
+            # Conta quantos produtos diferentes essa loja tem em estoque
+            product_count = InventoryItem.objects.filter(store=store).count() if store else 0
+            
+            data.append({
+                "id": u.id,
+                "email": u.email,
+                "display_name": getattr(store, 'name', u.name),
+                "plan": getattr(store, 'plan', 'free'),
+                "store_slug": getattr(store, 'slug', None),
+                "storefront_enabled": getattr(store, 'storefront_enabled', False),
+                "whatsapp_number": getattr(store, 'whatsapp', None),
+                "product_count": product_count,
+                "created_at": getattr(store, 'created_at', u.last_login),
+                "last_sign_in": u.last_login,
+                "subscription_started_at": getattr(store, 'subscription_started_at', None),
+                "subscription_expires_at": getattr(store, 'subscription_expires_at', None),
+                "payment_provider": getattr(store, 'payment_provider', None),
+                "payment_external_id": getattr(store, 'payment_external_id', None),
+            })
 
 class AdminUpdatePlanView(APIView):
     """✅ CORRIGIDO: Muda o plano de um usuário rapidamente"""
