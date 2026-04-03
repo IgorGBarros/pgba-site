@@ -1,7 +1,9 @@
+// StockAdjustmentModal.tsx - VERSÃO CORRIGIDA
+
 import { useState, useEffect } from "react";
 import { X, Loader2, Scale, Minus, Plus, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { inventoryApi, movementsApi, InventoryItem } from "../lib/api";
+import { movementsApi, InventoryItem } from "../lib/api"; // ✅ REMOVER inventoryApi
 import { useToast } from "../hooks/use-toast";
 
 interface StockAdjustmentModalProps {
@@ -17,7 +19,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // 🚀 LÓGICA DE EXTRAÇÃO SEGURA (COMPATÍVEL COM O NOVO BACKEND)
+  // 🚀 LÓGICA DE EXTRAÇÃO SEGURA
   const systemQty = item?.total_quantity ?? item?.quantity ?? 0;
   const productName = item?.product?.name || item?.product_name || "Produto Desconhecido";
   const barcode = item?.product?.bar_code || item?.barcode || "";
@@ -43,41 +45,63 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
 
     setLoading(true);
     try {
-      // 1. Atualiza a quantidade do inventário da loja (suportando novo e velho padrão)
-      await inventoryApi.update(item.id, { 
-          total_quantity: realQty, 
-          quantity: realQty 
-        }); // ✅ Correct
+      const adjustmentQty = Math.abs(diff);
+      const isIncrease = diff > 0;
+      
+      console.log(`🔧 Ajuste manual: ${systemQty} → ${realQty} (${diff > 0 ? "+" : ""}${diff})`);
 
-      // 2. Registra o histórico com a diferença (Entrada ou Saída)
-      await movementsApi.create({
-        // 🚀 CORREÇÃO OBRIGATÓRIA PARA O DJANGO NÃO DAR ERRO 400:
-        product: productId, 
-        transaction_type: diff > 0 ? "ENTRADA" : "AJUSTE",
-        description: notes.trim() || (diff < 0 ? "Ajuste de saldo (Perda/Saída)" : "Ajuste manual de saldo (Entrada)"),
-        unit_cost: item.cost_price || 0,
+      // ✅ USAR APENAS A API DE TRANSAÇÕES (que aplica FIFO automaticamente)
+      const transactionData = {
+        product: productId,
+        product_id: productId,
+        quantity: adjustmentQty,
+        transaction_type: isIncrease ? "ENTRADA" : "AJUSTE", // AJUSTE para saídas
         unit_price: 0,
-
-        // Mantendo os campos antigos para o TypeScript não reclamar
-        product_id: productId as string,
-        batch_id: null,
+        unit_cost: item.cost_price || 0,
+        description: notes.trim() || (
+          isIncrease 
+            ? `Ajuste manual: +${adjustmentQty} unidades` 
+            : `Ajuste manual: -${adjustmentQty} unidades (Correção de inventário)`
+        ),
+        // Campos extras para compatibilidade
         product_name: productName,
         barcode: barcode,
-        movement_type: diff > 0 ? "entrada" : "saida",
-        quantity: Math.abs(diff), // Math.abs garante que só enviamos números absolutos
-        sale_type: diff < 0 ? "perda" : null, 
+        movement_type: isIncrease ? "entrada" : "saida",
+        sale_type: isIncrease ? null : "ajuste",
         notes: notes.trim(),
-      } as any);
+      };
+
+      console.log('📤 Enviando transação de ajuste:', transactionData);
+
+      // ✅ CRIAR TRANSAÇÃO (que automaticamente aplica FIFO se for saída)
+      const response = await movementsApi.create(transactionData);
+      
+      console.log('✅ Resposta da transação:', response);
 
       toast({
-        title: "Estoque ajustado!",
-        description: `${productName}: ${systemQty} → ${realQty} (${diff > 0 ? "+" : ""}${diff})`,
+        title: "Estoque ajustado com sucesso!",
+        description: `${productName}: ${systemQty} → ${realQty} unidades`,
       });
       
-      onAdjusted();
+      onAdjusted(); // Recarregar dados
       onClose();
+      
     } catch (err: any) {
-      toast({ title: "Erro ao ajustar", description: err.message, variant: "destructive" });
+      console.error('❌ Erro no ajuste:', err);
+      
+      let errorMessage = "Erro desconhecido";
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      toast({ 
+        title: "Erro ao ajustar estoque", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }
@@ -163,7 +187,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
               </div>
             </div>
 
-            {/* Difference Warning */}
+            {/* ✅ NOVO: Indicador de FIFO para saídas */}
             <div className="h-16 flex items-center justify-center">
               {typeof realQty === "number" && realQty !== systemQty && (
                 <div className={`w-full rounded-xl p-3 text-center border ${diff < 0 ? "bg-destructive/10 border-destructive/20" : "bg-primary/10 border-primary/20"}`}>
@@ -174,7 +198,10 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjusted
                     </span>
                   </div>
                   <p className={`text-[10px] mt-0.5 font-medium ${diff < 0 ? "text-destructive/70" : "text-primary/70"}`}>
-                    {diff < 0 ? "Será registrada uma SAÍDA (Perda/Ajuste)" : "Será registrada uma ENTRADA (Ajuste)"}
+                    {diff < 0 
+                      ? "🤖 FIFO será aplicado automaticamente nos lotes mais antigos" 
+                      : "Será registrada uma ENTRADA no estoque"
+                    }
                   </p>
                 </div>
               )}

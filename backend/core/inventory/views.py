@@ -1833,32 +1833,27 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             traceback.print_exc()
             raise
 
+# inventory/views.py - ADICIONAR suporte a AJUSTE
+
+
     def create(self, request, *args, **kwargs):
-        """✅ Create com FIFO AUTOMÁTICO para saídas"""
+        """✅ Create com FIFO AUTOMÁTICO para saídas (incluindo ajustes)"""
         try:
-            print(f"🔄 CREATE - Dados recebidos: {request.data}")
-            
-            # ✅ VALIDAÇÃO 1: Garantir que usuário tem loja
             store = ensure_user_has_store(request.user)
             if not store:
-                return Response({
-                    'error': 'Não foi possível obter/criar loja para o usuário'
-                }, status=400)
+                return Response({'error': 'Loja não encontrada para o usuário'}, status=400)
             
-            print(f"✅ VALIDAÇÃO 1 - Store obtida: {store.id}")
+            data = request.data.copy()
+            print(f"🔄 CREATE - Dados recebidos: {data}")
             
-            # ✅ VALIDAÇÃO 2: Campos obrigatórios
+            # ✅ VALIDAÇÕES OBRIGATÓRIAS
             required_fields = ['product', 'quantity', 'transaction_type']
             for field in required_fields:
-                if not request.data.get(field):
-                    return Response({
-                        'error': f'Campo {field} é obrigatório'
-                    }, status=400)
-            
-            print(f"✅ VALIDAÇÃO 2 - Campos obrigatórios OK")
+                if not data.get(field):
+                    return Response({'error': f'Campo {field} é obrigatório'}, status=400)
             
             # ✅ BUSCAR PRODUTO E INVENTÁRIO
-            product_id = request.data.get('product_id') or request.data.get('product')
+            product_id = data.get('product_id') or data.get('product')
             try:
                 from .models import Product, InventoryItem
                 product = Product.objects.get(id=product_id)
@@ -1870,15 +1865,15 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             except InventoryItem.DoesNotExist:
                 return Response({'error': 'Produto não está no seu estoque'}, status=404)
             
-            quantity = abs(int(request.data.get('quantity', 0)))
-            transaction_type = request.data.get('transaction_type', '').upper()
-            unit_price = float(request.data.get('unit_price', 0))
+            quantity = abs(int(data.get('quantity', 0)))
+            transaction_type = data.get('transaction_type', '').upper()
+            unit_price = float(data.get('unit_price', 0))
             
-            # ✅ VERIFICAR SE É SAÍDA E APLICAR FIFO
-            is_exit = transaction_type in ['VENDA', 'USO_PROPRIO', 'PRESENTE', 'BRINDE', 'PERDA', 'SAIDA']
+            # ✅ VERIFICAR SE É SAÍDA E APLICAR FIFO (incluindo AJUSTE)
+            is_exit = transaction_type in ['VENDA', 'USO_PROPRIO', 'PRESENTE', 'BRINDE', 'PERDA', 'SAIDA', 'AJUSTE']
             
             if is_exit:
-                print(f"🔄 SAÍDA DETECTADA - Aplicando FIFO para {quantity} unidades")
+                print(f"🔄 SAÍDA DETECTADA ({transaction_type}) - Aplicando FIFO para {quantity} unidades")
                 
                 # Verificar estoque suficiente
                 if inventory_item.total_quantity < quantity:
@@ -1903,7 +1898,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                             quantity=-quantity,  # ✅ NEGATIVO para saída
                             unit_price=unit_price,
                             unit_cost=inventory_item.cost_price or 0,
-                            description=request.data.get('description', f"{transaction_type} - {product.name}")
+                            description=data.get('description', f"{transaction_type} - {product.name}")
                         )
                         
                         print(f"✅ Transação FIFO criada: {transaction_obj.id}")
@@ -1911,7 +1906,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                         
                         serializer = self.get_serializer(transaction_obj)
                         return Response({
-                            'message': 'Baixa FIFO aplicada com sucesso',
+                            'message': f'{"Ajuste" if transaction_type == "AJUSTE" else "Baixa"} FIFO aplicada com sucesso',
                             'transaction': serializer.data,
                             'batches_used': batches_used,
                             'new_total_quantity': inventory_item.total_quantity,
@@ -1923,11 +1918,11 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                         return Response({'error': str(ve)}, status=400)
             
             else:
-                # ✅ ENTRADA NORMAL (sem FIFO)
-                print(f"🔄 ENTRADA DETECTADA - Sem FIFO")
+                # ✅ ENTRADA NORMAL (sem FIFO) - para ENTRADA ou outros tipos
+                print(f"🔄 ENTRADA DETECTADA ({transaction_type}) - Sem FIFO")
                 
                 # ✅ Validar serializer
-                serializer = self.get_serializer(data=request.data)
+                serializer = self.get_serializer(data=data)
                 serializer.is_valid(raise_exception=True)
                 
                 # ✅ perform_create vai definir o store automaticamente
