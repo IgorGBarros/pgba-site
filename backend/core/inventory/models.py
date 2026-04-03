@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-
+from django.utils.text import slugify
 from django.db import models
 from django.contrib.auth.models import (
     AbstractBaseUser, BaseUserManager, PermissionsMixin, Permission
@@ -65,18 +65,20 @@ class CrawlerLog(models.Model):
 
 class Store(models.Model):
     """Loja da consultora"""
-    name = models.CharField(max_length=255)
-    owner = models.OneToOneField(  # ✅ ADICIONAR este campo se não existir
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='store'
-    )
-    slug = models.SlugField(max_length=100, unique=True, blank=True)
-    whatsapp = models.CharField(max_length=20, blank=True)
-    storefront_enabled = models.BooleanField(default=False)
-    plan = models.CharField(max_length=20, default='free')
+    name = models.CharField(max_length=255, default='Minha Loja Natura')
+    slug = models.SlugField(unique=True, blank=True, max_length=120)
+    whatsapp = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # ✅ RELACIONAMENTO CORRETO
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='store',
+        null=True,  # Permitir null temporariamente
+        blank=True
+    )
 
     PLAN_CHOICES = [
         ('free', 'Free'),
@@ -93,14 +95,23 @@ class Store(models.Model):
     payment_external_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID da transação/assinatura")
     subscription_started_at = models.DateTimeField(blank=True, null=True)
     subscription_expires_at = models.DateTimeField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name)
+            slug = base_slug
+            counter = 1
+            while Store.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return f"{self.name} ({self.owner.email if self.owner else 'Sem dono'})"
-
-    def save(self, *args, **kwargs):
-        if not self.slug and self.name:
-            from django.utils.text import slugify
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
+    
+    class Meta:
+        verbose_name = 'Loja'
+        verbose_name_plural = 'Lojas'
 
 class InventoryItem(models.Model):
     """

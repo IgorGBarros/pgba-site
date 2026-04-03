@@ -1,3 +1,5 @@
+from time import time
+
 from aiohttp import request
 from django.db import models
 from django.db import transaction
@@ -104,9 +106,13 @@ from .scraper import search_google_shopping
 
 # inventory/views.py - VERSÃO FINAL da função get_current_store
 
+# inventory/views.py - VERSÃO FINAL da função get_current_store
+
+# inventory/views.py - VERSÃO FINAL da função get_current_store
+
 def get_current_store(user):
     """
-    Versão final com fallback automático para criar loja
+    ✅ Versão final com fallback automático para criar loja
     """
     try:
         print(f"🔍 get_current_store para usuário: {user.id} ({user.email})")
@@ -117,26 +123,24 @@ def get_current_store(user):
         
         from .models import Store
         
-        # Estratégia 1: Buscar por owner_id na tabela Store
-        stores = Store.objects.filter(owner_id=user.id)
-        print(f"📊 Encontradas {stores.count()} lojas para owner_id={user.id}")
-        
-        if stores.exists():
-            store = stores.first()
-            print(f"✅ Loja encontrada: {store.id} - {store.name}")
-            return store
-        
-        # Estratégia 2: Buscar por owner (relacionamento)
+        # Estratégia 1: Buscar por relacionamento owner
         try:
-            stores_by_relation = Store.objects.filter(owner=user)
-            print(f"📊 Encontradas {stores_by_relation.count()} lojas por relacionamento")
-            
-            if stores_by_relation.exists():
-                store = stores_by_relation.first()
-                print(f"✅ Loja encontrada por relacionamento: {store.id} - {store.name}")
+            store = Store.objects.filter(owner=user).first()
+            if store:
+                print(f"✅ Loja encontrada via relacionamento: {store.id} - {store.name}")
                 return store
         except Exception as e:
             print(f"⚠️ Erro ao buscar por relacionamento: {e}")
+        
+        # Estratégia 2: Buscar por owner_id direto
+        try:
+            stores = Store.objects.filter(owner_id=user.id)
+            if stores.exists():
+                store = stores.first()
+                print(f"✅ Loja encontrada por owner_id: {store.id} - {store.name}")
+                return store
+        except Exception as e:
+            print(f"⚠️ Erro ao buscar por owner_id: {e}")
         
         # Estratégia 3: FALLBACK - Criar loja automaticamente
         print(f"🏪 Criando loja automaticamente para usuário {user.email}")
@@ -145,7 +149,7 @@ def get_current_store(user):
             store = Store.objects.create(
                 name=f"Loja de {user.email}",
                 owner=user,
-                slug=f"loja-{user.id}"
+                slug=f"loja-{user.id}-{int(time.time())}"  # Slug único
             )
             print(f"✅ Loja criada automaticamente: {store.id} - {store.name}")
             return store
@@ -154,10 +158,13 @@ def get_current_store(user):
             print(f"❌ Erro ao criar loja: {create_error}")
             
             # Estratégia 4: ÚLTIMO RECURSO - Usar primeira loja disponível
-            first_store = Store.objects.first()
-            if first_store:
-                print(f"⚠️ Usando primeira loja disponível: {first_store.id}")
-                return first_store
+            try:
+                first_store = Store.objects.first()
+                if first_store:
+                    print(f"⚠️ Usando primeira loja disponível: {first_store.id}")
+                    return first_store
+            except Exception as e:
+                print(f"❌ Erro ao buscar primeira loja: {e}")
         
         print(f"❌ Nenhuma loja encontrada/criada para usuário {user.id}")
         return None
@@ -1734,7 +1741,7 @@ def public_storefront_view(request, slug=None, brand=None):
         traceback.print_exc()
         return Response({'error': 'Erro interno do servidor'}, status=500)
     
-class StockTransactionViewSet(viewsets.ModelViewSet):
+class StockTransactionViewSet(viewsets.ModelViewSet):   
     serializer_class = StockTransactionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
@@ -1743,8 +1750,31 @@ class StockTransactionViewSet(viewsets.ModelViewSet):
     filterset_fields = ['transaction_type', 'product', 'created_at']
     
     def get_queryset(self):
-        store = get_current_store(self.request.user)
-        return StockTransaction.objects.filter(store=store).select_related('product', 'batch')   
+        """Queryset com tratamento de erro robusto"""
+        try:
+            store = get_current_store(self.request.user)
+            if not store:
+                return StockTransaction.objects.none()
+                
+            return StockTransaction.objects.filter(
+                store=store
+            ).select_related('product', 'batch').order_by('-created_at')
+        except Exception as e:
+            print(f"❌ Erro no get_queryset StockTransaction: {e}")
+            return StockTransaction.objects.none()
+    def get_queryset(self):
+        """Queryset com tratamento de erro robusto"""
+        try:
+            store = get_current_store(self.request.user)
+            if not store:
+                return StockTransaction.objects.none()
+                
+            return StockTransaction.objects.filter(
+                store=store
+            ).select_related('product', 'batch').order_by('-created_at')
+        except Exception as e:
+            print(f"❌ Erro no get_queryset StockTransaction: {e}")
+            return StockTransaction.objects.none()
     
 # inventory/views.py - ADICIONAR esta view
 
@@ -1824,7 +1854,7 @@ def inventory_item_batches_view(request, item_id):
 from django.db.models import Sum, F
 from django.db import transaction
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+
 from rest_framework.response import Response
 from datetime import datetime
 
