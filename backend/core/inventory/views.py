@@ -1233,7 +1233,45 @@ def lookup_product(request):
 # 4. VITRINE PÚBLICA E DASHBOARD
 # ==========================================
 # inventory/views.py - CORRIGIR dashboard_overview
-
+@api_view(['GET'])
+@permission_classes([AllowAny]) # ✅ Público para clientes
+def public_storefront(request, slug):
+    """
+    Exibe os produtos disponíveis da loja para clientes (Vitrine).
+    """
+    try:
+        store = Store.objects.get(slug=slug)
+    except Store.DoesNotExist:
+        return Response({"error": "Loja não encontrada"}, status=404)
+        
+    items = InventoryItem.objects.filter(
+        store=store, total_quantity__gt=0
+    ).select_related('product').prefetch_related('batches')
+    
+    items_data = []
+    for item in items:
+        # Pega a validade do lote que vence primeiro
+        first_batch = item.batches.filter(quantity__gt=0).order_by('expiration_date').first()
+        
+        items_data.append({
+            "id": item.id,
+            "sale_price": item.sale_price if item.sale_price > 0 else item.product.official_price,
+            "total_quantity": item.total_quantity,
+            "product": {
+                "name": item.product.name,
+                "category": item.product.category,
+                "image_url": item.product.image_url
+            },
+            "next_expiration": first_batch.expiration_date if first_batch else None
+        })
+        
+    return Response({
+        "store": {
+            "name": store.name,
+            "whatsapp": store.whatsapp
+        },
+        "items": items_data
+    })
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_overview(request):
