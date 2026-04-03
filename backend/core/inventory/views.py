@@ -1287,8 +1287,8 @@ def dashboard_overview(request):
         
         # 📊 MÉTRICAS DE ESTOQUE - CORRIGIDO
         inventory_stats = InventoryItem.objects.filter(store=store).aggregate(
-            total_products=Count('id'),
-            total_stock=Sum('total_quantity'),
+        total_stock=Sum('total_quantity'),  # Campo correto
+        total_products=Count('id'),
             low_stock_count=Count('id', filter=Q(total_quantity__lte=F('min_quantity')))
         )
         
