@@ -192,6 +192,8 @@ class UserNestedSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ["id", "email", "name"]
 
+# inventory/serializers.py - CORRIGIR ProfileSerializer
+
 class ProfileSerializer(serializers.ModelSerializer):
     """
     Serializador de Perfil — baseado na Store vinculada ao usuário.
@@ -202,15 +204,16 @@ class ProfileSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='name', required=False, allow_blank=True, allow_null=True)
     whatsapp_number = serializers.CharField(source='whatsapp', required=False, allow_blank=True, allow_null=True)
     store_slug = serializers.CharField(source='slug', required=False, allow_blank=True, allow_null=True)
-
+    
     class Meta:
         model = Store
         fields = [
             "id", "user", "display_name", "store_slug", "whatsapp_number", 
-            "storefront_enabled", "created_at", "plan"
+            "created_at", "plan"
+            # ✅ REMOVIDO: "storefront_enabled" (não existe no modelo)
         ]
         read_only_fields = ["id", "user", "created_at", "plan"]
-
+    
     # 🚀 CORREÇÃO 3: BLINDAGEM CONTRA O ERRO 500
     # Se o frontend enviar null nessas chaves, o serializer converte para string vazia
     # protegendo o banco de dados de quebrar.
