@@ -1741,40 +1741,98 @@ def public_storefront_view(request, slug=None, brand=None):
         traceback.print_exc()
         return Response({'error': 'Erro interno do servidor'}, status=500)
     
-class StockTransactionViewSet(viewsets.ModelViewSet):   
+# inventory/views.py - SUBSTITUIR COMPLETAMENTE o StockTransactionViewSet
+
+class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
+    """Extrato de Movimentações da Loja - VERSÃO FINAL BLINDADA"""
     serializer_class = StockTransactionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    
-    # ✅ Agora o campo transaction_type existirá
-    filterset_fields = ['transaction_type', 'product', 'created_at']
+    filterset_fields = ['transaction_type']
     
     def get_queryset(self):
-        """Queryset com tratamento de erro robusto"""
+        """Queryset com garantia de loja"""
         try:
-            store = get_current_store(self.request.user)
-            if not store:
-                return StockTransaction.objects.none()
-                
+            store = ensure_user_has_store(self.request.user)
             return StockTransaction.objects.filter(
                 store=store
             ).select_related('product', 'batch').order_by('-created_at')
         except Exception as e:
-            print(f"❌ Erro no get_queryset StockTransaction: {e}")
+            print(f"❌ Erro no get_queryset: {e}")
             return StockTransaction.objects.none()
-    def get_queryset(self):
-        """Queryset com tratamento de erro robusto"""
+
+    def perform_create(self, serializer):
+        """✅ GARANTIR store_id SEMPRE"""
         try:
-            store = get_current_store(self.request.user)
-            if not store:
-                return StockTransaction.objects.none()
-                
-            return StockTransaction.objects.filter(
-                store=store
-            ).select_related('product', 'batch').order_by('-created_at')
+            store = ensure_user_has_store(self.request.user)
+            print(f"🏪 perform_create - store_id: {store.id}")
+            
+            # ✅ FORÇAR store na criação
+            instance = serializer.save(store=store)
+            print(f"✅ StockTransaction {instance.id} criada com store_id: {instance.store_id}")
+            
         except Exception as e:
-            print(f"❌ Erro no get_queryset StockTransaction: {e}")
-            return StockTransaction.objects.none()
+            print(f"❌ Erro no perform_create: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def create(self, request, *args, **kwargs):
+        """✅ Create com validação TRIPLA de store_id"""
+        try:
+            print(f"🔄 CREATE - Dados recebidos: {request.data}")
+            
+            # ✅ VALIDAÇÃO 1: Garantir que usuário tem loja
+            store = ensure_user_has_store(request.user)
+            if not store:
+                return Response({
+                    'error': 'Não foi possível obter/criar loja para o usuário'
+                }, status=400)
+            
+            print(f"✅ VALIDAÇÃO 1 - Store obtida: {store.id}")
+            
+            # ✅ VALIDAÇÃO 2: Campos obrigatórios
+            required_fields = ['product', 'quantity', 'transaction_type']
+            for field in required_fields:
+                if not request.data.get(field):
+                    return Response({
+                        'error': f'Campo {field} é obrigatório'
+                    }, status=400)
+            
+            print(f"✅ VALIDAÇÃO 2 - Campos obrigatórios OK")
+            
+            # ✅ VALIDAÇÃO 3: Serializer
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            print(f"✅ VALIDAÇÃO 3 - Serializer válido")
+            
+            # ✅ CRIAR COM STORE GARANTIDO
+            print(f"🔄 Chamando perform_create com store {store.id}")
+            self.perform_create(serializer)
+            
+            headers = self.get_success_headers(serializer.data)
+            
+            # ✅ VERIFICAÇÃO FINAL
+            created_instance = serializer.instance
+            print(f"✅ SUCESSO - Transação {created_instance.id} criada com store_id: {created_instance.store_id}")
+            
+            return Response(serializer.data, status=201, headers=headers)
+            
+        except Exception as e:
+            print(f"❌ ERRO CRÍTICO no create: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            return Response({
+                'error': 'Erro ao criar transação',
+                'message': str(e),
+                'debug': {
+                    'user_id': request.user.id,
+                    'user_email': request.user.email,
+                    'data': request.data
+                }
+            }, status=500)
     
 # inventory/views.py - ADICIONAR esta view
 
