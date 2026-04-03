@@ -81,7 +81,7 @@ export default function Dashboard() {
     try {
       setLoading(true);
       // ✅ NOVA API: Usar endpoint melhorado
-      const response = await api.get('api/dashboard/overview/');
+      const response = await api.get('/dashboard/overview/');
       setData(response.data);
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
