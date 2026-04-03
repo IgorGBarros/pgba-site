@@ -1291,6 +1291,11 @@ def dashboard_overview(request):
         thirty_days_ago = timezone.now() - timedelta(days=30)
         today = timezone.now().date()
         
+                # Período configurável
+        period = request.GET.get('period', '30d')
+        days = {'7d': 7, '30d': 30, '90d': 90}[period]
+        start_date = timezone.now() - timedelta(days=days)
+        
         # 📊 MÉTRICAS DE ESTOQUE - CORRIGIDO
         inventory_items = InventoryItem.objects.filter(store=store)
         
@@ -1413,6 +1418,69 @@ def dashboard_overview(request):
         # 💡 CÁLCULOS DERIVADOS
         profit_potential = total_potential - total_invested
         avg_ticket = (sales_stats['total_revenue'] or 0) / max(sales_stats['total_sales'] or 1, 1)
+
+                # ✅ NOVO: Vendas por semana
+        weekly_sales = []
+        weeks_back = 4  # Últimas 4 semanas
+        
+        for i in range(weeks_back):
+            week_start = timezone.now() - timedelta(weeks=i+1)
+            week_end = timezone.now() - timedelta(weeks=i)
+            
+            week_data = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='VENDA',
+                created_at__range=[week_start, week_end]
+            ).aggregate(
+                revenue=Sum('unit_price'),
+                quantity=Sum('quantity'),
+                cost=Sum('unit_cost')
+            )
+            
+            revenue = float(week_data['revenue'] or 0)
+            cost = float(week_data['cost'] or 0)
+            profit = revenue - cost
+            
+            weekly_sales.append({
+                'week': f'Sem {weeks_back - i}',
+                'revenue': revenue,
+                'quantity': abs(week_data['quantity'] or 0),
+                'profit': profit
+            })
+        
+        weekly_sales.reverse()  # Ordem cronológica
+        
+        # ✅ NOVO: Comparação mensal (últimos 3 meses)
+        monthly_comparison = []
+        for i in range(3):
+            month_start = timezone.now().replace(day=1) - timedelta(days=30*i)
+            month_end = month_start + timedelta(days=30)
+            
+            month_data = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='VENDA',
+                created_at__range=[month_start, month_end]
+            ).aggregate(
+                revenue=Sum('unit_price'),
+                cost=Sum('unit_cost')
+            )
+            
+            revenue = float(month_data['revenue'] or 0)
+            cost = float(month_data['cost'] or 0)
+            
+            monthly_comparison.append({
+                'month': month_start.strftime('%b/%Y'),
+                'revenue': revenue,
+                'profit': revenue - cost
+            })
+        
+        monthly_comparison.reverse()
+        
+       # ✅ NOVO: Categorias com percentual
+        category_total_value = sum(cat['total_value'] for cat in category_stats)
+        for cat in category_stats:
+            cat['percentage'] = (cat['total_value'] / max(category_total_value, 1)) * 100
+        
         
         return Response({
             'store_info': {

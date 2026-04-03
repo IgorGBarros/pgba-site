@@ -1,4 +1,4 @@
-// components/Dashboard.tsx - VERSÃO CORRIGIDA FINAL
+// components/Dashboard.tsx - VERSÃO COM GRÁFICOS
 
 import { useState, useEffect } from 'react';
 import { 
@@ -9,13 +9,32 @@ import {
   DollarSign,
   ShoppingCart,
   BarChart3,
-  Clock,
-  Loader2
+  PieChart,
+  Target,
+  Percent,
+  Clock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Cell,
+  LineChart,
+  Line,
+  Area,
+  AreaChart,
+  Pie
+} from 'recharts';
+import { api } from '../services/api';
 
-// ✅ CORREÇÃO: Import correto da API
-import { api } from '../services/api'; // ou '../services/api' dependendo da sua estrutura
+// Cores para gráficos
+const CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0'];
 
 interface DashboardData {
   store_info: {
@@ -29,6 +48,7 @@ interface DashboardData {
     profit_potential: number;
     total_revenue_30d: number;
     avg_ticket: number;
+    margin_percent: number;
   };
   inventory: {
     total_products: number;
@@ -44,6 +64,17 @@ interface DashboardData {
       revenue: number;
       quantity: number;
     }>;
+    weekly_sales: Array<{
+      week: string;
+      revenue: number;
+      quantity: number;
+      profit: number;
+    }>;
+    monthly_comparison: Array<{
+      month: string;
+      revenue: number;
+      profit: number;
+    }>;
   };
   charts: {
     by_category: Array<{
@@ -51,35 +82,24 @@ interface DashboardData {
       total_products: number;
       total_quantity: number;
       total_value: number;
+      percentage: number;
     }>;
     top_products: Array<{
       name: string;
       id: number;
       total_sold: number;
       revenue: number;
+      profit: number;
     }>;
+    performance_metrics: {
+      turnover_rate: number;
+      stock_rotation_days: number;
+      sell_through_rate: number;
+    };
   };
   alerts: {
-    low_stock: Array<{
-      id: number;
-      product_name: string;
-      current_stock: number;
-      min_stock: number;
-      status: 'critical' | 'warning';
-    }>;
-    expiring_soon: Array<{
-      id: number;
-      product_name: string;
-      batch_code: string;
-      expiration_date: string;
-      quantity: number;
-      days_to_expire: number;
-    }>;
-  };
-  sessions: {
-    total_sessions_30d: number;
-    total_products_registered_30d: number;
-    avg_session_duration: number;
+    low_stock: Array<any>;
+    expiring_soon: Array<any>;
   };
 }
 
@@ -87,78 +107,43 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d');
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [selectedPeriod]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('🔄 Carregando dashboard...');
-      
-      // ✅ CORREÇÃO: Usar a instância correta da API
-      const response = await api.get('/dashboard/overview/');
-      
-      console.log('✅ Dados recebidos:', response.data);
-      
+      const response = await api.get(`/dashboard/overview/?period=${selectedPeriod}`);
       setData(response.data);
       
     } catch (err: any) {
       console.error('❌ Erro ao carregar dashboard:', err);
-      
-      // ✅ CORREÇÃO: Definir erro para exibir na interface
-      const errorMessage = err.response?.data?.error || err.message || 'Erro ao carregar dados do dashboard';
-      setError(errorMessage);
-      
+      setError(err.response?.data?.error || 'Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ LOADING STATE
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Carregando dashboard...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  // ✅ ERROR STATE
-  if (error) {
+  if (error || !data) {
     return (
       <div className="text-center p-8">
         <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-foreground mb-2">Erro ao carregar dashboard</h3>
-        <p className="text-destructive mb-4">{error}</p>
-        <button 
-          onClick={loadDashboardData}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
+        <p className="text-destructive">{error}</p>
+        <button onClick={loadDashboardData} className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md">
           Tentar Novamente
-        </button>
-      </div>
-    );
-  }
-
-  // ✅ NO DATA STATE
-  if (!data) {
-    return (
-      <div className="text-center p-8">
-        <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum dado disponível</h3>
-        <p className="text-muted-foreground mb-4">Não foi possível carregar os dados do dashboard.</p>
-        <button 
-          onClick={loadDashboardData}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
-          Recarregar
         </button>
       </div>
     );
@@ -167,9 +152,12 @@ export default function Dashboard() {
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
+  const formatPercent = (value: number) => 
+    `${(value || 0).toFixed(1)}%`;
+
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
+      {/* Header com Seletor de Período */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
@@ -177,16 +165,34 @@ export default function Dashboard() {
             {data.store_info.name} • Plano {data.store_info.plan.toUpperCase()}
           </p>
         </div>
-        <div className="text-right text-sm text-muted-foreground">
-          Última atualização: {new Date().toLocaleString('pt-BR')}
+        
+        {/* Seletor de Período */}
+        <div className="flex gap-2">
+          {[
+            { key: '7d', label: '7 dias' },
+            { key: '30d', label: '30 dias' },
+            { key: '90d', label: '90 dias' }
+          ].map((period) => (
+            <button
+              key={period.key}
+              onClick={() => setSelectedPeriod(period.key as any)}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                selectedPeriod === period.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              {period.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Métricas Principais */}
+      {/* KPIs Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita (30d)</CardTitle>
+            <CardTitle className="text-sm font-medium">Receita ({selectedPeriod})</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -201,122 +207,321 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Produtos em Estoque</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.inventory.total_products}</div>
-            <p className="text-xs text-muted-foreground">
-              {data.inventory.total_stock} unidades totais
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Lucro Potencial</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
               {formatCurrency(data.financial.profit_potential)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Investido: {formatCurrency(data.financial.total_invested)}
+              Margem: {formatPercent(data.financial.margin_percent || 0)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Giro de Estoque</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              {data.charts.performance_metrics?.turnover_rate?.toFixed(1) || '0.0'}x
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Rotação a cada {data.charts.performance_metrics?.stock_rotation_days || 0} dias
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {data.alerts.low_stock.length + data.alerts.expiring_soon.length}
+              {formatPercent(data.charts.performance_metrics?.sell_through_rate || 0)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {data.alerts.low_stock.length} estoque baixo • {data.alerts.expiring_soon.length} vencendo
+              Produtos vendidos vs estoque
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Gráficos e Listas */}
+      {/* Gráficos Principais */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Vendas por Dia */}
+        {/* Gráfico de Vendas por Semana */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Vendas dos Últimos 7 Dias
+              Vendas por Semana
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {data.sales.daily_sales && data.sales.daily_sales.length > 0 ? (
-                data.sales.daily_sales.map((day, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
-                    <div>
-                      <div className="font-medium">{day.day_name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(day.date).toLocaleDateString('pt-BR')}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-green-600">{formatCurrency(day.revenue)}</div>
-                      <div className="text-sm text-muted-foreground">{day.quantity} itens</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma venda nos últimos 7 dias
-                </p>
-              )}
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.sales.weekly_sales}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value: any, name: string) => [
+                    name === 'revenue' ? formatCurrency(value) : value,
+                    name === 'revenue' ? 'Receita' : name === 'quantity' ? 'Quantidade' : 'Lucro'
+                  ]}
+                />
+                <Bar dataKey="revenue" fill="#8884d8" name="revenue" />
+                <Bar dataKey="profit" fill="#82ca9d" name="profit" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Pizza - Vendas por Categoria */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="h-5 w-5" />
+              Vendas por Categoria
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsPieChart>
+                <Pie
+                  data={data.charts.by_category}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ category, percentage }) => `${category} (${percentage?.toFixed(1)}%)`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="total_value"
+                >
+                  {data.charts.by_category.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: any) => [formatCurrency(value), 'Valor']} />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráfico de Linha - Evolução Mensal */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Evolução de Receita e Lucro
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <AreaChart data={data.sales.monthly_comparison}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip formatter={(value: any) => [formatCurrency(value), '']} />
+              <Area 
+                type="monotone" 
+                dataKey="revenue" 
+                stackId="1" 
+                stroke="#8884d8" 
+                fill="#8884d8" 
+                fillOpacity={0.6}
+                name="Receita"
+              />
+              <Area 
+                type="monotone" 
+                dataKey="profit" 
+                stackId="1" 
+                stroke="#82ca9d" 
+                fill="#82ca9d" 
+                fillOpacity={0.6}
+                name="Lucro"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Métricas Avançadas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Análise Financeira */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Análise Financeira
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Capital Investido</span>
+              <span className="font-bold text-red-600">{formatCurrency(data.financial.total_invested)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Receita Potencial</span>
+              <span className="font-bold text-green-600">{formatCurrency(data.financial.total_potential)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Lucro Potencial</span>
+              <span className="font-bold text-blue-600">{formatCurrency(data.financial.profit_potential)}</span>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">ROI Potencial</span>
+                <span className="font-bold text-purple-600">
+                  {formatPercent((data.financial.profit_potential / Math.max(data.financial.total_invested, 1)) * 100)}
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Top Produtos */}
+        {/* Performance de Estoque */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Produtos Mais Vendidos (30d)
+              <Package className="h-5 w-5" />
+              Performance de Estoque
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {data.charts.top_products && data.charts.top_products.length > 0 ? (
-                data.charts.top_products.slice(0, 5).map((product, index) => (
-                  <div key={product.id} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="font-medium line-clamp-1">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">{product.total_sold} vendidos</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-green-600">{formatCurrency(product.revenue)}</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma venda registrada nos últimos 30 dias
-                </p>
-              )}
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Produtos Ativos</span>
+              <span className="font-bold">{data.inventory.total_products}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Unidades Totais</span>
+              <span className="font-bold">{data.inventory.total_stock}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Giro Médio</span>
+              <span className="font-bold text-blue-600">
+                {data.charts.performance_metrics?.turnover_rate?.toFixed(1) || '0.0'}x/mês
+              </span>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Eficiência</span>
+                <span className="font-bold text-green-600">
+                  {formatPercent(((data.inventory.total_products - data.inventory.low_stock_count) / Math.max(data.inventory.total_products, 1)) * 100)}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Alertas e Riscos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Gestão de Riscos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Estoque Baixo</span>
+              <span className={`font-bold ${data.alerts.low_stock.length > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                {data.alerts.low_stock.length}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Vencendo em Breve</span>
+              <span className={`font-bold ${data.alerts.expiring_soon.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {data.alerts.expiring_soon.length}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Risco Total</span>
+              <span className="font-bold text-purple-600">
+                {data.alerts.low_stock.length + data.alerts.expiring_soon.length > 5 ? 'Alto' : 
+                 data.alerts.low_stock.length + data.alerts.expiring_soon.length > 2 ? 'Médio' : 'Baixo'}
+              </span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Alertas */}
+      {/* Gráfico de Vendas Diárias */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LineChart className="h-5 w-5" />
+            Vendas dos Últimos 7 Dias
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={data.sales.daily_sales}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="day_name" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value: any, name: string) => [
+                  name === 'revenue' ? formatCurrency(value) : `${value} itens`,
+                  name === 'revenue' ? 'Receita' : 'Quantidade'
+                ]}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="revenue" 
+                stroke="#8884d8" 
+                strokeWidth={3}
+                dot={{ fill: '#8884d8', strokeWidth: 2, r: 4 }}
+                name="revenue"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="quantity" 
+                stroke="#82ca9d" 
+                strokeWidth={2}
+                dot={{ fill: '#82ca9d', strokeWidth: 2, r: 3 }}
+                name="quantity"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Top Produtos com Gráfico de Barras Horizontal */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Top 5 Produtos Mais Vendidos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart 
+              data={data.charts.top_products.slice(0, 5)} 
+              layout="horizontal"
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis dataKey="name" type="category" width={150} />
+              <Tooltip 
+                formatter={(value: any, name: string) => [
+                  name === 'revenue' ? formatCurrency(value) : `${value} vendidos`,
+                  name === 'revenue' ? 'Receita' : 'Quantidade'
+                ]}
+              />
+              <Bar dataKey="revenue" fill="#8884d8" name="revenue" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Alertas Visuais */}
       {(data.alerts.low_stock.length > 0 || data.alerts.expiring_soon.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Estoque Baixo */}
@@ -330,11 +535,11 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {data.alerts.low_stock.slice(0, 5).map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-2 rounded-md bg-orange-50 border border-orange-200">
+                  {data.alerts.low_stock.slice(0, 5).map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-200">
                       <div>
-                        <div className="font-medium">{item.product_name}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="font-medium text-sm">{item.product_name}</div>
+                        <div className="text-xs text-muted-foreground">
                           Mín: {item.min_stock} • Atual: {item.current_stock}
                         </div>
                       </div>
@@ -363,11 +568,11 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {data.alerts.expiring_soon.slice(0, 5).map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-2 rounded-md bg-red-50 border border-red-200">
+                  {data.alerts.expiring_soon.slice(0, 5).map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-200">
                       <div>
-                        <div className="font-medium">{item.product_name}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="font-medium text-sm">{item.product_name}</div>
+                        <div className="text-xs text-muted-foreground">
                           Lote: {item.batch_code} • {item.quantity} unidades
                         </div>
                       </div>
