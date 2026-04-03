@@ -102,9 +102,11 @@ from .scraper import search_google_shopping
 # ==========================================
 
 
+# inventory/views.py - VERSÃO FINAL da função get_current_store
+
 def get_current_store(user):
     """
-    ✅ VERSÃO CORRIGIDA: Usa relacionamento OneToOne consistente
+    Versão final com fallback automático para criar loja
     """
     try:
         print(f"🔍 get_current_store para usuário: {user.id} ({user.email})")
@@ -115,25 +117,49 @@ def get_current_store(user):
         
         from .models import Store
         
-        # ✅ ESTRATÉGIA 1: Tentar via relacionamento OneToOne
-        try:
-            store = user.store
-            if store:
-                print(f"✅ Loja encontrada via user.store: {store.id} - {store.name}")
-                return store
-        except Store.DoesNotExist:
-            print("⚠️ Não encontrou via user.store")
-        except AttributeError:
-            print("⚠️ Relacionamento user.store não existe")
+        # Estratégia 1: Buscar por owner_id na tabela Store
+        stores = Store.objects.filter(owner_id=user.id)
+        print(f"📊 Encontradas {stores.count()} lojas para owner_id={user.id}")
         
-        # ✅ ESTRATÉGIA 2: Buscar diretamente por owner
-        store = Store.objects.filter(owner=user).first()
-        
-        if store:
-            print(f"✅ Loja encontrada via Store.objects: {store.id} - {store.name}")
+        if stores.exists():
+            store = stores.first()
+            print(f"✅ Loja encontrada: {store.id} - {store.name}")
             return store
         
-        print(f"❌ Nenhuma loja encontrada para usuário {user.id}")
+        # Estratégia 2: Buscar por owner (relacionamento)
+        try:
+            stores_by_relation = Store.objects.filter(owner=user)
+            print(f"📊 Encontradas {stores_by_relation.count()} lojas por relacionamento")
+            
+            if stores_by_relation.exists():
+                store = stores_by_relation.first()
+                print(f"✅ Loja encontrada por relacionamento: {store.id} - {store.name}")
+                return store
+        except Exception as e:
+            print(f"⚠️ Erro ao buscar por relacionamento: {e}")
+        
+        # Estratégia 3: FALLBACK - Criar loja automaticamente
+        print(f"🏪 Criando loja automaticamente para usuário {user.email}")
+        
+        try:
+            store = Store.objects.create(
+                name=f"Loja de {user.email}",
+                owner=user,
+                slug=f"loja-{user.id}"
+            )
+            print(f"✅ Loja criada automaticamente: {store.id} - {store.name}")
+            return store
+            
+        except Exception as create_error:
+            print(f"❌ Erro ao criar loja: {create_error}")
+            
+            # Estratégia 4: ÚLTIMO RECURSO - Usar primeira loja disponível
+            first_store = Store.objects.first()
+            if first_store:
+                print(f"⚠️ Usando primeira loja disponível: {first_store.id}")
+                return first_store
+        
+        print(f"❌ Nenhuma loja encontrada/criada para usuário {user.id}")
         return None
         
     except Exception as e:
@@ -549,8 +575,11 @@ class InventoryViewSet(TenantModelMixin, viewsets.ModelViewSet):
 from django.db import transaction
 from django.db.models import Sum
 
+from django.db import transaction
+from django.db.models import Sum
+
 class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
-    """Extrato de Movimentações da Loja - VERSÃO FINAL CORRIGIDA"""
+    """Extrato de Movimentações da Loja - VERSÃO CORRIGIDA FINAL"""
     serializer_class = StockTransactionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
@@ -572,12 +601,9 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
 
     # ✅ CORREÇÃO: Override do perform_create para garantir store_id
     def perform_create(self, serializer):
-        """✅ GARANTIR que store_id seja SEMPRE definido"""
+        """Garantir que store_id seja sempre definido"""
         try:
             store = get_current_store(self.request.user)
-            if not store:
-                raise ValueError("Loja não encontrada para o usuário")
-            
             print(f"🏪 Definindo store_id: {store.id}")
             
             # ✅ FORÇAR store_id na criação
@@ -650,30 +676,20 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
         try:
             store = get_current_store(request.user)
             if not store:
-                return Response({
-                    'error': 'Loja não encontrada para o usuário',
-                    'message': 'Usuário não possui loja associada'
-                }, status=400)
-            
+                return Response({'error': 'Loja não encontrada para o usuário'}, status=400)
             
             data = request.data.copy()
             print(f"🔄 Criando transação para store {store.id}: {data}")
             
             # ✅ VALIDAÇÕES OBRIGATÓRIAS
-            if not request.data.get('product'):
-                return Response({
-                    'error': 'Campo product é obrigatório'
-                }, status=400)
+            if not data.get('product') and not data.get('product_id'):
+                return Response({'error': 'Campo product ou product_id é obrigatório'}, status=400)
             
-            if not request.data.get('quantity'):
-                return Response({
-                    'error': 'Campo quantity é obrigatório'
-                }, status=400)
+            if not data.get('quantity'):
+                return Response({'error': 'Campo quantity é obrigatório'}, status=400)
             
-            if not request.data.get('transaction_type'):
-                return Response({
-                    'error': 'Campo transaction_type é obrigatório'
-                }, status=400)
+            if not data.get('transaction_type'):
+                return Response({'error': 'Campo transaction_type é obrigatório'}, status=400)
             
             # ✅ BUSCA MELHORADA DO PRODUTO
             product_id = data.get('product_id') or data.get('product')
@@ -770,9 +786,8 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                     description=data.get('description', f"{transaction_type} - {product.name}")
                 )
                 
-                # Atualizar estoque (entrada)
-                inventory_item.total_quantity += quantity
-                inventory_item.save()
+                # ✅ CORREÇÃO: Para entradas, não atualizar inventory_item aqui
+                # O estoque deve ser atualizado via StockEntry ou Batch
                 
                 serializer = self.get_serializer(transaction_obj)
                 return Response(serializer.data, status=201)
