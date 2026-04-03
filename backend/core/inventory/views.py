@@ -2626,3 +2626,236 @@ def fix_user_store(request):
             'error': str(e),
             'message': 'Erro ao corrigir loja'
         }, status=500)
+    
+
+# inventory/views.py - FLUXO DE CAIXA COM DADOS EXISTENTES
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cash_flow_summary(request):
+    """Fluxo de caixa baseado em StockTransaction existente"""
+    try:
+        store = ensure_user_has_store(request.user)
+        
+        # Período configurável
+        period = request.GET.get('period', '30d')
+        period_map = {'7d': 7, '30d': 30, '90d': 90, '180d': 180, '1y': 365}
+        days = period_map.get(period, 30)
+        start_date = timezone.now() - timedelta(days=days)
+        
+        # 💰 RECEITAS (baseado em vendas reais)
+        revenue_transactions = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='VENDA',
+            created_at__gte=start_date,
+            quantity__lt=0  # Saídas (vendas)
+        )
+        
+        total_revenue = revenue_transactions.aggregate(
+            total=Sum('unit_price')
+        )['total'] or 0
+        
+        total_items_sold = abs(revenue_transactions.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0)
+        
+        # 💸 CUSTOS (baseado em entradas de estoque)
+        cost_transactions = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='ENTRADA',
+            created_at__gte=start_date,
+            quantity__gt=0  # Entradas
+        )
+        
+        total_invested = cost_transactions.aggregate(
+            total=Sum(F('quantity') * F('unit_cost'))
+        )['total'] or 0
+        
+        # 📊 LUCRO BRUTO (receita - custo dos produtos vendidos)
+        cost_of_goods_sold = revenue_transactions.aggregate(
+            total=Sum(F('quantity') * F('unit_cost'))  # quantity é negativo
+        )['total'] or 0
+        
+        gross_profit = total_revenue + cost_of_goods_sold  # + porque quantity é negativo
+        gross_margin = (gross_profit / max(total_revenue, 1)) * 100
+        
+        # 📈 FLUXO DIÁRIO
+        daily_flow = []
+        for i in range(min(days, 30)):  # Máximo 30 dias para performance
+            day = start_date + timedelta(days=i)
+            if day.date() > timezone.now().date():
+                break
+                
+            # Receitas do dia
+            day_revenue = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='VENDA',
+                created_at__date=day.date()
+            ).aggregate(total=Sum('unit_price'))['total'] or 0
+            
+            # Investimentos do dia (compras de estoque)
+            day_investment = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='ENTRADA',
+                created_at__date=day.date()
+            ).aggregate(
+                total=Sum(F('quantity') * F('unit_cost'))
+            )['total'] or 0
+            
+            daily_flow.append({
+                'date': day.strftime('%Y-%m-%d'),
+                'day_name': day.strftime('%a'),
+                'revenue': float(day_revenue),
+                'investment': float(day_investment),
+                'net_flow': float(day_revenue - day_investment)
+            })
+        
+        # 🏆 PRODUTOS MAIS LUCRATIVOS
+        profitable_products = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='VENDA',
+            created_at__gte=start_date
+        ).values(
+            'product__name',
+            'product__id'
+        ).annotate(
+            total_revenue=Sum('unit_price'),
+            total_cost=Sum(F('quantity') * F('unit_cost')),
+            units_sold=Sum('quantity')
+        ).annotate(
+            profit=F('total_revenue') + F('total_cost')  # + porque quantity é negativo
+        ).order_by('-profit')[:10]
+        
+        # 📊 ANÁLISE POR CATEGORIA
+        category_analysis = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='VENDA',
+            created_at__gte=start_date
+        ).values(
+            'product__category'
+        ).annotate(
+            revenue=Sum('unit_price'),
+            cost=Sum(F('quantity') * F('unit_cost')),
+            profit=F('revenue') + F('cost'),
+            units_sold=Sum('quantity')
+        ).order_by('-revenue')
+        
+        return Response({
+            'period_info': {
+                'selected': period,
+                'days': days,
+                'start_date': start_date.date(),
+                'end_date': timezone.now().date()
+            },
+            'summary': {
+                'total_revenue': float(total_revenue),
+                'total_invested': float(total_invested),
+                'gross_profit': float(gross_profit),
+                'gross_margin_percent': float(gross_margin),
+                'total_items_sold': int(total_items_sold),
+                'avg_ticket': float(total_revenue / max(revenue_transactions.count(), 1))
+            },
+            'daily_flow': daily_flow,
+            'top_profitable_products': [
+                {
+                    'name': item['product__name'],
+                    'revenue': float(item['total_revenue'] or 0),
+                    'profit': float(item['profit'] or 0),
+                    'units_sold': abs(int(item['units_sold'] or 0)),
+                    'margin_percent': (float(item['profit'] or 0) / max(float(item['total_revenue'] or 1), 1)) * 100
+                }
+                for item in profitable_products
+            ],
+            'by_category': [
+                {
+                    'category': item['product__category'] or 'Sem categoria',
+                    'revenue': float(item['revenue'] or 0),
+                    'profit': float(item['profit'] or 0),
+                    'units_sold': abs(int(item['units_sold'] or 0))
+                }
+                for item in category_analysis
+            ]
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro no fluxo de caixa: {e}")
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cash_flow_detailed(request):
+    """Fluxo de caixa detalhado com todas as transações"""
+    try:
+        store = ensure_user_has_store(request.user)
+        
+        # Filtros
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        transaction_type = request.GET.get('type')  # 'VENDA', 'ENTRADA', etc.
+        
+        # Query base
+        transactions = StockTransaction.objects.filter(store=store)
+        
+        # Aplicar filtros
+        if start_date:
+            transactions = transactions.filter(created_at__date__gte=start_date)
+        if end_date:
+            transactions = transactions.filter(created_at__date__lte=end_date)
+        if transaction_type:
+            transactions = transactions.filter(transaction_type=transaction_type)
+        
+        # Ordenar por data
+        transactions = transactions.select_related('product').order_by('-created_at')
+        
+        # Paginar
+        from django.core.paginator import Paginator
+        paginator = Paginator(transactions, 50)  # 50 por página
+        page = request.GET.get('page', 1)
+        transactions_page = paginator.get_page(page)
+        
+        # Serializar transações
+        transactions_data = []
+        for transaction in transactions_page:
+            # Calcular valores financeiros
+            if transaction.transaction_type == 'VENDA':
+                financial_impact = transaction.unit_price  # Receita
+                type_label = 'Receita'
+                impact_type = 'income'
+            elif transaction.transaction_type == 'ENTRADA':
+                financial_impact = -(transaction.quantity * (transaction.unit_cost or 0))  # Investimento
+                type_label = 'Investimento'
+                impact_type = 'expense'
+            else:
+                financial_impact = 0
+                type_label = transaction.transaction_type
+                impact_type = 'neutral'
+            
+            transactions_data.append({
+                'id': transaction.id,
+                'date': transaction.created_at.date(),
+                'time': transaction.created_at.time(),
+                'product_name': transaction.product.name if transaction.product else 'N/A',
+                'transaction_type': transaction.transaction_type,
+                'type_label': type_label,
+                'quantity': abs(transaction.quantity),
+                'unit_price': float(transaction.unit_price or 0),
+                'unit_cost': float(transaction.unit_cost or 0),
+                'financial_impact': float(financial_impact),
+                'impact_type': impact_type,
+                'description': transaction.description or ''
+            })
+        
+        return Response({
+            'transactions': transactions_data,
+            'pagination': {
+                'current_page': transactions_page.number,
+                'total_pages': paginator.num_pages,
+                'total_items': paginator.count,
+                'has_next': transactions_page.has_next(),
+                'has_previous': transactions_page.has_previous()
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro no fluxo detalhado: {e}")
+        return Response({'error': str(e)}, status=500) 
