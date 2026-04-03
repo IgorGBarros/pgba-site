@@ -1,4 +1,4 @@
-// components/Dashboard.tsx - VERSÃO MELHORADA
+// components/Dashboard.tsx - VERSÃO CORRIGIDA FINAL
 
 import { useState, useEffect } from 'react';
 import { 
@@ -9,40 +9,56 @@ import {
   DollarSign,
   ShoppingCart,
   BarChart3,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import api from '../services/api';
+
+// ✅ CORREÇÃO: Import correto da API
+import { api } from '../services/api'; // ou '../services/api' dependendo da sua estrutura
+
 interface DashboardData {
   store_info: {
     name: string;
     plan: string;
     created_at: string;
   };
+  financial: {
+    total_invested: number;
+    total_potential: number;
+    profit_potential: number;
+    total_revenue_30d: number;
+    avg_ticket: number;
+  };
   inventory: {
     total_products: number;
     total_stock: number;
-    avg_stock_value: number;
     low_stock_count: number;
   };
   sales: {
     total_sales_30d: number;
-    total_revenue_30d: number;
     total_items_sold_30d: number;
-    avg_ticket: number;
+    daily_sales: Array<{
+      date: string;
+      day_name: string;
+      revenue: number;
+      quantity: number;
+    }>;
   };
-  daily_sales: Array<{
-    date: string;
-    day_name: string;
-    revenue: number;
-    quantity: number;
-  }>;
-  top_products: Array<{
-    name: string;
-    id: number;
-    total_sold: number;
-    revenue: number;
-  }>;
+  charts: {
+    by_category: Array<{
+      category: string;
+      total_products: number;
+      total_quantity: number;
+      total_value: number;
+    }>;
+    top_products: Array<{
+      name: string;
+      id: number;
+      total_sold: number;
+      revenue: number;
+    }>;
+  };
   alerts: {
     low_stock: Array<{
       id: number;
@@ -72,7 +88,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -80,32 +95,51 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      // ✅ NOVA API: Usar endpoint melhorado
+      setError(null);
+      
+      console.log('🔄 Carregando dashboard...');
+      
+      // ✅ CORREÇÃO: Usar a instância correta da API
       const response = await api.get('/dashboard/overview/');
+      
+      console.log('✅ Dados recebidos:', response.data);
+      
       setData(response.data);
-    } catch (err) {
-      console.error('Erro ao carregar dashboard:', err);
+      
+    } catch (err: any) {
+      console.error('❌ Erro ao carregar dashboard:', err);
+      
+      // ✅ CORREÇÃO: Definir erro para exibir na interface
+      const errorMessage = err.response?.data?.error || err.message || 'Erro ao carregar dados do dashboard';
+      setError(errorMessage);
+      
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ LOADING STATE
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Carregando dashboard...</p>
+        </div>
       </div>
     );
   }
 
+  // ✅ ERROR STATE
   if (error) {
     return (
       <div className="text-center p-8">
         <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-        <p className="text-destructive">{error}</p>
+        <h3 className="text-lg font-semibold text-foreground mb-2">Erro ao carregar dashboard</h3>
+        <p className="text-destructive mb-4">{error}</p>
         <button 
           onClick={loadDashboardData}
-          className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Tentar Novamente
         </button>
@@ -113,18 +147,35 @@ export default function Dashboard() {
     );
   }
 
-  if (!data) return null;
+  // ✅ NO DATA STATE
+  if (!data) {
+    return (
+      <div className="text-center p-8">
+        <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">Nenhum dado disponível</h3>
+        <p className="text-muted-foreground mb-4">Não foi possível carregar os dados do dashboard.</p>
+        <button 
+          onClick={loadDashboardData}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          Recarregar
+        </button>
+      </div>
+    );
+  }
 
   const formatCurrency = (value: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">{data.store_info.name} • Plano {data.store_info.plan}</p>
+          <p className="text-muted-foreground">
+            {data.store_info.name} • Plano {data.store_info.plan.toUpperCase()}
+          </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
           Última atualização: {new Date().toLocaleString('pt-BR')}
@@ -140,10 +191,10 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(data.sales.total_revenue_30d)}
+              {formatCurrency(data.financial.total_revenue_30d)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {data.sales.total_sales_30d} vendas • Ticket médio: {formatCurrency(data.sales.avg_ticket)}
+              {data.sales.total_sales_30d} vendas • Ticket médio: {formatCurrency(data.financial.avg_ticket)}
             </p>
           </CardContent>
         </Card>
@@ -163,13 +214,15 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Itens Vendidos (30d)</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Lucro Potencial</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.sales.total_items_sold_30d}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {formatCurrency(data.financial.profit_potential)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Em {data.sales.total_sales_30d} transações
+              Investido: {formatCurrency(data.financial.total_invested)}
             </p>
           </CardContent>
         </Card>
@@ -202,20 +255,26 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.daily_sales.map((day, index) => (
-                <div key={index} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
-                  <div>
-                    <div className="font-medium">{day.day_name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {new Date(day.date).toLocaleDateString('pt-BR')}
+              {data.sales.daily_sales && data.sales.daily_sales.length > 0 ? (
+                data.sales.daily_sales.map((day, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
+                    <div>
+                      <div className="font-medium">{day.day_name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(day.date).toLocaleDateString('pt-BR')}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">{formatCurrency(day.revenue)}</div>
+                      <div className="text-sm text-muted-foreground">{day.quantity} itens</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-green-600">{formatCurrency(day.revenue)}</div>
-                    <div className="text-sm text-muted-foreground">{day.quantity} itens</div>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma venda nos últimos 7 dias
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -230,22 +289,28 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.top_products.slice(0, 5).map((product, index) => (
-                <div key={product.id} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                      {index + 1}
+              {data.charts.top_products && data.charts.top_products.length > 0 ? (
+                data.charts.top_products.slice(0, 5).map((product, index) => (
+                  <div key={product.id} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-medium line-clamp-1">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">{product.total_sold} vendidos</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium line-clamp-1">{product.name}</div>
-                      <div className="text-sm text-muted-foreground">{product.total_sold} vendidos</div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">{formatCurrency(product.revenue)}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-green-600">{formatCurrency(product.revenue)}</div>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma venda registrada nos últimos 30 dias
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -321,34 +386,6 @@ export default function Dashboard() {
             </Card>
           )}
         </div>
-      )}
-
-      {/* Sessões de Cadastro */}
-      {data.sessions.total_sessions_30d > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Atividade de Cadastro (30d)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{data.sessions.total_sessions_30d}</div>
-                <div className="text-sm text-muted-foreground">Sessões</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{data.sessions.total_products_registered_30d}</div>
-                <div className="text-sm text-muted-foreground">Produtos Cadastrados</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{Math.round(data.sessions.avg_session_duration)}</div>
-                <div className="text-sm text-muted-foreground">Minutos Médios/Sessão</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       )}
     </div>
   );
