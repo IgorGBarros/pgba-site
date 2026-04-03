@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+
   useEffect(() => {
     loadDashboardData();
   }, []);
@@ -79,12 +80,11 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/dashboard/overview/');
+      // ✅ NOVA API: Usar endpoint melhorado
+      const response = await api.get('api/dashboard/overview/');
       setData(response.data);
-      setError(null);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
-      setError(err.response?.data?.error || 'Erro ao carregar dados');
     } finally {
       setLoading(false);
     }

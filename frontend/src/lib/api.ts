@@ -500,57 +500,7 @@ export const profileApi = {
   update: (data: Partial<Profile>) => (isDemoMode() ? Promise.resolve({ ...DEMO_PROFILE, ...data } as Profile) : apiRequest<Profile>("/profile/", { method: "PATCH", body: JSON.stringify(data) })),
 };
 
-// ✅ Dashboard API
-export const dashboardApi = {
-  getStats: async (forceRefresh = false) => {
-    console.log(`📊 Carregando estatísticas do dashboard`);
-    
-    if (isDemoMode()) {
-      const totalItems = DEMO_INVENTORY.length;
-      const totalValue = DEMO_INVENTORY.reduce((sum, item) => sum + (item.sale_price || 0) * (item.quantity || 0), 0);
-      const lowStock = DEMO_INVENTORY.filter(item => (item.quantity || 0) <= (item.min_quantity || 0)).length;
-      const recentMovements = DEMO_MOVEMENTS.slice(0, 5);
-      
-      return {
-        totalItems,
-        totalValue,
-        lowStock,
-        recentMovements,
-        totalMovements: DEMO_MOVEMENTS.length
-      };
-    }
-    
-    try {
-      const [inventory, movements] = await Promise.all([
-        inventoryApi.list(forceRefresh),
-        movementsApi.list(forceRefresh)
-      ]);
-      
-      const totalItems = inventory.length;
-      const totalValue = inventory.reduce((sum, item) => sum + (item.sale_price || 0) * (item.total_quantity || 0), 0);
-      const lowStock = inventory.filter(item => (item.total_quantity || 0) <= (item.min_quantity || 0)).length;
-      const recentMovements = movements.slice(0, 5);
-      
-      return {
-        totalItems,
-        totalValue,
-        lowStock,
-        recentMovements,
-        totalMovements: movements.length
-      };
-      
-    } catch (error) {
-      console.error("❌ Erro ao carregar dashboard:", error);
-      return {
-        totalItems: 0,
-        totalValue: 0,
-        lowStock: 0,
-        recentMovements: [],
-        totalMovements: 0
-      };
-    }
-  }
-};
+
 
 // ── Storefront (public) - URLs completas mantidas ──
 export interface StorefrontItem {
