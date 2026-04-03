@@ -1272,10 +1272,16 @@ def public_storefront(request, slug):
         },
         "items": items_data
     })
+# inventory/views.py - ADICIONAR estas funções ao seu arquivo
+
+from django.db.models import Sum, Count, Avg, Q, F
+from django.utils import timezone
+from datetime import datetime, timedelta
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_overview(request):
-    """Dashboard principal - VERSÃO CORRIGIDA SEM ERROS"""
+    """Dashboard principal - VERSÃO CORRIGIDA FINAL"""
     try:
         store = ensure_user_has_store(request.user)
         if not store:
@@ -1286,17 +1292,20 @@ def dashboard_overview(request):
         today = timezone.now().date()
         
         # 📊 MÉTRICAS DE ESTOQUE - CORRIGIDO
-        inventory_stats = InventoryItem.objects.filter(store=store).aggregate(
-        total_stock=Sum('total_quantity'),  # Campo correto
-        total_products=Count('id'),
-            low_stock_count=Count('id', filter=Q(total_quantity__lte=F('min_quantity')))
-        )
+        inventory_items = InventoryItem.objects.filter(store=store)
         
-        # ✅ CALCULAR VALORES MANUALMENTE (evita erro de agregação)
+        # ✅ CALCULAR TOTAIS CORRETAMENTE (sem agregação problemática)
+        total_products = inventory_items.count()
+        total_stock = sum(item.total_quantity or 0 for item in inventory_items)
+        low_stock_count = inventory_items.filter(
+            total_quantity__lte=F('min_quantity')
+        ).count()
+        
+        # ✅ CALCULAR VALORES FINANCEIROS MANUALMENTE
         total_invested = 0
         total_potential = 0
         
-        for item in InventoryItem.objects.filter(store=store):
+        for item in inventory_items:
             if item.total_quantity and item.cost_price:
                 total_invested += item.total_quantity * item.cost_price
             if item.total_quantity and item.sale_price:
@@ -1310,8 +1319,11 @@ def dashboard_overview(request):
         ).aggregate(
             total_sales=Count('id'),
             total_revenue=Sum('unit_price'),
-            total_items_sold=Sum('quantity') * -1  # Negativo para saída
+            total_items_sold=Sum('quantity')
         )
+        
+        # ✅ CORRIGIR valor de items_sold (deve ser positivo)
+        total_items_sold = abs(sales_stats['total_items_sold'] or 0)
         
         # 📈 VENDAS POR DIA (últimos 7 dias)
         seven_days_ago = timezone.now() - timedelta(days=7)
@@ -1323,8 +1335,8 @@ def dashboard_overview(request):
                 transaction_type='VENDA',
                 created_at__date=day.date()
             ).aggregate(
-                revenue=Sum('unit_price') or 0,
-                quantity=Sum('quantity') or 0
+                revenue=Sum('unit_price'),
+                quantity=Sum('quantity')
             )
             daily_sales.append({
                 'date': day.strftime('%Y-%m-%d'),
@@ -1342,9 +1354,9 @@ def dashboard_overview(request):
             'product__name',
             'product__id'
         ).annotate(
-            total_sold=Sum('quantity') * -1,
+            total_sold=Sum('quantity'),
             total_revenue=Sum('unit_price')
-        ).order_by('-total_sold')[:5]
+        ).order_by('total_sold')[:5]  # Ordenar crescente pois quantity é negativo
         
         # 📊 ANÁLISE POR CATEGORIA - CORRIGIDO
         category_stats = []
@@ -1360,19 +1372,19 @@ def dashboard_overview(request):
                 total_quantity__gt=0
             )
             
-            total_products = items.count()
-            total_quantity = items.aggregate(Sum('total_quantity'))['total_quantity'] or 0
+            total_products_cat = items.count()
+            total_quantity_cat = sum(item.total_quantity or 0 for item in items)
             
             # Calcular valor total manualmente
-            total_value = 0
-            for item in items:
-                if item.total_quantity and item.sale_price:
-                    total_value += item.total_quantity * item.sale_price
+            total_value = sum(
+                (item.total_quantity or 0) * (item.sale_price or 0) 
+                for item in items
+            )
             
             category_stats.append({
-                'category': category,
-                'total_products': total_products,
-                'total_quantity': total_quantity,
+                'category': category or 'Sem categoria',
+                'total_products': total_products_cat,
+                'total_quantity': total_quantity_cat,
                 'total_value': total_value
             })
         
@@ -1387,19 +1399,16 @@ def dashboard_overview(request):
         
         # 📦 PRODUTOS PRÓXIMOS DO VENCIMENTO (próximos 30 dias)
         thirty_days_from_now = today + timedelta(days=30)
-        expiring_soon = InventoryBatch.objects.filter(
-            item__store=store,
-            expiration_date__lte=thirty_days_from_now,
-            expiration_date__gte=today,
-            quantity__gt=0
-        ).select_related('item__product').order_by('expiration_date')[:10]
-        
-        # 🎯 SESSÕES DE CADASTRO - REMOVIDO (evita erro da tabela)
-        session_stats = {
-            'total_sessions_30d': 0,
-            'total_products_registered_30d': 0,
-            'avg_session_duration': 0
-        }
+        expiring_soon = []
+        try:
+            expiring_soon = InventoryBatch.objects.filter(
+                item__store=store,
+                expiration_date__lte=thirty_days_from_now,
+                expiration_date__gte=today,
+                quantity__gt=0
+            ).select_related('item__product').order_by('expiration_date')[:10]
+        except Exception as e:
+            print(f"⚠️ Erro ao buscar lotes vencendo: {e}")
         
         # 💡 CÁLCULOS DERIVADOS
         profit_potential = total_potential - total_invested
@@ -1408,7 +1417,7 @@ def dashboard_overview(request):
         return Response({
             'store_info': {
                 'name': store.name,
-                'plan': store.plan,
+                'plan': getattr(store, 'plan', 'free'),
                 'created_at': store.created_at
             },
             'financial': {
@@ -1419,13 +1428,13 @@ def dashboard_overview(request):
                 'avg_ticket': float(avg_ticket)
             },
             'inventory': {
-                'total_products': inventory_stats['total_products'] or 0,
-                'total_stock': inventory_stats['total_stock'] or 0,
-                'low_stock_count': inventory_stats['low_stock_count'] or 0
+                'total_products': total_products,
+                'total_stock': total_stock,
+                'low_stock_count': low_stock_count
             },
             'sales': {
                 'total_sales_30d': sales_stats['total_sales'] or 0,
-                'total_items_sold_30d': abs(sales_stats['total_items_sold'] or 0),
+                'total_items_sold_30d': total_items_sold,
                 'daily_sales': daily_sales
             },
             'charts': {
@@ -1434,7 +1443,7 @@ def dashboard_overview(request):
                     {
                         'name': item['product__name'],
                         'id': item['product__id'],
-                        'total_sold': item['total_sold'],
+                        'total_sold': abs(item['total_sold'] or 0),
                         'revenue': float(item['total_revenue'] or 0)
                     }
                     for item in top_products
@@ -1455,7 +1464,7 @@ def dashboard_overview(request):
                     {
                         'id': batch.id,
                         'product_name': batch.item.product.name,
-                        'batch_code': batch.batch_code,
+                        'batch_code': batch.batch_code or 'S/N',
                         'expiration_date': batch.expiration_date,
                         'quantity': batch.quantity,
                         'days_to_expire': (batch.expiration_date - today).days
@@ -1463,7 +1472,11 @@ def dashboard_overview(request):
                     for batch in expiring_soon
                 ]
             },
-            'sessions': session_stats
+            'sessions': {
+                'total_sessions_30d': 0,
+                'total_products_registered_30d': 0,
+                'avg_session_duration': 0
+            }
         })
         
     except Exception as e:
@@ -1492,7 +1505,7 @@ def dashboard_financial_summary(request):
             transaction_type__in=['VENDA', 'PRESENTE', 'BRINDE']
         ).values('transaction_type').annotate(
             total_revenue=Sum('unit_price'),
-            total_quantity=Sum('quantity') * -1
+            total_quantity=Sum('quantity')
         ).order_by('-total_revenue')
         
         # 📊 CUSTOS vs RECEITAS
@@ -1545,14 +1558,36 @@ def dashboard_inventory_analysis(request):
         if not store:
             return Response({'error': 'Loja não encontrada'}, status=400)
 
-        # 📦 ANÁLISE POR CATEGORIA
-        category_analysis = InventoryItem.objects.filter(
+        # 📦 ANÁLISE POR CATEGORIA - CORRIGIDO (sem F() expressions problemáticas)
+        category_analysis = []
+        categories = InventoryItem.objects.filter(
             store=store
-        ).values('product__category').annotate(
-            total_products=Count('id'),
-            total_quantity=Sum('total_quantity'),
-            total_value=Sum(models.F('total_quantity') * models.F('cost_price'))
-        ).order_by('-total_value')
+        ).values_list('product__category', flat=True).distinct()
+        
+        for category in categories:
+            items = InventoryItem.objects.filter(
+                store=store,
+                product__category=category
+            )
+            
+            total_products = items.count()
+            total_quantity = sum(item.total_quantity or 0 for item in items)
+            
+            # Calcular valor total manualmente
+            total_value = sum(
+                (item.total_quantity or 0) * (item.cost_price or 0) 
+                for item in items
+            )
+            
+            category_analysis.append({
+                'category': category or 'Sem categoria',
+                'total_products': total_products,
+                'total_quantity': total_quantity,
+                'total_value': total_value
+            })
+        
+        # Ordenar por valor
+        category_analysis.sort(key=lambda x: x['total_value'], reverse=True)
         
         # 🔄 GIRO DE ESTOQUE (últimos 30 dias)
         thirty_days_ago = timezone.now() - timedelta(days=30)
@@ -1566,7 +1601,7 @@ def dashboard_inventory_analysis(request):
                 created_at__gte=thirty_days_ago
             ).aggregate(sold=Sum('quantity'))['sold'] or 0
             
-            avg_stock = item.total_quantity
+            avg_stock = item.total_quantity or 1
             turnover_rate = abs(sold_quantity) / max(avg_stock, 1) if avg_stock > 0 else 0
             
             turnover_analysis.append({
@@ -1581,15 +1616,7 @@ def dashboard_inventory_analysis(request):
         turnover_analysis.sort(key=lambda x: x['turnover_rate'], reverse=True)
         
         return Response({
-            'category_analysis': [
-                {
-                    'category': item['product__category'],
-                    'total_products': item['total_products'],
-                    'total_quantity': item['total_quantity'],
-                    'total_value': float(item['total_value'] or 0)
-                }
-                for item in category_analysis
-            ],
+            'category_analysis': category_analysis,
             'turnover_analysis': turnover_analysis[:10]  # Top 10
         })
         
