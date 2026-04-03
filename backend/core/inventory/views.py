@@ -1273,50 +1273,293 @@ def public_storefront(request, slug):
         "items": items_data
     })
 
-class DashboardStatsView(APIView):
-    """
-    Estatísticas para o painel principal.
-    """
-    permission_classes = [IsAuthenticated]
+# inventory/views.py - ADICIONAR estas views para dashboard
 
-    def get(self, request):
-        store = get_current_store(request.user)
+from django.db.models import Sum, Count, Avg, Q
+from django.utils import timezone
+from datetime import datetime, timedelta
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_overview(request):
+    """Dashboard principal com métricas consolidadas"""
+    try:
+        store = ensure_user_has_store(request.user)
         if not store:
-            return Response({"error": "Loja não configurada"}, status=400)
+            return Response({'error': 'Loja não encontrada'}, status=400)
+
+        # Período para análises (últimos 30 dias)
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        today = timezone.now().date()
         
-        totals = InventoryItem.objects.filter(store=store).aggregate(
-            total_cost=Sum(F('total_quantity') * F('cost_price')),
-            total_sales_potential=Sum(F('total_quantity') * F('sale_price')),
-            total_items=Sum('total_quantity')
+        # 📊 MÉTRICAS DE ESTOQUE
+        inventory_stats = InventoryItem.objects.filter(store=store).aggregate(
+            total_products=Count('id'),
+            total_stock=Sum('total_quantity'),
+            avg_stock_value=Avg('cost_price'),
+            low_stock_count=Count('id', filter=Q(total_quantity__lte=models.F('min_quantity')))
         )
-
-        category_stats = (
-            InventoryItem.objects.filter(store=store, total_quantity__gt=0)
-            .values('product__category')
-            .annotate(
-                value=Sum(F('total_quantity') * F('sale_price')),
-                count=Sum('total_quantity')
-            ).order_by('-value')
+        
+        # 💰 MÉTRICAS FINANCEIRAS (últimos 30 dias)
+        sales_stats = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='VENDA',
+            created_at__gte=thirty_days_ago
+        ).aggregate(
+            total_sales=Count('id'),
+            total_revenue=Sum('unit_price'),
+            total_items_sold=Sum('quantity') * -1  # Negativo para saída
         )
-
-        low_stock = InventoryItem.objects.filter(
-            store=store, total_quantity__lte=F('min_quantity'), total_quantity__gt=0
-        ).count()
-
+        
+        # 📈 VENDAS POR DIA (últimos 7 dias)
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        daily_sales = []
+        for i in range(7):
+            day = seven_days_ago + timedelta(days=i)
+            day_sales = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='VENDA',
+                created_at__date=day.date()
+            ).aggregate(
+                revenue=Sum('unit_price') or 0,
+                quantity=Sum('quantity') or 0
+            )
+            daily_sales.append({
+                'date': day.strftime('%Y-%m-%d'),
+                'day_name': day.strftime('%a'),
+                'revenue': float(day_sales['revenue'] or 0),
+                'quantity': abs(int(day_sales['quantity'] or 0))
+            })
+        
+        # 🏆 TOP PRODUTOS (mais vendidos)
+        top_products = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='VENDA',
+            created_at__gte=thirty_days_ago
+        ).values(
+            'product__name',
+            'product__id'
+        ).annotate(
+            total_sold=Sum('quantity') * -1,
+            total_revenue=Sum('unit_price')
+        ).order_by('-total_sold')[:5]
+        
+        # ⚠️ ALERTAS DE ESTOQUE
+        low_stock_items = InventoryItem.objects.filter(
+            store=store,
+            total_quantity__lte=models.F('min_quantity')
+        ).select_related('product')[:10]
+        
+        # 📦 PRODUTOS PRÓXIMOS DO VENCIMENTO (próximos 30 dias)
+        thirty_days_from_now = today + timedelta(days=30)
+        expiring_soon = InventoryBatch.objects.filter(
+            item__store=store,
+            expiration_date__lte=thirty_days_from_now,
+            expiration_date__gte=today,
+            quantity__gt=0
+        ).select_related('item__product').order_by('expiration_date')[:10]
+        
+        # 🎯 SESSÕES DE CADASTRO (últimos 30 dias)
+        session_stats = RegistrationSession.objects.filter(
+            store=store,
+            started_at__gte=thirty_days_ago
+        ).aggregate(
+            total_sessions=Count('id'),
+            total_products_registered=Sum('products_count'),
+            avg_session_duration=Avg('duration_minutes')
+        )
+        
         return Response({
-            "financial": {
-                "invested": totals['total_cost'] or 0,
-                "potential_revenue": totals['total_sales_potential'] or 0,
-                "profit_margin": (totals['total_sales_potential'] or 0) - (totals['total_cost'] or 0)
+            'store_info': {
+                'name': store.name,
+                'plan': store.plan,
+                'created_at': store.created_at
             },
-            "inventory": {
-                "total_items": totals['total_items'] or 0,
-                "low_stock_count": low_stock
+            'inventory': {
+                'total_products': inventory_stats['total_products'] or 0,
+                'total_stock': inventory_stats['total_stock'] or 0,
+                'avg_stock_value': float(inventory_stats['avg_stock_value'] or 0),
+                'low_stock_count': inventory_stats['low_stock_count'] or 0
             },
-            "charts": {
-                "by_category": category_stats
+            'sales': {
+                'total_sales_30d': sales_stats['total_sales'] or 0,
+                'total_revenue_30d': float(sales_stats['total_revenue'] or 0),
+                'total_items_sold_30d': abs(sales_stats['total_items_sold'] or 0),
+                'avg_ticket': float((sales_stats['total_revenue'] or 0) / max(sales_stats['total_sales'] or 1, 1))
+            },
+            'daily_sales': daily_sales,
+            'top_products': [
+                {
+                    'name': item['product__name'],
+                    'id': item['product__id'],
+                    'total_sold': item['total_sold'],
+                    'revenue': float(item['total_revenue'] or 0)
+                }
+                for item in top_products
+            ],
+            'alerts': {
+                'low_stock': [
+                    {
+                        'id': item.id,
+                        'product_name': item.product.name,
+                        'current_stock': item.total_quantity,
+                        'min_stock': item.min_quantity,
+                        'status': 'critical' if item.total_quantity == 0 else 'warning'
+                    }
+                    for item in low_stock_items
+                ],
+                'expiring_soon': [
+                    {
+                        'id': batch.id,
+                        'product_name': batch.item.product.name,
+                        'batch_code': batch.batch_code,
+                        'expiration_date': batch.expiration_date,
+                        'quantity': batch.quantity,
+                        'days_to_expire': (batch.expiration_date - today).days
+                    }
+                    for batch in expiring_soon
+                ]
+            },
+            'sessions': {
+                'total_sessions_30d': session_stats['total_sessions'] or 0,
+                'total_products_registered_30d': session_stats['total_products_registered'] or 0,
+                'avg_session_duration': float(session_stats['avg_session_duration'] or 0)
             }
         })
+        
+    except Exception as e:
+        print(f"❌ Erro no dashboard: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_financial_summary(request):
+    """Resumo financeiro detalhado"""
+    try:
+        store = ensure_user_has_store(request.user)
+        if not store:
+            return Response({'error': 'Loja não encontrada'}, status=400)
+
+        # Período configurável (padrão: últimos 30 dias)
+        days = int(request.GET.get('days', 30))
+        start_date = timezone.now() - timedelta(days=days)
+        
+        # 💰 RECEITAS POR TIPO DE TRANSAÇÃO
+        revenue_by_type = StockTransaction.objects.filter(
+            store=store,
+            created_at__gte=start_date,
+            transaction_type__in=['VENDA', 'PRESENTE', 'BRINDE']
+        ).values('transaction_type').annotate(
+            total_revenue=Sum('unit_price'),
+            total_quantity=Sum('quantity') * -1
+        ).order_by('-total_revenue')
+        
+        # 📊 CUSTOS vs RECEITAS
+        cost_analysis = StockTransaction.objects.filter(
+            store=store,
+            transaction_type='VENDA',
+            created_at__gte=start_date
+        ).aggregate(
+            total_revenue=Sum('unit_price'),
+            total_cost=Sum('unit_cost'),
+            total_items=Count('id')
+        )
+        
+        profit = (cost_analysis['total_revenue'] or 0) - (cost_analysis['total_cost'] or 0)
+        margin = (profit / max(cost_analysis['total_revenue'] or 1, 1)) * 100
+        
+        return Response({
+            'period': {
+                'days': days,
+                'start_date': start_date.date(),
+                'end_date': timezone.now().date()
+            },
+            'revenue_by_type': [
+                {
+                    'type': item['transaction_type'],
+                    'revenue': float(item['total_revenue'] or 0),
+                    'quantity': abs(item['total_quantity'] or 0)
+                }
+                for item in revenue_by_type
+            ],
+            'profitability': {
+                'total_revenue': float(cost_analysis['total_revenue'] or 0),
+                'total_cost': float(cost_analysis['total_cost'] or 0),
+                'profit': float(profit),
+                'margin_percent': float(margin),
+                'total_transactions': cost_analysis['total_items'] or 0
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro no resumo financeiro: {e}")
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_inventory_analysis(request):
+    """Análise detalhada do inventário"""
+    try:
+        store = ensure_user_has_store(request.user)
+        if not store:
+            return Response({'error': 'Loja não encontrada'}, status=400)
+
+        # 📦 ANÁLISE POR CATEGORIA
+        category_analysis = InventoryItem.objects.filter(
+            store=store
+        ).values('product__category').annotate(
+            total_products=Count('id'),
+            total_quantity=Sum('total_quantity'),
+            total_value=Sum(models.F('total_quantity') * models.F('cost_price'))
+        ).order_by('-total_value')
+        
+        # 🔄 GIRO DE ESTOQUE (últimos 30 dias)
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        turnover_analysis = []
+        
+        for item in InventoryItem.objects.filter(store=store).select_related('product')[:20]:
+            sold_quantity = StockTransaction.objects.filter(
+                store=store,
+                product=item.product,
+                transaction_type='VENDA',
+                created_at__gte=thirty_days_ago
+            ).aggregate(sold=Sum('quantity'))['sold'] or 0
+            
+            avg_stock = item.total_quantity
+            turnover_rate = abs(sold_quantity) / max(avg_stock, 1) if avg_stock > 0 else 0
+            
+            turnover_analysis.append({
+                'product_name': item.product.name,
+                'current_stock': item.total_quantity,
+                'sold_30d': abs(sold_quantity),
+                'turnover_rate': round(turnover_rate, 2),
+                'status': 'high' if turnover_rate > 1 else 'medium' if turnover_rate > 0.5 else 'low'
+            })
+        
+        # Ordenar por taxa de giro
+        turnover_analysis.sort(key=lambda x: x['turnover_rate'], reverse=True)
+        
+        return Response({
+            'category_analysis': [
+                {
+                    'category': item['product__category'],
+                    'total_products': item['total_products'],
+                    'total_quantity': item['total_quantity'],
+                    'total_value': float(item['total_value'] or 0)
+                }
+                for item in category_analysis
+            ],
+            'turnover_analysis': turnover_analysis[:10]  # Top 10
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro na análise de inventário: {e}")
+        return Response({'error': str(e)}, status=500)
     
 
 @api_view(["GET"])

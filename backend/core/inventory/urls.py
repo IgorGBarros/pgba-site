@@ -22,7 +22,10 @@ from .views import (
     AdminUpdatePlanView,
     AdminUpdateSubscriptionView,
     public_storefront,
-    public_storefront_view
+    public_storefront_view,
+    dashboard_overview,
+    dashboard_financial_summary,       
+    dashboard_inventory_analysis
     # FirebaseLoginView e CustomUserCreateView foram removidos daqui pois estão comentados na view
 )
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -63,6 +66,10 @@ urlpatterns = [
 
     path('debug/user-store/', debug_user_store, name='debug-user-store'),
     path('debug/associate-store/', associate_user_store, name='associate-store'),
+
+    path('dashboard/overview/', dashboard_overview, name='dashboard-overview'),
+    path('dashboard/financial/', dashboard_financial_summary, name='dashboard-financial'),
+    path('dashboard/inventory/', dashboard_inventory_analysis, name='dashboard-inventory'),
     
 
     # --- Rotas Automáticas (Router) ---
