@@ -1743,15 +1743,17 @@ def public_storefront_view(request, slug=None, brand=None):
     
 # inventory/views.py - SUBSTITUIR COMPLETAMENTE o StockTransactionViewSet
 
+# inventory/views.py - SUBSTITUIR COMPLETAMENTE o StockTransactionViewSet
+
 class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
-    """Extrato de Movimentações da Loja - VERSÃO FINAL BLINDADA"""
+    """Extrato de Movimentações da Loja - VERSÃO COM FIFO FUNCIONAL"""
     serializer_class = StockTransactionSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['transaction_type']
     
     def get_queryset(self):
-        """Queryset com garantia de loja"""
+        """Queryset com tratamento de erro robusto"""
         try:
             store = ensure_user_has_store(self.request.user)
             return StockTransaction.objects.filter(
@@ -1761,8 +1763,62 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             print(f"❌ Erro no get_queryset: {e}")
             return StockTransaction.objects.none()
 
+    def apply_fifo_withdrawal(self, inventory_item, quantity_to_withdraw):
+        """✅ FIFO automático com correções - VERSÃO FUNCIONAL"""
+        print(f"🎯 Aplicando FIFO: {quantity_to_withdraw} unidades de {inventory_item.product.name}")
+        
+        # Buscar lotes ordenados por validade (FIFO)
+        available_batches = inventory_item.batches.filter(
+            quantity__gt=0
+        ).order_by('expiration_date', 'id')
+        
+        if not available_batches.exists():
+            raise ValueError("Não há lotes disponíveis")
+        
+        total_available = sum(batch.quantity for batch in available_batches)
+        if total_available < quantity_to_withdraw:
+            raise ValueError(f"Estoque insuficiente. Disponível: {total_available}, Solicitado: {quantity_to_withdraw}")
+        
+        # Aplicar baixas nos lotes (FIFO)
+        remaining_to_withdraw = quantity_to_withdraw
+        batches_used = []
+        
+        for batch in available_batches:
+            if remaining_to_withdraw <= 0:
+                break
+            
+            qty_from_batch = min(remaining_to_withdraw, batch.quantity)
+            
+            print(f"📦 Lote {batch.id} (Val: {batch.expiration_date}): {batch.quantity} → {batch.quantity - qty_from_batch}")
+            
+            # ✅ APLICAR BAIXA NO LOTE
+            batch.quantity -= qty_from_batch
+            batch.save()
+            
+            batches_used.append({
+                'batch_id': batch.id,
+                'quantity_used': qty_from_batch,
+                'expiration_date': batch.expiration_date,
+                'batch_code': batch.batch_code
+            })
+            
+            remaining_to_withdraw -= qty_from_batch
+        
+        # ✅ RECALCULAR TOTAL DO INVENTÁRIO
+        from django.db.models import Sum
+        total_real = inventory_item.batches.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        inventory_item.total_quantity = total_real
+        inventory_item.save()
+        
+        print(f"📊 Total atualizado: {inventory_item.product.name} - {inventory_item.total_quantity}")
+        
+        return batches_used
+
     def perform_create(self, serializer):
-        """✅ GARANTIR store_id SEMPRE"""
+        """✅ GARANTIR store_id E APLICAR FIFO"""
         try:
             store = ensure_user_has_store(self.request.user)
             print(f"🏪 perform_create - store_id: {store.id}")
@@ -1778,7 +1834,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             raise
 
     def create(self, request, *args, **kwargs):
-        """✅ Create com validação TRIPLA de store_id"""
+        """✅ Create com FIFO AUTOMÁTICO para saídas"""
         try:
             print(f"🔄 CREATE - Dados recebidos: {request.data}")
             
@@ -1801,23 +1857,84 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
             
             print(f"✅ VALIDAÇÃO 2 - Campos obrigatórios OK")
             
-            # ✅ VALIDAÇÃO 3: Serializer
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
+            # ✅ BUSCAR PRODUTO E INVENTÁRIO
+            product_id = request.data.get('product_id') or request.data.get('product')
+            try:
+                from .models import Product, InventoryItem
+                product = Product.objects.get(id=product_id)
+                inventory_item = InventoryItem.objects.get(store=store, product=product)
+                print(f"✅ Produto encontrado: {product.name}")
+                print(f"✅ Inventário encontrado: {inventory_item.total_quantity} unidades")
+            except Product.DoesNotExist:
+                return Response({'error': 'Produto não encontrado'}, status=404)
+            except InventoryItem.DoesNotExist:
+                return Response({'error': 'Produto não está no seu estoque'}, status=404)
             
-            print(f"✅ VALIDAÇÃO 3 - Serializer válido")
+            quantity = abs(int(request.data.get('quantity', 0)))
+            transaction_type = request.data.get('transaction_type', '').upper()
+            unit_price = float(request.data.get('unit_price', 0))
             
-            # ✅ CRIAR COM STORE GARANTIDO
-            print(f"🔄 Chamando perform_create com store {store.id}")
-            self.perform_create(serializer)
+            # ✅ VERIFICAR SE É SAÍDA E APLICAR FIFO
+            is_exit = transaction_type in ['VENDA', 'USO_PROPRIO', 'PRESENTE', 'BRINDE', 'PERDA', 'SAIDA']
             
-            headers = self.get_success_headers(serializer.data)
+            if is_exit:
+                print(f"🔄 SAÍDA DETECTADA - Aplicando FIFO para {quantity} unidades")
+                
+                # Verificar estoque suficiente
+                if inventory_item.total_quantity < quantity:
+                    return Response({
+                        'error': 'Estoque insuficiente',
+                        'available': inventory_item.total_quantity,
+                        'requested': quantity
+                    }, status=400)
+                
+                # ✅ APLICAR FIFO COM TRANSAÇÃO ATÔMICA
+                from django.db import transaction as db_transaction
+                with db_transaction.atomic():
+                    try:
+                        # Aplicar FIFO
+                        batches_used = self.apply_fifo_withdrawal(inventory_item, quantity)
+                        
+                        # ✅ CRIAR TRANSAÇÃO COM QUANTIDADE NEGATIVA (saída)
+                        transaction_obj = StockTransaction.objects.create(
+                            store=store,
+                            product=product,
+                            transaction_type=transaction_type,
+                            quantity=-quantity,  # ✅ NEGATIVO para saída
+                            unit_price=unit_price,
+                            unit_cost=inventory_item.cost_price or 0,
+                            description=request.data.get('description', f"{transaction_type} - {product.name}")
+                        )
+                        
+                        print(f"✅ Transação FIFO criada: {transaction_obj.id}")
+                        print(f"✅ Novo total do estoque: {inventory_item.total_quantity}")
+                        
+                        serializer = self.get_serializer(transaction_obj)
+                        return Response({
+                            'message': 'Baixa FIFO aplicada com sucesso',
+                            'transaction': serializer.data,
+                            'batches_used': batches_used,
+                            'new_total_quantity': inventory_item.total_quantity,
+                            'fifo_applied': True
+                        }, status=201)
+                        
+                    except ValueError as ve:
+                        print(f"❌ Erro no FIFO: {ve}")
+                        return Response({'error': str(ve)}, status=400)
             
-            # ✅ VERIFICAÇÃO FINAL
-            created_instance = serializer.instance
-            print(f"✅ SUCESSO - Transação {created_instance.id} criada com store_id: {created_instance.store_id}")
-            
-            return Response(serializer.data, status=201, headers=headers)
+            else:
+                # ✅ ENTRADA NORMAL (sem FIFO)
+                print(f"🔄 ENTRADA DETECTADA - Sem FIFO")
+                
+                # ✅ Validar serializer
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                
+                # ✅ perform_create vai definir o store automaticamente
+                self.perform_create(serializer)
+                
+                headers = self.get_success_headers(serializer.data)
+                return Response(serializer.data, status=201, headers=headers)
             
         except Exception as e:
             print(f"❌ ERRO CRÍTICO no create: {e}")
@@ -1833,7 +1950,6 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
                     'data': request.data
                 }
             }, status=500)
-    
 # inventory/views.py - ADICIONAR esta view
 
 @api_view(['GET'])
