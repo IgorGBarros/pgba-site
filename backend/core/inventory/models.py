@@ -306,6 +306,7 @@ class RegistrationSession(models.Model):
             return (self.finished_at - self.started_at).total_seconds() / 60
         return (timezone.now() - self.started_at).total_seconds() / 60
     
+    
     def add_product(self, inventory_item, quantity=1):
         """Adiciona produto à sessão"""
         self.products_count += quantity

@@ -1273,19 +1273,17 @@ def public_storefront(request, slug):
         "items": items_data
     })
 
-# inventory/views.py - ADICIONAR estas views para dashboard
 
-from django.db.models import Sum, Count, Avg, Q
+
+from django.db.models import Sum, Count, Avg, Q, F, Case, When
+from django.db.models.functions import Extract
 from django.utils import timezone
 from datetime import datetime, timedelta
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_overview(request):
-    """Dashboard principal com métricas consolidadas"""
+    """Dashboard principal com métricas consolidadas - VERSÃO CORRIGIDA"""
     try:
         store = ensure_user_has_store(request.user)
         if not store:
@@ -1299,8 +1297,9 @@ def dashboard_overview(request):
         inventory_stats = InventoryItem.objects.filter(store=store).aggregate(
             total_products=Count('id'),
             total_stock=Sum('total_quantity'),
-            avg_stock_value=Avg('cost_price'),
-            low_stock_count=Count('id', filter=Q(total_quantity__lte=models.F('min_quantity')))
+            total_invested=Sum(F('total_quantity') * F('cost_price')),
+            total_potential=Sum(F('total_quantity') * F('sale_price')),
+            low_stock_count=Count('id', filter=Q(total_quantity__lte=F('min_quantity')))
         )
         
         # 💰 MÉTRICAS FINANCEIRAS (últimos 30 dias)
@@ -1347,10 +1346,20 @@ def dashboard_overview(request):
             total_revenue=Sum('unit_price')
         ).order_by('-total_sold')[:5]
         
+        # 📊 ANÁLISE POR CATEGORIA
+        category_stats = InventoryItem.objects.filter(
+            store=store,
+            total_quantity__gt=0
+        ).values('product__category').annotate(
+            total_products=Count('id'),
+            total_quantity=Sum('total_quantity'),
+            total_value=Sum(F('total_quantity') * F('sale_price'))
+        ).order_by('-total_value')[:5]
+        
         # ⚠️ ALERTAS DE ESTOQUE
         low_stock_items = InventoryItem.objects.filter(
             store=store,
-            total_quantity__lte=models.F('min_quantity')
+            total_quantity__lte=F('min_quantity')
         ).select_related('product')[:10]
         
         # 📦 PRODUTOS PRÓXIMOS DO VENCIMENTO (próximos 30 dias)
@@ -1362,15 +1371,40 @@ def dashboard_overview(request):
             quantity__gt=0
         ).select_related('item__product').order_by('expiration_date')[:10]
         
-        # 🎯 SESSÕES DE CADASTRO (últimos 30 dias)
-        session_stats = RegistrationSession.objects.filter(
-            store=store,
-            started_at__gte=thirty_days_ago
-        ).aggregate(
-            total_sessions=Count('id'),
-            total_products_registered=Sum('products_count'),
-            avg_session_duration=Avg('duration_minutes')
-        )
+        # 🎯 SESSÕES DE CADASTRO (se existir o modelo) - CORRIGIDO
+        session_stats = {'total_sessions_30d': 0, 'total_products_registered_30d': 0, 'avg_session_duration': 0}
+        try:
+            # ✅ CALCULAR DURAÇÃO NO BANCO DE DADOS
+            sessions_data = RegistrationSession.objects.filter(
+                store=store,
+                started_at__gte=thirty_days_ago
+            ).annotate(
+                # ✅ Calcular duração em minutos usando Extract
+                duration_minutes=Case(
+                    When(finished_at__isnull=False, 
+                         then=Extract(F('finished_at') - F('started_at'), 'epoch') / 60),
+                    default=Extract(timezone.now() - F('started_at'), 'epoch') / 60,
+                    output_field=models.FloatField()
+                )
+            ).aggregate(
+                total_sessions_30d=Count('id'),
+                total_products_registered_30d=Sum('products_count'),
+                avg_session_duration=Avg('duration_minutes')
+            )
+            
+            session_stats = {
+                'total_sessions_30d': sessions_data['total_sessions_30d'] or 0,
+                'total_products_registered_30d': sessions_data['total_products_registered_30d'] or 0,
+                'avg_session_duration': round(sessions_data['avg_session_duration'] or 0, 1)
+            }
+            
+        except Exception as e:
+            print(f"⚠️ Erro ao calcular sessões: {e}")
+            # RegistrationSession pode não existir ou ter problemas
+        
+        # 💡 CÁLCULOS DERIVADOS
+        profit_potential = (inventory_stats['total_potential'] or 0) - (inventory_stats['total_invested'] or 0)
+        avg_ticket = (sales_stats['total_revenue'] or 0) / max(sales_stats['total_sales'] or 1, 1)
         
         return Response({
             'store_info': {
@@ -1378,28 +1412,43 @@ def dashboard_overview(request):
                 'plan': store.plan,
                 'created_at': store.created_at
             },
+            'financial': {
+                'total_invested': float(inventory_stats['total_invested'] or 0),
+                'total_potential': float(inventory_stats['total_potential'] or 0),
+                'profit_potential': float(profit_potential),
+                'total_revenue_30d': float(sales_stats['total_revenue'] or 0),
+                'avg_ticket': float(avg_ticket)
+            },
             'inventory': {
                 'total_products': inventory_stats['total_products'] or 0,
                 'total_stock': inventory_stats['total_stock'] or 0,
-                'avg_stock_value': float(inventory_stats['avg_stock_value'] or 0),
                 'low_stock_count': inventory_stats['low_stock_count'] or 0
             },
             'sales': {
                 'total_sales_30d': sales_stats['total_sales'] or 0,
-                'total_revenue_30d': float(sales_stats['total_revenue'] or 0),
                 'total_items_sold_30d': abs(sales_stats['total_items_sold'] or 0),
-                'avg_ticket': float((sales_stats['total_revenue'] or 0) / max(sales_stats['total_sales'] or 1, 1))
+                'daily_sales': daily_sales
             },
-            'daily_sales': daily_sales,
-            'top_products': [
-                {
-                    'name': item['product__name'],
-                    'id': item['product__id'],
-                    'total_sold': item['total_sold'],
-                    'revenue': float(item['total_revenue'] or 0)
-                }
-                for item in top_products
-            ],
+            'charts': {
+                'by_category': [
+                    {
+                        'category': item['product__category'],
+                        'total_products': item['total_products'],
+                        'total_quantity': item['total_quantity'],
+                        'total_value': float(item['total_value'] or 0)
+                    }
+                    for item in category_stats
+                ],
+                'top_products': [
+                    {
+                        'name': item['product__name'],
+                        'id': item['product__id'],
+                        'total_sold': item['total_sold'],
+                        'revenue': float(item['total_revenue'] or 0)
+                    }
+                    for item in top_products
+                ]
+            },
             'alerts': {
                 'low_stock': [
                     {
@@ -1423,11 +1472,7 @@ def dashboard_overview(request):
                     for batch in expiring_soon
                 ]
             },
-            'sessions': {
-                'total_sessions_30d': session_stats['total_sessions'] or 0,
-                'total_products_registered_30d': session_stats['total_products_registered'] or 0,
-                'avg_session_duration': float(session_stats['avg_session_duration'] or 0)
-            }
+            'sessions': session_stats
         })
         
     except Exception as e:
