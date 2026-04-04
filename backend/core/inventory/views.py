@@ -1278,33 +1278,27 @@ from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone
 from datetime import datetime, timedelta
 # inventory/views.py - CORRIGIR dashboard_overview
+# inventory/views.py - CORRIGIR dashboard_overview
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_overview(request):
-    """Dashboard principal - VERSÃO CORRIGIDA COM FILTROS"""
+    """Dashboard principal - VERSÃO CORRIGIDA COM CASH_FLOW"""
     try:
         store = ensure_user_has_store(request.user)
         if not store:
             return Response({'error': 'Loja não encontrada'}, status=400)
 
-        # ✅ CORREÇÃO: Período configurável com start_date funcional
+        # Período configurável
         period = request.GET.get('period', '30d')
-        period_map = {
-            '7d': 7,
-            '30d': 30,
-            '90d': 90,
-            '180d': 180,
-            '1y': 365
-        }
-        
+        period_map = {'7d': 7, '30d': 30, '90d': 90, '180d': 180, '1y': 365}
         days = period_map.get(period, 30)
         start_date = timezone.now() - timedelta(days=days)
         today = timezone.now().date()
-        
+
         print(f"📊 Dashboard período: {period} ({days} dias) - desde {start_date.date()}")
 
-        # 📊 MÉTRICAS DE ESTOQUE (sempre atual)
+        # 📊 MÉTRICAS DE ESTOQUE
         inventory_items = InventoryItem.objects.filter(store=store)
         total_products = inventory_items.count()
         total_stock = sum(item.total_quantity or 0 for item in inventory_items)
@@ -1312,7 +1306,7 @@ def dashboard_overview(request):
             total_quantity__lte=F('min_quantity')
         ).count()
 
-        # ✅ VALORES FINANCEIROS (sempre atual)
+        # 💰 VALORES FINANCEIROS
         total_invested = 0
         total_potential = 0
         for item in inventory_items:
@@ -1321,64 +1315,137 @@ def dashboard_overview(request):
             if item.total_quantity and item.sale_price:
                 total_potential += item.total_quantity * item.sale_price
 
-        # ✅ CORREÇÃO: MÉTRICAS FINANCEIRAS usando start_date
-        sales_stats = StockTransaction.objects.filter(
+        # 💸 RECEITAS E VENDAS (período selecionado)
+        revenue_transactions = StockTransaction.objects.filter(
             store=store,
             transaction_type='VENDA',
-            created_at__gte=start_date  # ✅ USAR start_date aqui
-        ).aggregate(
-            total_sales=Count('id'),
-            total_revenue=Sum('unit_price'),
-            total_items_sold=Sum('quantity')
+            created_at__gte=start_date
         )
 
-        total_items_sold = abs(sales_stats['total_items_sold'] or 0)
+        total_revenue = revenue_transactions.aggregate(
+            total=Sum('unit_price')
+        )['total'] or 0
 
-        # ✅ CORREÇÃO: VENDAS POR DIA usando período selecionado
+        total_sales = revenue_transactions.count()
+        total_items_sold = abs(revenue_transactions.aggregate(
+            total=Sum('quantity')
+        )['total'] or 0)
+
+        # 📈 VENDAS POR SEMANA (últimas 4 semanas)
+        weekly_sales = []
+        weeks_back = 4
+        for i in range(weeks_back):
+            week_start = timezone.now() - timedelta(weeks=i+1)
+            week_end = timezone.now() - timedelta(weeks=i)
+            
+            week_data = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='VENDA',
+                created_at__range=[week_start, week_end]
+            ).aggregate(
+                revenue=Sum('unit_price'),
+                quantity=Sum('quantity'),
+                cost=Sum(F('quantity') * F('unit_cost'))
+            )
+            
+            revenue = float(week_data['revenue'] or 0)
+            cost = abs(float(week_data['cost'] or 0))  # Positivo
+            profit = revenue - cost
+            
+            weekly_sales.append({
+                'week': f'S{weeks_back - i}',
+                'week_label': f'Semana {weeks_back - i}',
+                'revenue': revenue,
+                'quantity': abs(week_data['quantity'] or 0),
+                'profit': profit,
+                'cost': cost
+            })
+
+        weekly_sales.reverse()  # Ordem cronológica
+
+        # 📊 VENDAS POR MÊS (últimos 3 meses)
+        monthly_comparison = []
+        for i in range(3):
+            month_start = (timezone.now().replace(day=1) - timedelta(days=30*i))
+            month_end = month_start + timedelta(days=30)
+            
+            month_data = StockTransaction.objects.filter(
+                store=store,
+                transaction_type='VENDA',
+                created_at__range=[month_start, month_end]
+            ).aggregate(
+                revenue=Sum('unit_price'),
+                cost=Sum(F('quantity') * F('unit_cost')),
+                quantity=Sum('quantity')
+            )
+            
+            revenue = float(month_data['revenue'] or 0)
+            cost = abs(float(month_data['cost'] or 0))
+            profit = revenue - cost
+            
+            monthly_comparison.append({
+                'month': month_start.strftime('%b/%Y'),
+                'month_short': month_start.strftime('%b'),
+                'revenue': revenue,
+                'profit': profit,
+                'cost': cost,
+                'quantity': abs(month_data['quantity'] or 0)
+            })
+
+        monthly_comparison.reverse()
+
+        # 📈 VENDAS DIÁRIAS (últimos 7 dias)
         daily_sales = []
-        period_days = min(days, 30)  # Máximo 30 dias para o gráfico
-        
-        for i in range(period_days):
-            day = start_date + timedelta(days=i)
-            if day.date() > today:
-                break
-                
+        for i in range(7):
+            day = timezone.now() - timedelta(days=6-i)  # Últimos 7 dias
+            
             day_sales = StockTransaction.objects.filter(
                 store=store,
                 transaction_type='VENDA',
                 created_at__date=day.date()
             ).aggregate(
                 revenue=Sum('unit_price'),
-                quantity=Sum('quantity')
+                quantity=Sum('quantity'),
+                cost=Sum(F('quantity') * F('unit_cost'))
             )
+            
+            revenue = float(day_sales['revenue'] or 0)
+            cost = abs(float(day_sales['cost'] or 0))
             
             daily_sales.append({
                 'date': day.strftime('%Y-%m-%d'),
                 'day_name': day.strftime('%a'),
-                'revenue': float(day_sales['revenue'] or 0),
-                'quantity': abs(int(day_sales['quantity'] or 0))
+                'day_full': day.strftime('%d/%m'),
+                'revenue': revenue,
+                'quantity': abs(int(day_sales['quantity'] or 0)),
+                'profit': revenue - cost,
+                'cost': cost
             })
 
-        # ✅ CORREÇÃO: TOP PRODUTOS usando start_date
+        # 🏆 TOP PRODUTOS (mais vendidos)
         top_products = StockTransaction.objects.filter(
             store=store,
             transaction_type='VENDA',
-            created_at__gte=start_date  # ✅ USAR start_date aqui
+            created_at__gte=start_date
         ).values(
             'product__name',
             'product__id'
         ).annotate(
             total_sold=Sum('quantity'),
-            total_revenue=Sum('unit_price')
-        ).order_by('total_sold')[:5]
+            total_revenue=Sum('unit_price'),
+            total_cost=Sum(F('quantity') * F('unit_cost'))
+        ).annotate(
+            profit=F('total_revenue') + F('total_cost')  # + porque quantity é negativo
+        ).order_by('-total_revenue')[:10]
 
-        # 📊 ANÁLISE POR CATEGORIA (sempre atual)
+        # 📊 ANÁLISE POR CATEGORIA (com percentuais)
         category_stats = []
         categories = InventoryItem.objects.filter(
             store=store,
             total_quantity__gt=0
         ).values_list('product__category', flat=True).distinct()
 
+        category_total_value = 0
         for category in categories:
             items = InventoryItem.objects.filter(
                 store=store,
@@ -1392,6 +1459,7 @@ def dashboard_overview(request):
                 (item.total_quantity or 0) * (item.sale_price or 0)
                 for item in items
             )
+            category_total_value += total_value
             
             category_stats.append({
                 'category': category or 'Sem categoria',
@@ -1400,15 +1468,18 @@ def dashboard_overview(request):
                 'total_value': total_value
             })
 
+        # Calcular percentuais
+        for cat in category_stats:
+            cat['percentage'] = (cat['total_value'] / max(category_total_value, 1)) * 100
+
         category_stats.sort(key=lambda x: x['total_value'], reverse=True)
 
-        # ⚠️ ALERTAS DE ESTOQUE (sempre atual)
+        # ⚠️ ALERTAS
         low_stock_items = InventoryItem.objects.filter(
             store=store,
             total_quantity__lte=F('min_quantity')
         ).select_related('product')[:10]
 
-        # 📦 PRODUTOS PRÓXIMOS DO VENCIMENTO
         thirty_days_from_now = today + timedelta(days=30)
         expiring_soon = []
         try:
@@ -1421,12 +1492,34 @@ def dashboard_overview(request):
         except Exception as e:
             print(f"⚠️ Erro ao buscar lotes vencendo: {e}")
 
-        # 💡 CÁLCULOS DERIVADOS
+        # 💡 MÉTRICAS DE PERFORMANCE
         profit_potential = total_potential - total_invested
-        avg_ticket = (sales_stats['total_revenue'] or 0) / max(sales_stats['total_sales'] or 1, 1)
+        avg_ticket = total_revenue / max(total_sales, 1)
+        
+        # Calcular giro de estoque
+        turnover_rate = total_items_sold / max(total_stock, 1) if total_stock > 0 else 0
+        stock_rotation_days = 30 / max(turnover_rate, 0.1) if turnover_rate > 0 else 0
+        sell_through_rate = (total_items_sold / max(total_stock, 1)) * 100 if total_stock > 0 else 0
+
+        # Margem de lucro real
+        total_cost_sold = abs(revenue_transactions.aggregate(
+            total=Sum(F('quantity') * F('unit_cost'))
+        )['total'] or 0)
+        real_profit = total_revenue - total_cost_sold
+        real_margin = (real_profit / max(total_revenue, 1)) * 100
+
+        # ✅ FLUXO DE CAIXA - ADICIONAR ESTA SEÇÃO
+        cash_flow_summary = {
+            'total_income': float(total_revenue),
+            'total_expenses': float(total_cost_sold),
+            'net_flow': float(real_profit),
+            'daily_average': float(total_revenue / max(days, 1)),
+            'margin_percent': float(real_margin),
+            'growth_rate': 0.0  # Pode ser calculado comparando com período anterior
+        }
 
         return Response({
-            'period_info': {  # ✅ NOVO: Informações do período
+            'period_info': {
                 'selected': period,
                 'days': days,
                 'start_date': start_date.date(),
@@ -1441,8 +1534,11 @@ def dashboard_overview(request):
                 'total_invested': float(total_invested),
                 'total_potential': float(total_potential),
                 'profit_potential': float(profit_potential),
-                'total_revenue_period': float(sales_stats['total_revenue'] or 0),  # ✅ Renomeado
-                'avg_ticket': float(avg_ticket)
+                'total_revenue_30d': float(total_revenue),
+                'avg_ticket': float(avg_ticket),
+                'margin_percent': float(real_margin),
+                'real_profit': float(real_profit),
+                'cost_of_goods_sold': float(total_cost_sold)
             },
             'inventory': {
                 'total_products': total_products,
@@ -1450,21 +1546,29 @@ def dashboard_overview(request):
                 'low_stock_count': low_stock_count
             },
             'sales': {
-                'total_sales_period': sales_stats['total_sales'] or 0,  # ✅ Renomeado
-                'total_items_sold_period': total_items_sold,  # ✅ Renomeado
-                'daily_sales': daily_sales
+                'total_sales_30d': total_sales,
+                'total_items_sold_30d': total_items_sold,
+                'daily_sales': daily_sales,
+                'weekly_sales': weekly_sales,  # ✅ DADOS REAIS
+                'monthly_comparison': monthly_comparison  # ✅ DADOS REAIS
             },
             'charts': {
-                'by_category': category_stats[:5],
+                'by_category': category_stats[:5],  # Top 5 categorias
                 'top_products': [
                     {
                         'name': item['product__name'],
                         'id': item['product__id'],
                         'total_sold': abs(item['total_sold'] or 0),
-                        'revenue': float(item['total_revenue'] or 0)
+                        'revenue': float(item['total_revenue'] or 0),
+                        'profit': float(item['profit'] or 0)
                     }
                     for item in top_products
-                ]
+                ],
+                'performance_metrics': {
+                    'turnover_rate': round(turnover_rate, 2),
+                    'stock_rotation_days': round(stock_rotation_days),
+                    'sell_through_rate': round(sell_through_rate, 1)
+                }
             },
             'alerts': {
                 'low_stock': [
@@ -1488,7 +1592,9 @@ def dashboard_overview(request):
                     }
                     for batch in expiring_soon
                 ]
-            }
+            },
+            # ✅ ADICIONAR CASH_FLOW AO RESPONSE
+            'cash_flow': cash_flow_summary
         })
 
     except Exception as e:
