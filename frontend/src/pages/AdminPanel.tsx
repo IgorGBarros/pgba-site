@@ -14,6 +14,8 @@ import { useToast } from "../hooks/use-toast";
 import { Badge } from "../components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
+import React from "react";
+import PaymentGatewaysTab from "../components/admin/PaymentGatewaysTab";
 
 const ADMIN_SECRET = "natura2024admin";
 
@@ -1023,7 +1025,7 @@ export default function AdminPanel() {
       <main className="mx-auto max-w-7xl px-4 py-6">
         {/* Tabs de Navegação */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Dashboard
@@ -1040,6 +1042,12 @@ export default function AdminPanel() {
               <Megaphone className="h-4 w-4" />
               Promoções
             </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Pagamentos
+              
+            </TabsTrigger>
+            
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Analytics
@@ -1288,68 +1296,149 @@ export default function AdminPanel() {
                     <TableRow><TableCell colSpan={4} className="text-center py-10">Nenhum usuário.</TableCell></TableRow>
                   ) : (
                     filtered.map((u) => (
-                      <TableRow key={u.id} className="cursor-pointer hover:bg-secondary/30" onClick={() => setSelectedUser(u)}>
-                        <TableCell>
-                          <p className="font-medium text-sm text-foreground">{u.display_name || 'Sem nome'}</p>
-                          <p className="text-xs text-muted-foreground">{u.email}</p>
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(u)}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">{u.product_count}</TableCell>
-                        <TableCell className="text-right">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); togglePlan(u); }}
-                            disabled={updatingId === u.id}
-                            className={`text-xs px-3 py-1 rounded-full font-bold transition-colors ${
-                              u.plan === 'pro'
-                                ? 'bg-destructive/10 text-destructive hover:bg-destructive/20'
-                                : 'bg-primary/10 text-primary hover:bg-primary/20'
-                            }`}
-                          >
-                            {updatingId === u.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              u.plan === 'pro' ? 'Rebaixar' : 'Virar PRO'
-                            )}
-                          </button>
-                        </TableCell>
-                      </TableRow>
+                      <React.Fragment key={u.id}>
+                        <TableRow 
+                          className="cursor-pointer hover:bg-secondary/30" 
+                          onClick={() => setSelectedUser(selectedUser?.id === u.id ? null : u)}
+                        >
+                          <TableCell>
+                            <p className="font-medium text-sm text-foreground">
+                              {u.display_name || 'Sem nome'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{u.email}</p>
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(u)}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {u.product_count}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); togglePlan(u); }}
+                              disabled={updatingId === u.id}
+                              className={`text-xs px-3 py-1 rounded-full font-bold transition-colors ${
+                                u.plan === 'pro'
+                                  ? 'bg-destructive/10 text-destructive hover:bg-destructive/20'
+                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                              }`}
+                            >
+                              {updatingId === u.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                u.plan === 'pro' ? 'Rebaixar' : 'Virar PRO'
+                              )}
+                            </button>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* ✅ DETALHES INLINE — aparece logo abaixo da linha clicada */}
+                        {selectedUser?.id === u.id && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="p-0 border-0">
+                              <div className="p-5 bg-secondary/10 border-t border-b border-border animate-in slide-in-from-top-2 duration-200">
+                                <div className="flex justify-between items-center mb-4">
+                                  <h3 className="font-bold text-base flex items-center gap-2">
+                                    <User className="h-4 w-4 text-primary"/>
+                                    {u.display_name || u.email}
+                                  </h3>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setSelectedUser(null); }} 
+                                    className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                                  >
+                                    <X className="h-4 w-4 text-muted-foreground"/>
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground text-xs font-semibold uppercase mb-1">
+                                      Email
+                                    </p>
+                                    <p className="font-medium text-xs break-all">{u.email}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground text-xs font-semibold uppercase mb-1">
+                                      WhatsApp
+                                    </p>
+                                    <p className="font-medium text-xs">
+                                      {u.whatsapp_number || 'Não informado'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground text-xs font-semibold uppercase mb-1">
+                                      Vitrine
+                                    </p>
+                                    <p className="font-medium text-xs">
+                                      {u.store_slug || 'Não criada'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground text-xs font-semibold uppercase mb-1">
+                                      Criada em
+                                    </p>
+                                    <p className="font-medium text-xs">
+                                      {formatDate(u.created_at)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground text-xs font-semibold uppercase mb-1">
+                                      Produtos
+                                    </p>
+                                    <p className="font-medium text-xs">{u.product_count}</p>
+                                  </div>
+                                </div>
+
+                                {/* Assinatura — SEM gateway (movido para aba Pagamentos) */}
+                                <div className="mt-4 p-3 bg-card rounded-lg border border-border">
+                                  <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                    <Crown className="h-4 w-4 text-amber-500"/>
+                                    Assinatura
+                                  </h4>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                    <div>
+                                      <p className="text-muted-foreground font-semibold uppercase mb-0.5">
+                                        Plano
+                                      </p>
+                                      <p className="font-medium uppercase">{u.plan}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-semibold uppercase mb-0.5">
+                                        Status
+                                      </p>
+                                      <p className="font-medium">
+                                        {u.subscription_status || 'N/A'}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-semibold uppercase mb-0.5">
+                                        Início
+                                      </p>
+                                      <p className="font-medium">
+                                        {formatDate(u.subscription_started_at)}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground font-semibold uppercase mb-0.5">
+                                        Expira em
+                                      </p>
+                                      <p className="font-medium">
+                                        {formatDate(u.subscription_expires_at)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
                     ))
                   )}
                 </TableBody>
               </Table>
             </div>
 
-            {/* Detalhe do Usuário */}
-            {selectedUser && (
-              <div className="p-5 bg-card border rounded-xl shadow-lg animate-in slide-in-from-bottom-5 mt-4">
-                <div className="flex justify-between items-center mb-4 border-b pb-2">
-                  <h3 className="font-bold text-lg flex items-center gap-2">
-                    <User className="h-5 w-5 text-primary"/>
-                    Detalhes: {selectedUser.display_name || selectedUser.email}
-                  </h3>
-                  <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-secondary rounded-lg transition-colors">
-                    <X className="h-4 w-4 text-muted-foreground"/>
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm mb-6">
-                  <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Email</p><p className="font-medium">{selectedUser.email}</p></div>
-                  <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">WhatsApp</p><p className="font-medium">{selectedUser.whatsapp_number || 'Não informado'}</p></div>
-                  <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Vitrine</p><p className="font-medium">{selectedUser.store_slug || 'Não criada'}</p></div>
-                  <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Conta criada em</p><p className="font-medium">{formatDate(selectedUser.created_at)}</p></div>
-                </div>
-                <div className="bg-secondary/20 p-4 rounded-xl border border-border">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2"><CreditCard className="h-4 w-4"/> Assinatura Atual</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Gateway</p><p className="font-medium capitalize">{selectedUser.payment_provider || 'Nenhum'}</p></div>
-                    <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Expira em</p><p className="font-medium">{formatDate(selectedUser.subscription_expires_at)}</p></div>
-                    <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Status</p><p className="font-medium">{selectedUser.subscription_status || 'N/A'}</p></div>
-                    <div><p className="text-muted-foreground text-xs font-semibold uppercase mb-1">Produtos</p><p className="font-medium">{selectedUser.product_count}</p></div>
-                  </div>
-                </div>
-              </div>
-            )}
           </TabsContent>
 
           {/* ==========================================
@@ -1597,6 +1686,10 @@ export default function AdminPanel() {
         )}
       </div>
     </TabsContent>
+                  {/* ✅ NOVA TAB: PAGAMENTOS */}
+          <TabsContent value="payments" className="space-y-6">
+            <PaymentGatewaysTab />
+          </TabsContent>
 
     {/* ==========================================
         TAB: ANALYTICS
