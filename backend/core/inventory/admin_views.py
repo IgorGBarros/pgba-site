@@ -1,6 +1,6 @@
 # inventory/admin_views.py - CRIAR ESTE ARQUIVO COMPLETO
 
-from datetime import timezone
+from django.utils import timezone
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -143,7 +143,8 @@ def list_users(request):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
-@api_view(['POST'])
+# ✅ CORREÇÃO 2: Aceitar POST e PATCH
+@api_view(['POST', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_plan(request, user_id):
     """Atualiza plano do usuário"""
@@ -152,8 +153,6 @@ def update_plan(request, user_id):
     
     try:
         new_plan = request.data.get('plan', 'free')
-        
-        # Buscar store pelo owner
         store = Store.objects.filter(owner_id=user_id).first()
         if not store:
             return Response({'error': 'Store não encontrada'}, status=404)
@@ -165,7 +164,9 @@ def update_plan(request, user_id):
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
-@api_view(['POST'])
+
+# ✅ CORREÇÃO 3: Aceitar POST e PATCH
+@api_view(['POST', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_subscription(request, user_id):
     """Atualiza assinatura do usuário"""
@@ -174,7 +175,6 @@ def update_subscription(request, user_id):
     
     try:
         data = request.data
-        
         store = Store.objects.filter(owner_id=user_id).first()
         if not store:
             return Response({'error': 'Store não encontrada'}, status=404)
@@ -201,8 +201,7 @@ def update_subscription(request, user_id):
 # inventory/admin_views.py - ADICIONAR estas funções
 
 from django.db.models import Count, Sum, Avg, Q
-from django.db.models.functions import TruncDate
-from collections import defaultdict
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -348,7 +347,10 @@ def get_store_behavior_analytics(request):
         behavior_patterns['usage_patterns'] = {
             'free_plan': {
                 'avg_products': round(sum(s.items.count() for s in free_stores) / free_stores.count(), 1) if free_stores.count() > 0 else 0,
-                'stores_at_limit': free_stores.filter(items__count__gte=20).count(),
+                                # ✅ CORRETO — usar annotate
+                'stores_at_limit': free_stores.annotate(
+                    item_count=Count('items')
+                ).filter(item_count__gte=20).count(),
                 'avg_days_to_limit': 15,  # Calcular baseado em dados reais depois
             },
             'pro_plan': {
