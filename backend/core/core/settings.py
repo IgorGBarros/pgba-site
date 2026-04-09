@@ -81,7 +81,10 @@ ALLOWED_HOSTS = [
     'localhost', '127.0.0.1', '0.0.0.0',
     'gestao-estoque-one.vercel.app',
     'gestao-estoque-k5vy.onrender.com',
-    '.vercel.app', '.herokuapp.com', 'dev-brih.onrender.com','.onrender.com'
+    'gestao-estoque-dev-one.vercel.app',
+    'dev-brih.onrender.com',
+    '.vercel.app',
+    '.onrender.com',
 ]
 
 # ✅ CORREÇÃO: Apps completos com JWT
