@@ -544,178 +544,143 @@ export default function AdminPanel() {
   // ==========================================
   // FUNÇÕES DE API (UNIFICADAS)
   // ==========================================
+const fetchAllData = async () => {
+  setLoading(true);
+  try {
+    // 1. Carrega usuários (real)
+    const usersRes = await adminApi.listUsers();
+    setUsers(usersRes || []);
 
-  const fetchAllData = async () => {
-    setLoading(true);
+    // 2. Carrega promoções reais do backend
     try {
-      // 1. Carrega usuários (função original)
-      const usersRes = await adminApi.listUsers();
-      setUsers(usersRes || []);
+      const promotionsRes = await adminApi.listPromotions();
+      setPromotions(promotionsRes || []);
+    } catch (err) {
+      console.warn("⚠️ Erro ao carregar promoções:", err);
+      setPromotions([]);
+    }
 
-      // 2. Tenta carregar analytics do backend (com fallback simulado)
-      try {
-        const productRes = await adminApi.getProductAnalytics();
-        setProductAnalytics(productRes);
-      } catch {
-        // Fallback: dados simulados enquanto backend não está pronto
-        setProductAnalytics({
-          overview: {
-            total_products: 1250,
-            products_with_barcode: 980,
-            products_with_image: 750,
-            completion_rate: 60.0
-          },
-          brands: [
-            { name: 'Natura', count: 320, avg_price: 45.90 },
-            { name: 'Avon', count: 280, avg_price: 35.50 },
-            { name: 'Boticário', count: 220, avg_price: 55.80 },
-            { name: 'Eudora', count: 180, avg_price: 42.30 },
-            { name: 'Mary Kay', count: 150, avg_price: 48.70 }
-          ],
-          categories: [
-            { name: 'Perfumaria', count: 450 },
-            { name: 'Cuidados Pessoais', count: 380 },
-            { name: 'Maquiagem', count: 320 },
-            { name: 'Tratamento', count: 100 }
-          ],
-          popular_products: [
-            { name: 'Perfume Kaiak Masculino', brand: 'Natura', usage_count: 45, official_price: 89.90 },
-            { name: 'Base Líquida', brand: 'Avon', usage_count: 38, official_price: 25.90 },
-            { name: 'Creme Antissinais', brand: 'Boticário', usage_count: 32, official_price: 65.50 }
-          ],
-          price_ranges: { '0-10': 120, '10-50': 680, '50-100': 380, '100+': 70 }
-        });
-      }
+    // 3. Carrega planos reais do backend
+    try {
+      const plansRes = await adminApi.listPlanConfigs();
+      setPlanConfigs(plansRes || []);
+    } catch (err) {
+      console.warn("⚠️ Erro ao carregar planos:", err);
+      setPlanConfigs([]);
+    }
 
-      try {
-        const behaviorRes = await adminApi.getBehaviorAnalytics();
-        setBehaviorAnalytics(behaviorRes);
-      } catch {
-        // Fallback simulado para behavior analytics
-        const totalUsers = usersRes?.length || 0;
-        setBehaviorAnalytics({
-          behavior_patterns: {
-            onboarding_patterns: {
-              '0-7_days': { stores_count: 25, avg_products: 3.2, conversion_rate: 5.0, total_products: 80 },
-              '8-30_days': { stores_count: 45, avg_products: 12.5, conversion_rate: 15.8, total_products: 562 },
-              '31-90_days': { stores_count: 32, avg_products: 18.3, conversion_rate: 28.1, total_products: 586 },
-              '90+_days': { stores_count: 78, avg_products: 25.7, conversion_rate: 35.9, total_products: 2005 }
-            },
-            usage_patterns: {
-              free_plan: { avg_products: 14.2, stores_at_limit: 12, avg_days_to_limit: 15 },
-              pro_plan: { avg_products: 45.8, avg_monthly_growth: 25 }
-            },
-            product_preferences: [
-              { brand: 'Natura', stores_using: 85, total_quantity: 1250, popularity_score: 68.0 },
-              { brand: 'Avon', stores_using: 72, total_quantity: 980, popularity_score: 57.6 },
-              { brand: 'Boticário', stores_using: 58, total_quantity: 720, popularity_score: 46.4 }
-            ]
-          },
-          ml_insights: {
-            conversion_triggers: { avg_products_before_upgrade: 18.5, most_common_upgrade_day: 'Terça-feira', seasonal_factor: 1.2 },
-            churn_indicators: { days_without_activity: 30, product_threshold: 5, engagement_score_threshold: 0.3 },
-            personalization_data: { total_interactions: 15420, data_quality_score: 0.85, ready_for_ml: totalUsers > 50 }
-          },
-          data_summary: {
-            total_stores_analyzed: totalUsers,
-            data_points_collected: totalUsers * 15,
-            analysis_date: new Date().toISOString(),
-            lgpd_compliant: true
-          }
-        });
-      }
-
-      // 3. Dados simulados de planos
-      setPlanConfigs([
-        {
-          plan_type: 'free',
-          display_name: 'Free',
-          description: 'Para começar',
-          max_products: 20,
-          can_use_scanner: true,
-          can_use_storefront: false,
-          can_use_alerts: false,
-          can_use_ai_assistant: false,
-          can_use_analytics: false,
-          monthly_price: 0,
-          yearly_price: 0,
-          highlight_color: '#6B7280',
-          is_popular: false,
-          is_visible: true,
-          sort_order: 1
-        },
-        {
-          plan_type: 'pro',
-          display_name: 'PRO',
-          description: 'Recursos completos',
-          max_products: null,
-          can_use_scanner: true,
-          can_use_storefront: true,
-          can_use_alerts: true,
-          can_use_ai_assistant: true,
-          can_use_analytics: true,
-          monthly_price: 39.90,
-          yearly_price: 399.00,
-          highlight_color: '#3B82F6',
-          is_popular: true,
-          is_visible: true,
-          sort_order: 2
-        }
-      ]);
-
-      // 4. Dados simulados de promoções
-      setPromotions([
-        {
-          id: '1',
-          title: 'Promoção de Lançamento',
-          message: 'Primeiros 100 usuários ganham 50% de desconto!',
-          target_audience: 'free',
-          discount_percent: 50,
-          discount_amount: 0,
-          is_active: true,
-          starts_at: new Date().toISOString(),
-          ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          max_views_per_store: null,
-          created_at: new Date().toISOString()
-        }
-      ]);
-
-      // 5. Estatísticas simuladas baseadas nos usuários reais
+    // 4. Carrega stats reais do backend
+    try {
+      const statsRes = await adminApi.getSystemStats();
+      setSystemStats(statsRes || null);
+    } catch (err) {
+      console.warn("⚠️ Erro ao carregar stats, usando cálculo local:", err);
+      // Fallback: calcular stats baseado nos usuários carregados
       const totalUsers = usersRes?.length || 0;
-      const proUsers = usersRes?.filter(u => u.plan === 'pro').length || 0;
+      const proUsers = usersRes?.filter((u: any) => u.plan === 'pro').length || 0;
       const freeUsers = totalUsers - proUsers;
-
       setSystemStats({
         total_stores: totalUsers,
         active_stores: Math.floor(totalUsers * 0.7),
         pro_stores: proUsers,
         free_stores: freeUsers,
-        total_products: totalUsers * 15, // média estimada
+        total_products: totalUsers * 15,
         total_revenue: proUsers * 39.90,
         monthly_revenue: proUsers * 39.90,
         churn_rate: 5.2,
         conversion_rate: totalUsers > 0 ? (proUsers / totalUsers) * 100 : 0,
         avg_products_per_store: 15
       });
-
-    } catch (err: any) {
-      console.error(err);
-
-      if (err.message.includes("403")) {
-        toast({
-          title: "Acesso Negado",
-          description: "Sua conta não tem privilégios de administrador.",
-          variant: "destructive"
-        });
-        setAuthenticated(false);
-      } else {
-        toast({ title: "Erro ao carregar dados", description: err.message, variant: "destructive" });
-      }
-    } finally {
-      setLoading(false);
     }
-  };
 
+    // 5. Carrega analytics de produtos (com fallback)
+    try {
+      const productRes = await adminApi.getProductAnalytics();
+      setProductAnalytics(productRes);
+    } catch {
+      setProductAnalytics({
+        overview: {
+          total_products: 1250,
+          products_with_barcode: 980,
+          products_with_image: 750,
+          completion_rate: 60.0
+        },
+        brands: [
+          { name: 'Natura', count: 320, avg_price: 45.90 },
+          { name: 'Avon', count: 280, avg_price: 35.50 },
+          { name: 'Boticário', count: 220, avg_price: 55.80 },
+          { name: 'Eudora', count: 180, avg_price: 42.30 },
+          { name: 'Mary Kay', count: 150, avg_price: 48.70 }
+        ],
+        categories: [
+          { name: 'Perfumaria', count: 450 },
+          { name: 'Cuidados Pessoais', count: 380 },
+          { name: 'Maquiagem', count: 320 },
+          { name: 'Tratamento', count: 100 }
+        ],
+        popular_products: [
+          { name: 'Perfume Kaiak Masculino', brand: 'Natura', usage_count: 45, official_price: 89.90 },
+          { name: 'Base Líquida', brand: 'Avon', usage_count: 38, official_price: 25.90 },
+          { name: 'Creme Antissinais', brand: 'Boticário', usage_count: 32, official_price: 65.50 }
+        ],
+        price_ranges: { '0-10': 120, '10-50': 680, '50-100': 380, '100+': 70 }
+      });
+    }
+
+    // 6. Carrega analytics comportamental (com fallback)
+    try {
+      const behaviorRes = await adminApi.getBehaviorAnalytics();
+      setBehaviorAnalytics(behaviorRes);
+    } catch {
+      const totalUsers = usersRes?.length || 0;
+      setBehaviorAnalytics({
+        behavior_patterns: {
+          onboarding_patterns: {
+            '0-7_days': { stores_count: 25, avg_products: 3.2, conversion_rate: 5.0, total_products: 80 },
+            '8-30_days': { stores_count: 45, avg_products: 12.5, conversion_rate: 15.8, total_products: 562 },
+            '31-90_days': { stores_count: 32, avg_products: 18.3, conversion_rate: 28.1, total_products: 586 },
+            '90+_days': { stores_count: 78, avg_products: 25.7, conversion_rate: 35.9, total_products: 2005 }
+          },
+          usage_patterns: {
+            free_plan: { avg_products: 14.2, stores_at_limit: 12, avg_days_to_limit: 15 },
+            pro_plan: { avg_products: 45.8, avg_monthly_growth: 25 }
+          },
+          product_preferences: [
+            { brand: 'Natura', stores_using: 85, total_quantity: 1250, popularity_score: 68.0 },
+            { brand: 'Avon', stores_using: 72, total_quantity: 980, popularity_score: 57.6 },
+            { brand: 'Boticário', stores_using: 58, total_quantity: 720, popularity_score: 46.4 }
+          ]
+        },
+        ml_insights: {
+          conversion_triggers: { avg_products_before_upgrade: 18.5, most_common_upgrade_day: 'Terça-feira', seasonal_factor: 1.2 },
+          churn_indicators: { days_without_activity: 30, product_threshold: 5, engagement_score_threshold: 0.3 },
+          personalization_data: { total_interactions: 15420, data_quality_score: 0.85, ready_for_ml: totalUsers > 50 }
+        },
+        data_summary: {
+          total_stores_analyzed: totalUsers,
+          data_points_collected: totalUsers * 15,
+          analysis_date: new Date().toISOString(),
+          lgpd_compliant: true
+        }
+      });
+    }
+
+  } catch (err: any) {
+    console.error(err);
+    if (err.message?.includes("403")) {
+      toast({
+        title: "Acesso Negado",
+        description: "Sua conta não tem privilégios de administrador.",
+        variant: "destructive"
+      });
+      setAuthenticated(false);
+    } else {
+      toast({ title: "Erro ao carregar dados", description: err.message, variant: "destructive" });
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   const togglePlan = async (user: AdminUser) => {
     const newPlan = user.plan === "pro" ? "free" : "pro";
     setUpdatingId(user.id);
