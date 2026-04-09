@@ -112,18 +112,8 @@ class Store(models.Model):
     # inventory/models.py - ATUALIZAR Store    
     @property
     def product_count(self):
-        """✅ CONTAGEM OTIMIZADA com cache"""
-        # Cache válido por 5 minutos
-        if self.cache_updated_at:
-            age = timezone.now() - self.cache_updated_at
-            if age.total_seconds() < 300:
-                return self.cached_product_count
-        
-        # Recalcular (produtos únicos por loja)
-        real_count = self.items.values('product').distinct().count()
-        self.cached_product_count = real_count
-        self.save(update_fields=['cached_product_count', 'cache_updated_at'])
-        return real_count
+        """Contagem de produtos únicos da loja"""
+        return self.items.values('product').distinct().count()
     
     @property
     def plan_config(self):
