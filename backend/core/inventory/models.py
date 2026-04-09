@@ -854,3 +854,33 @@ class DataPrivacyConsent(models.Model):
     def __str__(self):
         status = "Concedido" if self.granted else "Negado"
         return f"{self.store.name} - {self.get_consent_type_display()} ({status})"
+    
+    # inventory/models.py (adicionar)
+# inventory/models.py (adicionar campos)
+class ExternalBarcodeCatalog(models.Model):
+    brand = models.CharField(max_length=100, db_index=True)
+    gtin = models.CharField(max_length=14, unique=True, db_index=True)
+    description = models.CharField(max_length=255)
+    source = models.CharField(max_length=50, default='bluesoft')
+    source_url = models.URLField(null=True, blank=True)
+    matched = models.BooleanField(default=False, db_index=True)
+    
+    # ✅ NOVOS CAMPOS PARA RASTREAMENTO
+    searched_product_sku = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    searched_product_name = models.CharField(max_length=255, null=True, blank=True)
+    search_term_used = models.CharField(max_length=255, null=True, blank=True)
+    confidence_level = models.CharField(max_length=20, null=True, blank=True)  # high, medium, low
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'external_barcode_catalog'
+        indexes = [
+            models.Index(fields=['brand', 'matched']),
+            models.Index(fields=['source', 'created_at']),
+            models.Index(fields=['searched_product_sku']),  # ✅ NOVO ÍNDICE
+        ]
+    
+    def __str__(self):
+        return f"{self.brand} - {self.gtin} - {self.description[:50]} (SKU: {self.searched_product_sku})"
