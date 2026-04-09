@@ -472,105 +472,40 @@ export const movementsApi = {
 
 // ── Admin ──
 export const adminApi = {
+  // ✅ Existentes (sem alteração)
   listUsers: () => apiRequest<any[]>("/admin/users/"),
+
   updatePlan: (id: string | number, plan: "free" | "pro") =>
     apiRequest<{ message: string; plan: string }>(`/admin/users/${id}/plan/`, {
       method: "PATCH",
       body: JSON.stringify({ plan }),
     }),
+
   updateSubscription: (id: string | number, data: any) =>
     apiRequest<{ message: string }>(`/admin/users/${id}/subscription/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
-  // ✅ ADICIONAR: Funções de Analytics
-  getProductAnalytics: async () => {
-    try {
-      return await apiRequest<any>("/admin/product-analytics/");
-    } catch (error) {
-      console.warn("⚠️ Endpoint de analytics não implementado, usando dados simulados");
-      // Fallback com dados simulados
-      return {
-        overview: {
-          total_products: 1250,
-          products_with_barcode: 980,
-          products_with_image: 750,
-          completion_rate: 60.0
-        },
-        brands: [
-          { name: 'Natura', count: 320, avg_price: 45.90 },
-          { name: 'Avon', count: 280, avg_price: 35.50 },
-          { name: 'Boticário', count: 220, avg_price: 55.80 },
-          { name: 'Eudora', count: 180, avg_price: 42.30 },
-          { name: 'Mary Kay', count: 150, avg_price: 48.70 }
-        ],
-        categories: [
-          { name: 'Perfumaria', count: 450 },
-          { name: 'Cuidados Pessoais', count: 380 },
-          { name: 'Maquiagem', count: 320 },
-          { name: 'Tratamento', count: 100 }
-        ],
-        popular_products: [
-          { name: 'Perfume Kaiak Masculino', brand: 'Natura', usage_count: 45, official_price: 89.90 },
-          { name: 'Base Líquida', brand: 'Avon', usage_count: 38, official_price: 25.90 },
-          { name: 'Creme Antissinais', brand: 'Boticário', usage_count: 32, official_price: 65.50 }
-        ],
-        price_ranges: { '0-10': 120, '10-50': 680, '50-100': 380, '100+': 70 }
-      };
-    }
-  },
 
-  getBehaviorAnalytics: async () => {
-    try {
-      return await apiRequest<any>("/admin/behavior-analytics/");
-    } catch (error) {
-      console.warn("⚠️ Endpoint de behavior analytics não implementado, usando dados simulados");
-      // Fallback com dados simulados
-      return {
-        behavior_patterns: {
-          onboarding_patterns: {
-            '0-7_days': { stores_count: 25, avg_products: 3.2, conversion_rate: 5.0, total_products: 80 },
-            '8-30_days': { stores_count: 45, avg_products: 12.5, conversion_rate: 15.8, total_products: 562 },
-            '31-90_days': { stores_count: 32, avg_products: 18.3, conversion_rate: 28.1, total_products: 586 },
-            '90+_days': { stores_count: 78, avg_products: 25.7, conversion_rate: 35.9, total_products: 2005 }
-          },
-          usage_patterns: {
-            free_plan: { avg_products: 14.2, stores_at_limit: 12, avg_days_to_limit: 15 },
-            pro_plan: { avg_products: 45.8, avg_monthly_growth: 25 }
-          },
-          product_preferences: [
-            { brand: 'Natura', stores_using: 85, total_quantity: 1250, popularity_score: 68.0 },
-            { brand: 'Avon', stores_using: 72, total_quantity: 980, popularity_score: 57.6 },
-            { brand: 'Boticário', stores_using: 58, total_quantity: 720, popularity_score: 46.4 }
-          ]
-        },
-        ml_insights: {
-          conversion_triggers: {
-            avg_products_before_upgrade: 18.5,
-            most_common_upgrade_day: 'Terça-feira',
-            seasonal_factor: 1.2
-          },
-          churn_indicators: {
-            days_without_activity: 30,
-            product_threshold: 5,
-            engagement_score_threshold: 0.3
-          },
-          personalization_data: {
-            total_interactions: 15420,
-            data_quality_score: 0.85,
-            ready_for_ml: true
-          }
-        },
-        data_summary: {
-          total_stores_analyzed: 180,
-          data_points_collected: 2700,
-          analysis_date: new Date().toISOString(),
-          lgpd_compliant: true
-        }
-      };
-    }
-  }
+  // ✅ NOVOS — Dados reais do backend (sem mock)
+  getProductAnalytics: () =>
+    apiRequest<any>("/admin/analytics/products/"),
+
+  getBehaviorAnalytics: () =>
+    apiRequest<any>("/admin/analytics/behavior/"),
+
+  getMlInsights: () =>
+    apiRequest<any>("/admin/analytics/ml-insights/"),
+
+  // ✅ NOVOS — Planos, Promoções, Stats (dados reais)
+  listPlanConfigs: () =>
+    apiRequest<any[]>("/admin/plan-configs/"),
+
+  listPromotions: () =>
+    apiRequest<any[]>("/admin/promotions/"),
+
+  getSystemStats: () =>
+    apiRequest<any>("/admin/stats/"),
 };
 // ── Profile ──
 export interface Profile {
