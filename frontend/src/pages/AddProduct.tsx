@@ -9,7 +9,7 @@ import BarcodeScanner from "../components/BarcodeScanner";
 import ProductSearchModal from "../components/ProductSearchModal";
 import UpgradeModal from "../components/UpgradeModal";
 import ProBadge from "../components/ProBadge";
-import { ocrApi, GlobalProduct, formatMoney } from "../lib/api";
+import { ocrApi, GlobalProduct, formatMoney, sessionApi } from "../lib/api";
 import { productService } from "../lib/productService";
 import { useAuth } from "../hooks/useAuth";
 import { usePlan } from "../../src/hooks/usePlan";
@@ -59,41 +59,9 @@ interface PlanLimits {
   remaining: number | null;
 }
 
-// ✅ NOVO: API de sessão
-const sessionApi = {
-  getStatus: async (): Promise<SessionStatus> => {
-    const response = await fetch('/api/session-control/', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      }
-    });
-    return response.json();
-  },
+
   
-  finish: async () => {
-    const response = await fetch('/api/session-control/', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({ action: 'finish' })
-    });
-    return response.json();
-  },
-  
-  confirmInvestment: async (sessionId: number, data: any) => {
-    const response = await fetch('/api/session-summary/', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({ session_id: sessionId, ...data })
-    });
-    return response.json();
-  }
-};
+
 
 export default function AddProduct() {
   const navigate = useNavigate();
@@ -128,44 +96,42 @@ export default function AddProduct() {
     image_url: "", official_price: 0, sale_price: 0, cost_price: 0,
     quantity: 1, batch_code: "", expiry_date: "", expiry_photo_url: "", brand: "",
   });
+// ❌ REMOVER a versão atual que usa fetch('/api/check-plan-limits/')
 
-  // ✅ NOVO: Função para verificar limites
-  const checkPlanLimits = async (): Promise<boolean> => {
-    setLimitsLoading(true);
-    try {
-      const response = await fetch('/api/check-plan-limits/', {
+// ✅ SUBSTITUIR por:
+const checkPlanLimits = async (): Promise<boolean> => {
+  setLimitsLoading(true);
+  try {
+    const response = await fetch(
+      `${((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com").replace(/\/$/, "")}/api/check-plan-limits/`,
+      {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
         }
-      });
-      
-      const limits = await response.json();
-      setPlanLimits(limits);
-      
-      // Se não pode adicionar produtos, mostrar modal de upgrade
-      if (!limits.can_add_products) {
-        setUpgradeFeature({
-          feature: "Limite de Produtos Atingido",
-          description: `Você atingiu o limite de ${limits.limit} produtos do plano ${limits.current_plan.toUpperCase()}. Faça upgrade para continuar cadastrando produtos.`
-        });
-        setShowUpgrade(true);
-        return false;
       }
-      
-      return true;
-    } catch (error) {
-      console.error('Erro ao verificar limites:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao verificar limites do plano.",
-        variant: "destructive"
+    );
+
+    const limits = await response.json();
+    setPlanLimits(limits);
+
+    if (!limits.can_add_products) {
+      setUpgradeFeature({
+        feature: "Limite de Produtos Atingido",
+        description: `Você atingiu o limite de ${limits.limit} produtos do plano ${limits.current_plan.toUpperCase()}.`
       });
+      setShowUpgrade(true);
       return false;
-    } finally {
-      setLimitsLoading(false);
     }
-  };
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao verificar limites:', error);
+    return true; // Em caso de erro, permitir (não bloquear o usuário)
+  } finally {
+    setLimitsLoading(false);
+  }
+};
 
   // ✅ NOVO: Verificar status da sessão e limites ao carregar
   useEffect(() => {
@@ -173,45 +139,57 @@ export default function AddProduct() {
     checkPlanLimits();
   }, []);
 
-  const checkSessionStatus = async () => {
-    try {
-      const status = await sessionApi.getStatus();
-      setSessionStatus(status);
-    } catch (error) {
-      console.error('Erro ao verificar sessão:', error);
-    }
-  };
+const checkSessionStatus = async () => {
+  try {
+    const status = await sessionApi.getStatus();
+    setSessionStatus(status);
+  } catch (error) {
+    console.error('Erro ao verificar sessão:', error);
+  }
+};
 
-  // ✅ NOVO: Finalizar sessão
-  const finishSession = async () => {
-    try {
-      const result = await sessionApi.finish();
-      setSessionStatus({ has_session: false });
-      
-      if (result.session_summary && result.session_summary.products_count > 0) {
-        setSessionSummaryData(result.session_summary);
-        setShowSessionSummary(true);
-      } else {
-        toast({ title: "Sessão finalizada", description: "Nenhum produto foi cadastrado." });
-      }
-    } catch (error) {
-      console.error('Erro ao finalizar sessão:', error);
-      toast({ title: "Erro", description: "Falha ao finalizar sessão.", variant: "destructive" });
-    }
-  };
+const finishSession = async () => {
+  try {
+    const result = await sessionApi.finishSession();
+    setSessionStatus({ has_session: false });
 
-  // ✅ NOVO: Confirmar investimento
-  const confirmInvestment = async (paymentData: any) => {
-    try {
-      await sessionApi.confirmInvestment(sessionSummaryData.session_id, paymentData);
-      setShowInvestmentModal(false);
-      setShowSessionSummary(false);
-      toast({ title: "Sucesso!", description: "Investimento registrado com sucesso." });
-    } catch (error) {
-      console.error('Erro ao confirmar investimento:', error);
-      toast({ title: "Erro", description: "Falha ao registrar investimento.", variant: "destructive" });
+    if (result.summary && result.summary.products_count > 0) {
+      setSessionSummaryData(result.summary);
+      setShowSessionSummary(true);
+    } else {
+      toast({ title: "Sessão finalizada" });
     }
-  };
+  } catch (error) {
+    console.error('Erro ao finalizar sessão:', error);
+    toast({ title: "Erro", description: "Falha ao finalizar sessão.", variant: "destructive" });
+  }
+};
+const confirmInvestment = async (paymentData: any) => {
+  try {
+    const API_BASE = ((import.meta as any).env?.VITE_API_BASE_URL || "https://gestao-estoque-k5vy.onrender.com").replace(/\/$/, "");
+    
+    const response = await fetch(`${API_BASE}/api/session-summary/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+      },
+      body: JSON.stringify({
+        session_id: sessionSummaryData.session_id,
+        ...paymentData
+      })
+    });
+
+    if (!response.ok) throw new Error('Falha ao registrar investimento');
+
+    setShowInvestmentModal(false);
+    setShowSessionSummary(false);
+    toast({ title: "Sucesso!", description: "Investimento registrado com sucesso." });
+  } catch (error) {
+    console.error('Erro ao confirmar investimento:', error);
+    toast({ title: "Erro", description: "Falha ao registrar investimento.", variant: "destructive" });
+  }
+};
 
   const triggerProGate = (feature: string, description: string) => {
     setUpgradeFeature({ feature, description });

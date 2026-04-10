@@ -790,5 +790,14 @@ export const sessionApi = {
   getSummary: async () => {
     const response = await api.get('/session-summary/');
     return response.data;
+  },
+
+  // ✅ ADICIONAR
+  confirmInvestment: async (sessionId: number, data: any) => {
+    const response = await api.post('/session-summary/', {
+      session_id: sessionId,
+      ...data
+    });
+    return response.data;
   }
 };
