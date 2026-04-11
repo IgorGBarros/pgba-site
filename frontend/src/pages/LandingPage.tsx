@@ -90,10 +90,10 @@ const TESTIMONIALS = [
     text: "A vitrine digital mudou meu negócio! Mando o link no status do WhatsApp e as clientes compram sozinhas. A Amorinha me ajuda com tudo!",
     stars: 5,
   },
-  {
+   {
     name: "Patricia Lima",
     role: "Empreendedora Digital",
-    text: "O scanner reconhece até produtos importados! E os alertas de validade já me salvaram de muito prejuízo. Recomendo de olhos fechados.",
+    text: "O scanner reconhece todos os produtos nacionais que trabalho! E os alertas de validade já me salvaram de muito prejuízo. Recomendo de olhos fechados.",
     stars: 5,
   },
 ];
@@ -358,7 +358,7 @@ export default function LandingPage() {
             className="mt-16 grid grid-cols-3 gap-6 divide-x divide-border border border-border rounded-2xl bg-card p-6 max-w-lg mx-auto shadow-sm"
           >
             {[
-              { value: "+100k", label: "Produtos Reconhecidos" },
+              { value: "5+ Marcas", label: "Principais do Brasil" },
               { value: "R$ 0", label: "Para começar" },
               { value: "100%", label: "Sua consultoria" },
             ].map((stat) => (
@@ -538,10 +538,10 @@ export default function LandingPage() {
                 </p>
               </div>
               <button 
-                onClick={() => setCheckoutOpen(true)} 
+                onClick={() => navigate("/auth")} 
                 className="w-full rounded-xl bg-[#871745] py-3 text-sm font-bold text-white hover:bg-[#871745]/90 transition-colors shadow-md shadow-[#871745]/20 flex items-center justify-center gap-2"
               >
-                <CreditCard className="h-4 w-4" /> Assinar PRO
+                <Users className="h-4 w-4" /> Criar Conta
               </button>
               <ul className="space-y-2.5">
                 {PRO_FEATURES.map((f) => (
@@ -552,10 +552,9 @@ export default function LandingPage() {
                 ))}
               </ul>
             </motion.div>
-             </div>
-        </div>
-      </section>
-
+          </div>
+          </div>
+          </section>
       {/* ─── TESTIMONIALS ─── */}
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-6">
