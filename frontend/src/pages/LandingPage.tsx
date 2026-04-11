@@ -307,7 +307,7 @@ export default function LandingPage() {
             <Sparkles className="h-3.5 w-3.5 text-[#871745]" />
             <span className="text-xs font-semibold text-[#871745]">Para consultoras de beleza brasileiras</span>
           </motion.div>
-          // Exemplo de como inserir no Hero Section da sua LandingPage.tsx
+         
           <section className="relative overflow-hidden py-20 md:py-32">
             <div className="relative mx-auto max-w-6xl px-6 grid md:grid-cols-2 gap-12 items-center">
               <div className="text-left">
@@ -327,7 +327,7 @@ export default function LandingPage() {
               <motion.div className="relative flex justify-center">
                 <div className="absolute -z-10 h-[400px] w-[400px] rounded-full bg-[#871745]/10 blur-3xl" />
                 <img 
-                  src="/amorinha-avatar.png" 
+                  src="amorinha-avatar.png" 
                   alt="Amorinha - Sua Assistente Virtual" 
                   className="w-full max-w-[450px] drop-shadow-2xl"
                 />
