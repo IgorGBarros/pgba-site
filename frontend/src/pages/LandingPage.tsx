@@ -487,7 +487,7 @@ export default function LandingPage() {
                 <span className="text-sm text-muted-foreground">/mês</span>
               </div>
               <button 
-                onClick={() => navigate("/auth/register")} 
+                onClick={() => navigate("/auth")} 
                 className="w-full rounded-xl border border-border py-3 text-sm font-semibold text-foreground hover:bg-[#FDF2F7] transition-colors"
               >
                 Criar Conta Grátis
@@ -669,13 +669,7 @@ export default function LandingPage() {
                 Começar gratuitamente
                 <ArrowRight className="h-5 w-5" />
               </button>
-              <button 
-                onClick={() => setCheckoutOpen(true)}
-                className="flex items-center gap-2 rounded-2xl border-2 border-[#871745] px-10 py-4 text-lg font-bold text-[#871745] hover:bg-[#871745] hover:text-white transition-all"
-              >
-                <Crown className="h-5 w-5" />
-                Assinar PRO
-              </button>
+
             </div>
             <p className="mt-6 text-sm text-muted-foreground">
               ✨ Sem compromisso • Cancele quando quiser • Suporte brasileiro
