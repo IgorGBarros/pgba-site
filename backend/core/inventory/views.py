@@ -848,6 +848,7 @@ class StockTransactionViewSet(TenantModelMixin, viewsets.ModelViewSet):
 # 2. OPERAÇÕES COMPLEXAS (ENTRADA E SAÍDA)
 # ==========================================
 
+
 class StockEntryView(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -856,7 +857,23 @@ class StockEntryView(APIView):
         print(f"Usuário: {request.user}")
         print(f"Dados recebidos: {request.data}")
         
-        serializer = StockEntrySerializer(data=request.data)
+        # ✅ 1. Obter store ANTES da validação
+        try:
+            store = get_current_store(request.user)
+            print(f"✅ Store obtida: {store.slug if hasattr(store, 'slug') else store.id}")
+        except Exception as e:
+            print(f"❌ Erro ao obter store: {e}")
+            return Response({
+                "error": "Usuário não possui loja vinculada.",
+                "details": str(e)
+            }, status=403)
+        
+        # ✅ 2. Validar dados COM store no contexto (automático)
+        serializer = StockEntrySerializer(
+            data=request.data,
+            context={'store': store, 'request': request}
+        )
+        
         if not serializer.is_valid():
             print(f"❌ Serializer inválido: {serializer.errors}")
             return Response(serializer.errors, status=400)
@@ -864,23 +881,10 @@ class StockEntryView(APIView):
         data = serializer.validated_data
         print(f"✅ Dados validados: {data}")
         
-        store = get_current_store(request.user)
-        print(f"Store encontrada: {store}")
-        
-        if not store:
-            print("❌ Usuário sem loja vinculada")
-            return Response({"error": "Usuário não possui loja vinculada."}, status=403)
-        
-        # ✅ NOVO: VALIDAÇÃO DE LIMITE ANTES DE PROCESSAR
-        try:
-            self.validate_plan_limits(store, data)
-        except ValidationError as e:
-            print(f"❌ Limite de plano atingido: {e.detail}")
-            return Response(e.detail, status=400)
-        
+        # ✅ 3. Processar entrada de estoque (lógica existente mantida)
         try:
             with transaction.atomic():
-                # Conversão de strings vazias para None (NULL) [1]
+                # Conversão de strings vazias para None
                 raw_sku = data.get('natura_sku')
                 sku_input = raw_sku if raw_sku and str(raw_sku).strip() != "" else None
                 
@@ -889,12 +893,13 @@ class StockEntryView(APIView):
                 
                 name_input = data.get('name', '').strip()
                 category_input = data.get('category', 'Geral')
-                # Proteção contra nomes de fallback [1]
+                
                 if name_input in ["Produto sem nome", "Produto Novo", ""]:
                     name_input = "Produto Novo"
+                
                 print(f"Buscando produto: SKU={sku_input}, Barcode={barcode_input}")
                 
-                # 1. Buscar produto no catálogo [1]
+                # 1. Buscar produto no catálogo
                 product = None
                 
                 if barcode_input:
@@ -902,9 +907,10 @@ class StockEntryView(APIView):
                     
                 if not product and sku_input:
                     product = Product.objects.filter(natura_sku=sku_input).first()
+                
                 print(f"Produto encontrado: {product}")
                 
-                # 2. Criar ou atualizar produto [1]
+                # 2. Criar ou atualizar produto
                 if product:
                     is_protected = getattr(product, 'is_protected', False)
                     if is_protected:
@@ -929,6 +935,7 @@ class StockEntryView(APIView):
                         if data.get('image_url') and not getattr(product, 'image_url', ''):
                             product.image_url = data['image_url']
                             updated = True
+                        
                         if updated:
                             product.save()
                             print("Produto atualizado com os novos dados")
@@ -945,10 +952,10 @@ class StockEntryView(APIView):
                     )
                     print(f"Produto criado: {product}")
                 
-                # 3. Gerenciar estoque da loja [1]
+                # 3. Gerenciar estoque da loja (TENANT-AWARE)
                 print(f"Criando/atualizando InventoryItem para store={store}, product={product}")
                 item, created = InventoryItem.objects.get_or_create(
-                    store=store,
+                    store=store,  # ✅ TENANT: isolamento por loja
                     product=product,
                     defaults={
                         'cost_price': data.get('cost_price', 0),
@@ -957,6 +964,7 @@ class StockEntryView(APIView):
                     }
                 )
                 print(f"InventoryItem: {item} (criado: {created})")
+                
                 if data.get('cost_price'): 
                     item.cost_price = data['cost_price']
                 if data.get('sale_price'): 
@@ -964,7 +972,7 @@ class StockEntryView(APIView):
                 item.save()
                 print("InventoryItem salvo")
                 
-                # 4. ✅ NOVO: Verificar se já existe lote com mesma validade
+                # 4. Verificar se já existe lote com mesma validade (CONSOLIDAÇÃO)
                 expiration_date = data.get('expiration_date')
                 existing_batch = None
                 
@@ -979,6 +987,7 @@ class StockEntryView(APIView):
                         expiration_date__isnull=True,
                         quantity__gt=0
                     ).first()
+                
                 if existing_batch:
                     # ✅ CONSOLIDAR: Somar quantidade no lote existente
                     print(f"📦 Consolidando com lote existente {existing_batch.id}")
@@ -996,16 +1005,16 @@ class StockEntryView(APIView):
                     )
                     print(f"Batch criado: {used_batch}")
                 
-                # 5. Atualizar Total Consolidado [1]
+                # 5. Atualizar Total Consolidado
                 total_real = item.batches.aggregate(total=Sum('quantity'))['total'] or 0
                 item.total_quantity = total_real
                 item.save()
                 print(f"Total atualizado: {total_real}")
                 
-                # 6. Registrar Transação [1]
+                # 6. Registrar Transação
                 print("Criando StockTransaction")
                 StockTransaction.objects.create(
-                    store=store,
+                    store=store,  # ✅ TENANT: transação por loja
                     product=product,
                     batch=used_batch,
                     transaction_type='ENTRADA',
@@ -1016,14 +1025,21 @@ class StockEntryView(APIView):
                 )
                 print("Transação criada")
                 
-                # 7. Adicionar à sessão se existir
+                # 7. Adicionar à sessão se existir (opcional)
                 try:
+                    from .models import RegistrationSession
                     session = RegistrationSession.objects.filter(store=store, is_active=True).first()
                     if session:
                         session.add_product(item, data['quantity'])
-                except:
-                    pass  # Sessão é opcional
+                        print(f"✅ Produto adicionado à sessão {session.id}")
+                except Exception as session_error:
+                    print(f"⚠️ Erro na sessão (não crítico): {session_error}")
+                    # Sessão é opcional, não quebra o fluxo
                     
+        except ValidationError as e:
+            # ✅ Erros de validação (como limite de plano)
+            print(f"❌ Erro de validação: {e.detail}")
+            return Response(e.detail, status=400)
         except Exception as e:
             print(f"❌ ERRO na transação: {str(e)}")
             print(f"Tipo do erro: {type(e)}")
@@ -1036,77 +1052,13 @@ class StockEntryView(APIView):
             "message": "Estoque atualizado com sucesso!", 
             "product": product.name,
             "new_total": item.total_quantity,
-            "batch_consolidated": existing_batch is not None
+            "batch_consolidated": existing_batch is not None,
+            "tenant_info": {
+                "store_id": store.id,
+                "current_products": store.product_count if hasattr(store, 'product_count') else 'N/A',
+                "plan": store.plan
+            }
         })
-    
-    def validate_plan_limits(self, store, data):
-        """✅ NOVO: Validação de limites do plano"""
-        # Verificar se é um produto novo para a loja
-        bar_code = data.get('bar_code')
-        natura_sku = data.get('natura_sku')
-        
-        is_new_product = self.is_new_product_for_store(store, bar_code, natura_sku)
-        
-        if is_new_product:
-            print(f"🆕 Produto novo detectado - validando limites do plano {store.plan}")
-            
-            # Obter configuração do plano
-            try:
-                from .models import PlanConfig
-                plan_config = PlanConfig.objects.filter(plan_type=store.plan).first()
-            except:
-                plan_config = None
-            
-            # Definir limite baseado no plano
-            if plan_config and plan_config.max_products:
-                limit = plan_config.max_products
-            else:
-                # Fallback para limites hardcoded
-                limit = 20 if store.plan == 'free' else None
-            
-            # Se tem limite, verificar
-            if limit is not None:
-                current_count = store.items.values('product').distinct().count()
-                print(f"📊 Contagem atual: {current_count}/{limit}")
-                
-                if current_count >= limit:
-                    from rest_framework.exceptions import ValidationError
-                    raise ValidationError({
-                        'error': 'PLAN_LIMIT_REACHED',
-                        'message': f'Você atingiu o limite de {limit} produtos do plano {store.plan.upper()}.',
-                        'current_plan': store.plan,
-                        'current_count': current_count,
-                        'limit': limit,
-                        'upgrade_required': True,
-                        'upgrade_url': '/upgrade'
-                    })
-            else:
-                print(f"✅ Plano {store.plan} permite produtos ilimitados")
-        else:
-            print(f"📦 Produto já existe na loja - sem validação de limite")
-    
-    def is_new_product_for_store(self, store, bar_code, natura_sku):
-        """✅ NOVO: Verifica se é produto novo para a loja"""
-        # Se não tem identificador, é produto novo
-        if not bar_code and not natura_sku:
-            return True
-        
-        # Verificar se já existe no estoque da loja
-        existing_item = None
-        
-        if bar_code:
-            existing_item = InventoryItem.objects.filter(
-                store=store,
-                product__bar_code=bar_code
-            ).first()
-        
-        if not existing_item and natura_sku:
-            existing_item = InventoryItem.objects.filter(
-                store=store,
-                product__natura_sku=natura_sku
-            ).first()
-        
-        return existing_item is None
 # inventory/views.py - CORRIGIR SaleCheckoutView
 
 class SaleCheckoutView(APIView):

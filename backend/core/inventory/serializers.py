@@ -229,7 +229,6 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 # 4. SERIALIZER DE ENTRADA COM VALIDAÇÃO DE LIMITE (melhorado)
 # ==========================================
 
-# inventory/serializers.py - CORRIGIR StockEntrySerializer
 
 class StockEntrySerializer(serializers.Serializer):
     bar_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -246,72 +245,124 @@ class StockEntrySerializer(serializers.Serializer):
     image_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     def validate(self, attrs):
-        """✅ CORRIGIDO: Validação de limites de plano com verificação de None"""
-        # ✅ CORREÇÃO: Verificar se store existe no contexto
-        store = self.context.get('store')
+        """✅ VALIDAÇÃO AUTOMÁTICA DE LIMITES POR TENANT"""
+        # ✅ 1. Obter Store do contexto ou request
+        store = self._get_store_from_context()
+        
         if not store:
-            # ✅ FALLBACK: Tentar pegar do request
-            request = self.context.get('request')
-            if request and hasattr(request, 'user') and request.user.is_authenticated:
-                try:
-                    store = request.user.store
-                except AttributeError:
-                    # ✅ Se usuário não tem store, criar uma
-                    from .utils import ensure_user_has_store
-                    store = ensure_user_has_store(request.user)
-            
-            if not store:
-                raise ValidationError("Store não encontrada. Usuário deve ter uma loja associada.")
+            raise ValidationError("Store não encontrada. Usuário deve ter uma loja associada.")
         
-        # Verificar se é um produto novo (sem bar_code existente)
-        bar_code = attrs.get('bar_code')
-        is_new_product = False
+        # ✅ 2. Verificar se é produto novo para esta loja (tenant)
+        is_new_product = self._is_new_product_for_store(store, attrs)
         
-        if bar_code:
-            # Verificar se produto existe globalmente
-            existing_product = Product.objects.filter(bar_code=bar_code).first()
-            if not existing_product:
-                is_new_product = True
-            else:
-                # Verificar se já existe no estoque da loja
-                existing_item = InventoryItem.objects.filter(
-                    store=store, 
-                    product=existing_product
-                ).first()
-                if not existing_item:
-                    is_new_product = True
-        else:
-            # Sem código de barras = produto novo
-            is_new_product = True
-        
-        # ✅ VALIDAÇÃO DE LIMITE (com verificação de None)
+        # ✅ 3. Validação automática de limite (só para produtos novos)
         if is_new_product:
-            # ✅ CORREÇÃO: Verificar se store tem método can_add_products
-            if hasattr(store, 'can_add_products'):
-                can_add = store.can_add_products
-            else:
-                # ✅ FALLBACK: Verificar manualmente
-                current_count = InventoryItem.objects.filter(store=store).count()
-                plan_config = getattr(store, 'plan_config', None)
-                max_products = plan_config.max_products if plan_config else 20
-                can_add = max_products is None or current_count < max_products
-            
-            if not can_add:
-                # ✅ Buscar configuração do plano
-                plan_config = getattr(store, 'plan_config', None)
-                limit = plan_config.max_products if plan_config else 20
-                current_count = InventoryItem.objects.filter(store=store).count()
-                
-                raise ValidationError({
-                    'error': 'PLAN_LIMIT_REACHED',
-                    'message': f'Você atingiu o limite de {limit} produtos do plano {store.plan.upper()}.',
-                    'current_plan': store.plan,
-                    'current_count': current_count,
-                    'limit': limit,
-                    'upgrade_required': True
-                })
+            self._validate_tenant_limits(store)
         
         return attrs
+    
+    def _get_store_from_context(self):
+        """✅ AUTOMÁTICO: Obter store do contexto ou request"""
+        # Primeiro: tentar do contexto (passado pela view)
+        store = self.context.get('store')
+        if store:
+            return store
+        
+        # Fallback: tentar do request.user
+        request = self.context.get('request')
+        if request and hasattr(request, 'user') and request.user.is_authenticated:
+            try:
+                return request.user.store
+            except AttributeError:
+                # Se usuário não tem store, criar uma
+                from .utils import ensure_user_has_store
+                return ensure_user_has_store(request.user)
+        
+        return None
+    
+    def _is_new_product_for_store(self, store, attrs):
+        """✅ AUTOMÁTICO: Verifica se é produto novo para este tenant"""
+        bar_code = attrs.get('bar_code')
+        natura_sku = attrs.get('natura_sku')
+        
+        # Se não tem identificadores, é produto novo
+        if not bar_code and not natura_sku:
+            return True
+        
+        # Verificar se já existe no estoque DESTA loja (tenant isolation)
+        existing_item = None
+        
+        if bar_code:
+            existing_item = InventoryItem.objects.filter(
+                store=store,  # ✅ TENANT: só desta loja
+                product__bar_code=bar_code
+            ).first()
+        
+        if not existing_item and natura_sku:
+            existing_item = InventoryItem.objects.filter(
+                store=store,  # ✅ TENANT: só desta loja
+                product__natura_sku=natura_sku
+            ).first()
+        
+        return existing_item is None
+    
+    def _validate_tenant_limits(self, store):
+        """✅ AUTOMÁTICO: Validação de limites por tenant"""
+        # Usar propriedade automática can_add_products
+        if hasattr(store, 'can_add_products'):
+            can_add = store.can_add_products
+        else:
+            # Fallback manual se propriedade não existir
+            can_add = self._manual_limit_check(store)
+        
+        if not can_add:
+            # Obter dados para erro estruturado
+            limit_info = self._get_limit_info(store)
+            
+            raise ValidationError({
+                'error': 'PLAN_LIMIT_REACHED',
+                'message': f'Você atingiu o limite de {limit_info["limit"]} produtos do plano {store.plan.upper()}.',
+                'current_plan': store.plan,
+                'current_count': limit_info['current_count'],
+                'limit': limit_info['limit'],
+                'upgrade_required': True,
+                'upgrade_url': '/upgrade'
+            })
+    
+    def _manual_limit_check(self, store):
+        """✅ FALLBACK: Verificação manual se propriedade não existir"""
+        current_count = InventoryItem.objects.filter(store=store).values('product').distinct().count()
+        
+        # Tentar pegar configuração do plano
+        try:
+            plan_config = getattr(store, 'plan_config', None)
+            max_products = plan_config.max_products if plan_config else None
+        except:
+            max_products = None
+        
+        # Fallback hardcoded
+        if max_products is None:
+            max_products = 20 if store.plan == 'free' else None
+        
+        return max_products is None or current_count < max_products
+    
+    def _get_limit_info(self, store):
+        """✅ HELPER: Obter informações de limite para erro"""
+        current_count = InventoryItem.objects.filter(store=store).values('product').distinct().count()
+        
+        try:
+            plan_config = getattr(store, 'plan_config', None)
+            limit = plan_config.max_products if plan_config else None
+        except:
+            limit = None
+        
+        if limit is None:
+            limit = 20 if store.plan == 'free' else 999999
+        
+        return {
+            'current_count': current_count,
+            'limit': limit
+        }
 
 # ==========================================
 # 5. SERIALIZERS DE VENDA (mantidos)
