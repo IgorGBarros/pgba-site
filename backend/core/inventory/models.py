@@ -122,11 +122,16 @@ class Store(models.Model):
     
     @property
     def can_add_products(self):
-        """Verifica se pode adicionar mais produtos"""
-        config = self.plan_config
-        if not config or config.max_products is None:
-            return True
-        return self.product_count < config.max_products
+        """Verifica se a loja pode adicionar mais produtos"""
+        if self.plan == 'pro':
+            return True  # PRO tem produtos ilimitados
+        
+        # Free tem limite
+        current_count = self.items.count()
+        plan_config = getattr(self, 'plan_config', None)
+        max_products = plan_config.max_products if plan_config else 20
+        
+        return current_count < max_products
     
     def get_plan_limits(self):
         """✅ INFORMAÇÕES COMPLETAS de limites"""
