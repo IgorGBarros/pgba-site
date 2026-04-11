@@ -396,6 +396,7 @@ export const batchApi = {
 
 // ── Movements ──
 export interface Movement {
+  movement_type: string;
   id: string;
   product_name: string;
   transaction_type: string;

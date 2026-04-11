@@ -64,7 +64,8 @@ export default function Index() {
           return {
             ...m,
             raw_type: rawType,
-            ui_type: uiType
+            ui_type: uiType,
+            profit: (m as any).profit ?? 0
           };
         });
 
