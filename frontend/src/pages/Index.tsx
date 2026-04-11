@@ -12,7 +12,6 @@ import { ChatAssistant } from "../components/ChatAssistant";
 import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
 import ProfileCompletionBanner from "../components/ProfileCompletionBanner";
-import { sessionApi } from '../lib/sessionApi';
 
 interface Stats {
   investedValue: number;
@@ -26,7 +25,7 @@ export default function Index() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isLocked } = useFeatureGates();
-  
+
   const [stats, setStats] = useState<Stats>({
     investedValue: 0,
     potentialValue: 0,
@@ -34,33 +33,31 @@ export default function Index() {
     monthSales: 0,
     monthProfit: 0,
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeCtx, setUpgradeCtx] = useState({ feature: "", description: "" });
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
-  
   const [showNotif, setShowNotif] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    
+
     profileApi
       .get()
       .then((p) => setStoreSlug(p.store_slug))
       .catch(() => setStoreSlug(null));
-      
+
     Promise.all([inventoryApi.list(), movementsApi.list()])
       .then(([items, movements]) => {
         const now = new Date();
-        
-        // 🚀 LÓGICA DE MOVIMENTAÇÕES IDÊNTICA AO DO HISTÓRICO PARA PRECISÃO MÁXIMA
+
         const monthMovements = movements.filter((m) => {
           const d = new Date(m.created_at);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         }).map(m => {
-          const rawType = (m.transaction_type || m.movement_type || "").toUpperCase();
-          const uiType = rawType === "ENTRADA" ? "entrada" : "saida"; 
+          const rawType = (m.transaction_type || (m as any).movement_type || "").toUpperCase();
+          const uiType = rawType === "ENTRADA" ? "entrada" : "saida";
           return {
             ...m,
             raw_type: rawType,
@@ -69,16 +66,10 @@ export default function Index() {
           };
         });
 
-        // Pega apenas as VENDAS REAIS (Saídas do tipo VENDA) deste mês
         const salesMovements = monthMovements.filter((m) => m.ui_type === "saida" && m.raw_type === "VENDA");
-        
-        // Receita Real do Mês (soma o preço unitário de venda * quantidade)
         const monthSales = salesMovements.reduce((s, m) => s + (Number(m.unit_price) || 0) * Math.abs(m.quantity), 0);
-        
-        // Lucro Real do Mês (soma o lucro já calculado e salvo pelo backend na hora da baixa)
         const monthProfit = salesMovements.reduce((s, m) => s + (m.profit || 0), 0);
 
-        // 🚀 CÁLCULO DE INVESTIMENTO (Baseado no saldo de estoque atual)
         const totalInvested = items.reduce((s, i) => {
           const qty = i.total_quantity ?? i.quantity ?? 0;
           return s + (qty * i.cost_price);
@@ -97,32 +88,22 @@ export default function Index() {
           monthSales,
           monthProfit,
         });
-        
+
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [user]);
 
   const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-  
-  // 🚀 CARDS RENOMEADOS FOCADOS NO FINANCEIRO E LUCRO REAL DO MÊS
+
   const statCards = [
     { label: "Valor Investido", value: fmt(stats.investedValue), icon: Package, color: "text-muted-foreground" },
     { label: "Potencial de Venda", value: fmt(stats.potentialValue), icon: DollarSign, color: "text-primary" },
     { label: "Lucro Estimado Geral", value: fmt(stats.projectedProfit), icon: BarChart3, color: "text-green-600" },
     { label: "Vendas deste Mês", value: fmt(stats.monthSales), icon: TrendingDown, color: "text-foreground" },
-    { label: "Lucro Real do Mês", value: fmt(stats.monthProfit), icon: BarChart3, color: "text-emerald-600" }, // Novo Card de Lucro do Mês!
+    { label: "Lucro Real do Mês", value: fmt(stats.monthProfit), icon: BarChart3, color: "text-emerald-600" },
   ];
-// Função para iniciar sessão
-const startRegistrationSession = async () => {
-  try {
-    await sessionApi.start();
-    navigate("/add");
-  } catch (error) {
-    console.error('Erro ao iniciar sessão:', error);
-    navigate("/add"); // Vai mesmo se der erro
-  }
-};
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-20 border-b border-border bg-card">
@@ -137,7 +118,6 @@ const startRegistrationSession = async () => {
             </div>
           </div>
           <div className="flex items-center gap-1 relative">
-            {/* MODAL DO SINO IMPLEMENTADO AQUI */}
             <button
               onClick={() => setShowNotif(!showNotif)}
               className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -171,11 +151,11 @@ const startRegistrationSession = async () => {
           </div>
         </div>
       </header>
-      
+
       <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
         <ProfileCompletionBanner />
-        
-        {/* CARDS FINANCEIROS (Com Skeleton Loading para evitar ansiedade) */}
+
+        {/* CARDS FINANCEIROS */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {statCards.map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md">
@@ -189,33 +169,30 @@ const startRegistrationSession = async () => {
             </div>
           ))}
         </div>
-        
-        {/* BOTÕES DE AÇÃO (Botão Manual removido) */}
+
+        {/* BOTÕES DE AÇÃO */}
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          
-          <ActionBtn 
-            onClick={startRegistrationSession} 
-            icon={ScanBarcode} 
-            label="Cadastrar" 
-            desc="Escanear entrada" 
-            primary 
+          {/* ✅ Navega direto — AddProduct gerencia a sessão internamente */}
+          <ActionBtn
+            onClick={() => navigate("/add")}
+            icon={ScanBarcode}
+            label="Cadastrar"
+            desc="Escanear entrada"
+            primary
           />
           <ActionBtn onClick={() => navigate("/withdraw")} icon={ArrowDownCircle} label="Baixa" desc="Registrar saída" />
           <ActionBtn onClick={() => navigate("/products")} icon={List} label="Meu Estoque" desc="Lista completa" />
           <ActionBtn onClick={() => navigate("/history")} icon={History} label="Extrato" desc="Movimentações" />
           <ActionBtn onClick={() => navigate("/dashboard")} icon={PieChart} label="Dashboard" desc="Gráficos e análises" proBadge={isLocked("dashboard_charts")} />
-          
-          {/* 🚀 BOTÃO VITRINE INTELIGENTE */}
+
           <ActionBtn
             onClick={() => {
               if (isLocked("storefront")) {
                 setUpgradeCtx({ feature: "Vitrine Digital", description: "Crie sua loja online e venda pelo WhatsApp automaticamente." });
                 setShowUpgrade(true);
               } else if (storeSlug) {
-                // Abre direto em uma nova aba se tiver slug
                 window.open(`${window.location.origin}/vitrine/${storeSlug}`, "_blank");
               } else {
-                // Manda pro perfil pra ela criar o slug
                 navigate("/profile");
               }
             }}
@@ -225,6 +202,7 @@ const startRegistrationSession = async () => {
             proBadge={isLocked("storefront")}
           />
         </div>
+
         <p className="mt-10 text-center text-sm text-muted-foreground bg-secondary/30 p-4 rounded-xl border border-border/50">
           {!isLocked("chat_assistant")
             ? "💬 Clique no botão no canto inferior direito para conversar com a nossa Inteligência Artificial"
@@ -233,7 +211,7 @@ const startRegistrationSession = async () => {
       </main>
 
       {!isLocked("chat_assistant") && <ChatAssistant />}
-      
+
       <UpgradeModal
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
