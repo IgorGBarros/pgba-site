@@ -8,13 +8,13 @@ import {
 } from "lucide-react";
 import { api } from "../services/api"; 
 import { useToast } from "../hooks/use-toast";
+import logoMinhaAmora from "../assets/logo-minhaamora.png";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 32 },
   visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] as const } }),
 };
 
-// ✅ CORES DA MINHA AMORA
 const BRAND_COLORS = {
   primary: '#871745',
   primaryLight: '#FDF2F7',
@@ -90,7 +90,7 @@ const TESTIMONIALS = [
     text: "A vitrine digital mudou meu negócio! Mando o link no status do WhatsApp e as clientes compram sozinhas. A Amorinha me ajuda com tudo!",
     stars: 5,
   },
-   {
+  {
     name: "Patricia Lima",
     role: "Empreendedora Digital",
     text: "O scanner reconhece todos os produtos nacionais que trabalho! E os alertas de validade já me salvaram de muito prejuízo. Recomendo de olhos fechados.",
@@ -117,7 +117,7 @@ const FAQS = [
   },
 ];
 
-// ─── Checkout Modal Atualizado ─────────────────────────────────────────────────────────
+// ─── Checkout Modal ─────────────────────────────────────────────────────────
 interface CheckoutModalProps {
   open: boolean;
   onClose: () => void;
@@ -156,14 +156,14 @@ function CheckoutModal({ open, onClose }: CheckoutModalProps) {
     } catch (err: any) {
       console.error(err);
       if (err.response?.status === 404 || err.message.includes('Network Error')) {
-         toast({ 
-             title: "Lista VIP da Minha Amora", 
-             description: "Sistema de pagamentos em atualização. Seu e-mail foi salvo com prioridade máxima!", 
-         });
-         setTimeout(onClose, 2500);
+        toast({ 
+          title: "Lista VIP da Minha Amora", 
+          description: "Sistema de pagamentos em atualização. Seu e-mail foi salvo com prioridade máxima!", 
+        });
+        setTimeout(onClose, 2500);
       } else {
-         const msg = err.response?.data?.error || err.message || "Erro ao processar checkout.";
-         toast({ title: "Ops!", description: msg, variant: "destructive" });
+        const msg = err.response?.data?.error || err.message || "Erro ao processar checkout.";
+        toast({ title: "Ops!", description: msg, variant: "destructive" });
       }
     } finally {
       setLoading(false);
@@ -188,7 +188,6 @@ function CheckoutModal({ open, onClose }: CheckoutModalProps) {
           <p className="text-sm text-muted-foreground">Checkout seguro. Cancele quando quiser.</p>
         </div>
         
-        {/* Billing toggle */}
         <div className="flex gap-2 mb-5 p-1 rounded-xl bg-[#FDF2F7]">
           <button 
             onClick={() => setBilling("monthly")} 
@@ -251,7 +250,7 @@ function CheckoutModal({ open, onClose }: CheckoutModalProps) {
   );
 }
 
-// ─── Landing Page Component Atualizada ──────────────────────────────────────────────────
+// ─── Landing Page Component ──────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -262,13 +261,16 @@ export default function LandingPage() {
         {checkoutOpen && <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />}
       </AnimatePresence>
       
-      {/* ─── NAV ATUALIZADA ─── */}
+      {/* ─── NAV ─── */}
       <nav className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#871745] to-[#A91B60]">
-              <span className="text-white text-sm">🫐</span>
-            </div>
+            {/* ✅ LOGO ATUALIZADO - NAV */}
+            <img
+              src={logoMinhaAmora}
+              alt="Minha Amora"
+              className="h-9 w-9 rounded-xl object-contain"
+            />
             <span className="font-display text-base font-bold text-foreground">
               Minha <span className="text-[#871745]">Amora</span>
             </span>
@@ -290,7 +292,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ─── HERO ATUALIZADO ─── */}
+      {/* ─── HERO ─── */}
       <section className="relative overflow-hidden py-20 md:py-32">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -top-40 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-[#871745]/8 blur-3xl" />
@@ -307,7 +309,6 @@ export default function LandingPage() {
             <Sparkles className="h-3.5 w-3.5 text-[#871745]" />
             <span className="text-xs font-semibold text-[#871745]">Para consultoras de beleza brasileiras</span>
           </motion.div>
-          
           
           <motion.h1 
             initial="hidden" 
@@ -372,7 +373,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── FEATURES ATUALIZADAS ─── */}
+      {/* ─── FEATURES ─── */}
       <section className="bg-[#FDF2F7]/30 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <motion.div 
@@ -454,7 +455,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── PRICING ATUALIZADO ─── */}
+      {/* ─── PRICING ─── */}
       <section className="bg-[#FDF2F7]/30 py-20" id="planos">
         <div className="mx-auto max-w-4xl px-6">
           <motion.div 
@@ -485,7 +486,7 @@ export default function LandingPage() {
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-display font-bold text-foreground">R$ 0</span>
-                <span className="text-sm text-muted-foreground">/mês</span>
+              <span className="text-sm text-muted-foreground">/mês</span>
               </div>
               <button 
                 onClick={() => navigate("/auth")} 
@@ -554,8 +555,9 @@ export default function LandingPage() {
               </ul>
             </motion.div>
           </div>
-          </div>
-          </section>
+        </div>
+      </section>
+
       {/* ─── TESTIMONIALS ─── */}
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-6">
@@ -652,8 +654,13 @@ export default function LandingPage() {
             viewport={{ once: true }} 
             variants={fadeUp}
           >
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-[#871745] to-[#A91B60] shadow-xl shadow-[#871745]/30">
-              <span className="text-3xl">🫐</span>
+            {/* ✅ LOGO ATUALIZADO - CTA FINAL */}
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-[#FDF2F7] shadow-xl shadow-[#871745]/30">
+              <img
+                src={logoMinhaAmora}
+                alt="Minha Amora"
+                className="h-16 w-16 object-contain"
+              />
             </div>
             <h2 className="font-display text-3xl font-bold text-foreground md:text-5xl tracking-tight mb-4">
               Sua consultoria merece brilhar
@@ -670,7 +677,6 @@ export default function LandingPage() {
                 Começar gratuitamente
                 <ArrowRight className="h-5 w-5" />
               </button>
-
             </div>
             <p className="mt-6 text-sm text-muted-foreground">
               ✨ Sem compromisso • Cancele quando quiser • Suporte brasileiro
@@ -684,9 +690,12 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#871745] to-[#A91B60]">
-                <span className="text-white text-lg">🫐</span>
-              </div>
+              {/* ✅ LOGO ATUALIZADO - FOOTER */}
+              <img
+                src={logoMinhaAmora}
+                alt="Minha Amora"
+                className="h-10 w-10 rounded-xl object-contain"
+              />
               <div>
                 <span className="font-display text-lg font-bold text-foreground">
                   Minha <span className="text-[#871745]">Amora</span>
@@ -733,3 +742,5 @@ export default function LandingPage() {
     </div>
   );
 }
+
+                
