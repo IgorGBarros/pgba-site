@@ -307,6 +307,33 @@ export default function LandingPage() {
             <Sparkles className="h-3.5 w-3.5 text-[#871745]" />
             <span className="text-xs font-semibold text-[#871745]">Para consultoras de beleza brasileiras</span>
           </motion.div>
+          // Exemplo de como inserir no Hero Section da sua LandingPage.tsx
+          <section className="relative overflow-hidden py-20 md:py-32">
+            <div className="relative mx-auto max-w-6xl px-6 grid md:grid-cols-2 gap-12 items-center">
+              <div className="text-left">
+                <motion.h1 className="font-display text-4xl font-bold leading-tight text-foreground md:text-6xl">
+                  Sua consultoria <span className="text-[#871745]">sob controle</span> com a ajuda da Amorinha.
+                </motion.h1>
+                <p className="mt-6 text-lg text-muted-foreground">
+                  A Minha Amora é mais que um app de estoque. É sua assistente inteligente que identifica produtos, avisa sobre vencimentos e cria sua vitrine digital.
+                </p>
+                {/* Botão de Call to Action com a cor da paleta */}
+                <button className="mt-10 bg-[#871745] px-8 py-4 rounded-2xl text-white font-bold shadow-lg">
+                  Começar agora gratuitamente
+                </button>
+              </div>
+              
+              {/* IMAGEM DA AMORINHA AQUI */}
+              <motion.div className="relative flex justify-center">
+                <div className="absolute -z-10 h-[400px] w-[400px] rounded-full bg-[#871745]/10 blur-3xl" />
+                <img 
+                  src="/amorinha-avatar.png" 
+                  alt="Amorinha - Sua Assistente Virtual" 
+                  className="w-full max-w-[450px] drop-shadow-2xl"
+                />
+              </motion.div>
+            </div>
+          </section>
           
           <motion.h1 
             initial="hidden" 
