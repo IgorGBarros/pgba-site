@@ -371,27 +371,6 @@ export default function LandingPage() {
               </div>
             ))}
           </motion.div>
-          {/* ✅ AMORINHA SUTIL NO HERO - Flutuante no canto */}
-          <motion.div
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 1.2, duration: 0.7, ease: "easeOut" }}
-            className="hidden lg:flex absolute bottom-8 right-8 items-end gap-3"
-          >
-            <div className="rounded-2xl bg-card border border-border shadow-lg px-4 py-3 max-w-[220px]">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                <span className="font-bold text-[#871745]">Amorinha:</span> "Oi! Posso te ajudar a organizar seu estoque hoje?" 💜
-              </p>
-            </div>
-            <div className="relative shrink-0">
-              <div className="absolute -inset-1 rounded-full bg-[#871745]/20 animate-pulse" />
-              <img
-                src={amorinhaAvatar}
-                alt="Amorinha - Assistente Virtual"
-                className="relative h-14 w-14 rounded-full object-cover border-2 border-[#871745] shadow-md"
-              />
-            </div>
-          </motion.div>
         </div>
         
       </section>
@@ -431,7 +410,31 @@ export default function LandingPage() {
               </motion.div>
             ))}
           </div>
+        
+          {/* ✅ AMORINHA SUTIL NO HERO - Flutuante no canto */}
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1.2, duration: 0.7, ease: "easeOut" }}
+            className="hidden lg:flex absolute bottom-8 right-8 items-end gap-3"
+          >
+            <div className="rounded-2xl bg-card border border-border shadow-lg px-4 py-3 max-w-[220px]">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span className="font-bold text-[#871745]">Amorinha:</span> "Oi! Posso te ajudar a organizar seu estoque hoje?" 💜
+              </p>
+            </div>
+            <div className="relative shrink-0">
+              <div className="absolute -inset-1 rounded-full bg-[#871745]/20 animate-pulse" />
+              <img
+                src={amorinhaAvatar}
+                alt="Amorinha - Assistente Virtual"
+                className="relative h-14 w-14 rounded-full object-cover border-2 border-[#871745] shadow-md"
+              />
+            </div>
+          </motion.div>
+            
         </div>
+        
       </section>
 
       {/* ─── HOW IT WORKS ─── */}
