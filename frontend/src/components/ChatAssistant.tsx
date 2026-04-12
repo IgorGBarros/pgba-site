@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot, User, Sparkles } from "lucide-react";
 import { api } from "../services/api";
-
+import amorinhaAvatar from "../assets/amorinha-avatar.png";
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -29,8 +29,8 @@ export const ChatAssistant: React.FC = () => {
       {
         id: "welcome",
         role: "assistant",
-        content:
-          "Olá! 👋 Sou seu assistente de estoque Natura. Pergunte sobre quantidades, valores ou produtos em falta!",
+        content:  
+           "Olá! 👋 Sou a Amorinha, sua assistente de estoque. Pergunte sobre quantidades, valores ou produtos em falta! 💜",    
         timestamp: new Date(),
       },
     ];
@@ -118,7 +118,16 @@ export const ChatAssistant: React.FC = () => {
             onClick={() => setIsOpen(true)}
             className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-shadow hover:shadow-xl hover:shadow-primary/40"
           >
-            <MessageCircle className="h-6 w-6" />
+            <img
+              src={amorinhaAvatar}
+                alt="Amorinha"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  // Fallback se imagem não carregar
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>';
+                }}
+              />
           </motion.button>
         )}
       </AnimatePresence>
@@ -134,16 +143,20 @@ export const ChatAssistant: React.FC = () => {
             className="fixed bottom-6 right-6 z-50 flex h-[520px] w-[380px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           >
             {/* Cabeçalho */}
-            <div className="flex items-center justify-between bg-primary px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-foreground/20">
-                  <Sparkles className="h-4 w-4 text-primary-foreground" />
+              <div className="flex items-center justify-between bg-gradient-to-r from-[#871745] to-[#A91B60] px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-full overflow-hidden border-2 border-white/30 shrink-0">
+                    <img
+                      src={amorinhaAvatar}
+                      alt="Amorinha"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Amorinha</p>
+                    <p className="text-xs text-white/70">Sua assistente de estoque 💜</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-primary-foreground">Assistente Natura</p>
-                  <p className="text-xs text-primary-foreground/70">Estoque inteligente</p>
-                </div>
-              </div>
               <button
                 onClick={() => setIsOpen(false)}
                 className="rounded-full p-1 text-primary-foreground/70 transition-colors hover:bg-primary-foreground/20 hover:text-primary-foreground"
@@ -161,17 +174,21 @@ export const ChatAssistant: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  {msg.role === "assistant" && (
-                    <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <Bot className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                  )}
+                {msg.role === "assistant" && (
+                  <div className="mt-1 h-6 w-6 shrink-0 rounded-full overflow-hidden border border-[#871745]/20">
+                    <img
+                      src={amorinhaAvatar}
+                      alt="Amorinha"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
 
                   <div
                     className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                       msg.role === "user"
                         ? "bg-chat-user text-chat-user-foreground rounded-br-md"
-                        : "bg-chat-assistant text-chat-assistant-foreground rounded-bl-md"
+                        : "bg-[#FDF2F7] text-[#2D292E] border border-[#871745]/10 rounded-bl-md"
                     }`}
                   >
                     {msg.content.split("\n").map((line, i) => (
@@ -198,9 +215,13 @@ export const ChatAssistant: React.FC = () => {
               {/* Loading */}
               {isLoading && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                    <Bot className="h-3.5 w-3.5 text-primary" />
-                  </div>
+                    <div className="h-6 w-6 rounded-full overflow-hidden border border-[#871745]/20">
+                      <img
+                        src={amorinhaAvatar}
+                        alt="Amorinha"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
                   <div className="flex gap-1 rounded-2xl bg-chat-assistant px-4 py-3">
                     <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 animation-delay-[0ms]" />
                     <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 animation-delay-[150ms]" />
