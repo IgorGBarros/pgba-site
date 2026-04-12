@@ -12,7 +12,7 @@ import { ChatAssistant } from "../components/ChatAssistant";
 import ProBadge from "../components/ProBadge";
 import UpgradeModal from "../components/UpgradeModal";
 import ProfileCompletionBanner from "../components/ProfileCompletionBanner";
-
+import amorinhaAvatar from "../assets/amorinha-avatar.png";
 interface Stats {
   investedValue: number;
   potentialValue: number;
@@ -109,12 +109,26 @@ export default function Index() {
       <header className="sticky top-0 z-20 border-b border-border bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
-              <Package className="h-5 w-5 text-primary-foreground" />
+            <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-[#871745]/20 shadow-sm">
+              <img
+                src={amorinhaAvatar}
+                alt="Minha Amora"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  // Fallback se imagem não carregar
+                  const parent = (e.target as HTMLImageElement).parentElement!;
+                  parent.innerHTML = '';
+                  parent.className = "flex h-10 w-10 items-center justify-center rounded-full bg-[#871745] shadow-sm";
+                  const icon = document.createElement('span');
+                  icon.textContent = '🍇';
+                  icon.className = 'text-lg';
+                  parent.appendChild(icon);
+                }}
+              />
             </div>
             <div>
-              <h1 className="font-display text-lg font-bold text-foreground">Estoque Natura</h1>
-              <p className="text-xs text-muted-foreground">Gestão inteligente de inventário</p>
+              <h1 className="font-display text-lg font-bold text-foreground">Minha Amora</h1>
+              <p className="text-xs text-muted-foreground">Gestão inteligente de estoque</p>
             </div>
           </div>
           <div className="flex items-center gap-1 relative">
@@ -202,12 +216,24 @@ export default function Index() {
             proBadge={isLocked("storefront")}
           />
         </div>
-
-        <p className="mt-10 text-center text-sm text-muted-foreground bg-secondary/30 p-4 rounded-xl border border-border/50">
-          {!isLocked("chat_assistant")
-            ? "💬 Clique no botão no canto inferior direito para conversar com a nossa Inteligência Artificial"
-            : "🔒 A Assistente de IA é uma funcionalidade exclusiva do plano PRO"}
-        </p>
+            <div className="mt-10 text-center text-sm text-muted-foreground bg-[#FDF2F7] p-4 rounded-xl border border-[#871745]/10">
+              {!isLocked("chat_assistant") ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-6 w-6 rounded-full overflow-hidden border border-[#871745]/20">
+                    <img
+                      src={amorinhaAvatar}
+                      alt="Amorinha"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <span>
+                    Converse com a <strong className="text-[#871745]">Amorinha</strong> no canto inferior direito 💜
+                  </span>
+                </div>
+              ) : (
+                <span>🔒 A Amorinha é uma funcionalidade exclusiva do plano PRO</span>
+              )}
+            </div>
       </main>
 
       {!isLocked("chat_assistant") && <ChatAssistant />}
@@ -241,8 +267,7 @@ function ActionBtn({
     <button
       onClick={onClick}
       className={`flex items-center gap-3 rounded-xl p-4 text-left transition-all hover:scale-[1.02] hover:shadow-md ${
-        primary ? "border-2 border-primary bg-primary shadow-sm" : "border border-border bg-card hover:bg-secondary/50"
-      }`}
+       primary ? "border-2 border-[#871745] bg-gradient-to-br from-[#871745] to-[#A91B60] shadow-sm" : "border border-border bg-card hover:bg-secondary/50" }`}
     >
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${primary ? "bg-white/20" : "bg-primary/10"}`}>
         <Icon className={`h-5 w-5 ${primary ? "text-primary-foreground" : "text-primary"}`} />
