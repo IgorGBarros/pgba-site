@@ -597,6 +597,11 @@
   --input: 330 20% 85%;
   --ring: 338 72% 31%;
   --radius: 0.75rem;
+    /* ── Chat ── */
+  --chat-user: 338 72% 31%;
+  --chat-user-foreground: 0 0% 100%;
+  --chat-assistant: 330 30% 97%;
+  --chat-assistant-foreground: 330 8% 17%;
 }
 
 /* ========================================
@@ -605,22 +610,70 @@
 
 /* Tema claro */
 :root:not([data-theme="dark"]) {
-  --bg-page: var(--bg-page-light);
-  --card-bg: var(--card-bg-light);
-  --card-border: var(--card-border-light);
-  --text-main: var(--text-main-light);
-  --text-sub: var(--text-sub-light);
-  --shadow: var(--shadow-light);
+  --bg-page: #0f0a0d;
+  --bg-page-alt: #1a1118;
+  --card-bg: rgba(26, 17, 24, 0.8);
+  --card-border: rgba(135, 23, 69, 0.2);
+  --text-main: #f5f0f3;
+  --text-sub: #a89ba3;
+  --shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.6);
+
+  --background: 330 20% 6%;
+  --foreground: 330 15% 95%;
+  --card: 330 20% 10%;
+  --card-foreground: 330 15% 95%;
+  --primary: 338 65% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 330 15% 15%;
+  --secondary-foreground: 330 15% 85%;
+  --muted: 330 12% 18%;
+  --muted-foreground: 330 12% 55%;
+  --accent: 338 65% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 330 15% 18%;
+  --input: 330 12% 20%;
+  --ring: 338 65% 42%;
+
+  --chat-user: 338 65% 42%;
+  --chat-user-foreground: 0 0% 100%;
+  --chat-assistant: 330 15% 15%;
+  --chat-assistant-foreground: 330 15% 90%;
 }
 
 /* Tema escuro */
 [data-theme="dark"] {
-  --bg-page: var(--bg-page-dark);
-  --card-bg: var(--card-bg-dark);
-  --card-border: var(--card-border-dark);
-  --text-main: var(--text-main-dark);
-  --text-sub: var(--text-sub-dark);
-  --shadow: var(--shadow-dark);
+  --bg-page: #0f0a0d;
+  --bg-page-alt: #1a1118;
+  --card-bg: rgba(26, 17, 24, 0.8);
+  --card-border: rgba(135, 23, 69, 0.2);
+  --text-main: #f5f0f3;
+  --text-sub: #a89ba3;
+  --shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.6);
+
+  --background: 330 20% 6%;
+  --foreground: 330 15% 95%;
+  --card: 330 20% 10%;
+  --card-foreground: 330 15% 95%;
+  --primary: 338 65% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 330 15% 15%;
+  --secondary-foreground: 330 15% 85%;
+  --muted: 330 12% 18%;
+  --muted-foreground: 330 12% 55%;
+  --accent: 338 65% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 330 15% 18%;
+  --input: 330 12% 20%;
+  --ring: 338 65% 42%;
+
+  --chat-user: 338 65% 42%;
+  --chat-user-foreground: 0 0% 100%;
+  --chat-assistant: 330 15% 15%;
+  --chat-assistant-foreground: 330 15% 90%;
 }
 
 /* ========================================
