@@ -411,6 +411,11 @@ export default function LandingPage() {
             ))}
           </div>
         
+
+            
+        </div>
+        
+      </section>
           {/* ✅ AMORINHA SUTIL NO HERO - Flutuante no canto */}
           <motion.div
             initial={{ opacity: 0, x: 40 }}
@@ -432,11 +437,6 @@ export default function LandingPage() {
               />
             </div>
           </motion.div>
-            
-        </div>
-        
-      </section>
-
       {/* ─── HOW IT WORKS ─── */}
       <section className="py-20">
         <div className="mx-auto max-w-4xl px-6">
