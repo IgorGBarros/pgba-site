@@ -558,21 +558,45 @@
    ======================================== */
 
 :root {
-  /* Cores do tema claro - mais vibrantes */
-  --bg-page-light: #f8fafc;
-  --card-bg-light: rgba(255, 255, 255, 0.85);
-  --card-border-light: rgba(0, 0, 0, 0.08);
-  --text-main-light: #0f172a;
-  --text-sub-light: #64748b;
-  --shadow-light: 0 20px 40px -10px rgba(0,0,0,0.08);
-  
-  /* Cores do tema escuro - originais */
-  --bg-page-dark: #020617;
-  --card-bg-dark: rgba(15, 23, 42, 0.6);
-  --card-border-dark: rgba(255, 255, 255, 0.1);
-  --text-main-dark: #ffffff;
-  --text-sub-dark: #94a3b8;
-  --shadow-dark: 0 30px 60px -15px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05);
+  /* ── Paleta Base (Minha Amora) ── */
+  --amora-primary: #871745;
+  --amora-primary-light: #A91B60;
+  --amora-primary-dark: #6d1239;
+  --amora-pink-soft: #FDF2F7;
+  --amora-pink-border: #f0cfe0;
+  --amora-green: #2E8B57;
+  --amora-green-light: #edf7f2;
+  --amora-text-dark: #2D292E;
+  --amora-text-muted: #6b7280;
+
+  /* ── Tema Claro (padrão) ── */
+  --bg-page: #F9EFF5;
+  --bg-page-alt: #F2F2F2;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: var(--amora-pink-border);
+  --text-main: var(--amora-text-dark);
+  --text-sub: var(--amora-text-muted);
+  --shadow: 0 4px 20px -4px rgba(135, 23, 69, 0.08);
+
+  /* ── Variáveis Tailwind (HSL) — Light ── */
+  --background: 330 30% 97%;
+  --foreground: 330 8% 17%;
+  --card: 0 0% 100%;
+  --card-foreground: 330 8% 17%;
+  --primary: 338 72% 31%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 330 30% 96%;
+  --secondary-foreground: 330 8% 17%;
+  --muted: 330 20% 94%;
+  --muted-foreground: 330 8% 45%;
+  --accent: 338 72% 31%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 330 25% 90%;
+  --input: 330 20% 85%;
+  --ring: 338 72% 31%;
+  --radius: 0.75rem;
 }
 
 /* ========================================
