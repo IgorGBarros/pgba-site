@@ -558,50 +558,21 @@
    ======================================== */
 
 :root {
-  /* ── Paleta Base (Minha Amora) ── */
-  --amora-primary: #871745;
-  --amora-primary-light: #A91B60;
-  --amora-primary-dark: #6d1239;
-  --amora-pink-soft: #FDF2F7;
-  --amora-pink-border: #f0cfe0;
-  --amora-green: #2E8B57;
-  --amora-green-light: #edf7f2;
-  --amora-text-dark: #2D292E;
-  --amora-text-muted: #6b7280;
-
-  /* ── Tema Claro (padrão) ── */
-  --bg-page: #F9EFF5;
-  --bg-page-alt: #F2F2F2;
-  --card-bg: rgba(255, 255, 255, 0.9);
-  --card-border: var(--amora-pink-border);
-  --text-main: var(--amora-text-dark);
-  --text-sub: var(--amora-text-muted);
-  --shadow: 0 4px 20px -4px rgba(135, 23, 69, 0.08);
-
-  /* ── Variáveis Tailwind (HSL) — Light ── */
-  --background: 330 30% 97%;
-  --foreground: 330 8% 17%;
-  --card: 0 0% 100%;
-  --card-foreground: 330 8% 17%;
-  --primary: 338 72% 31%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 330 30% 96%;
-  --secondary-foreground: 330 8% 17%;
-  --muted: 330 20% 94%;
-  --muted-foreground: 330 8% 45%;
-  --accent: 338 72% 31%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 330 25% 90%;
-  --input: 330 20% 85%;
-  --ring: 338 72% 31%;
-  --radius: 0.75rem;
-    /* ── Chat ── */
-  --chat-user: 338 72% 31%;
-  --chat-user-foreground: 0 0% 100%;
-  --chat-assistant: 330 30% 97%;
-  --chat-assistant-foreground: 330 8% 17%;
+  /* Cores do tema claro - mais vibrantes */
+  --bg-page-light: #f8fafc;
+  --card-bg-light: rgba(255, 255, 255, 0.85);
+  --card-border-light: rgba(0, 0, 0, 0.08);
+  --text-main-light: #0f172a;
+  --text-sub-light: #64748b;
+  --shadow-light: 0 20px 40px -10px rgba(0,0,0,0.08);
+  
+  /* Cores do tema escuro - originais */
+  --bg-page-dark: #020617;
+  --card-bg-dark: rgba(15, 23, 42, 0.6);
+  --card-border-dark: rgba(255, 255, 255, 0.1);
+  --text-main-dark: #ffffff;
+  --text-sub-dark: #94a3b8;
+  --shadow-dark: 0 30px 60px -15px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 /* ========================================
@@ -610,70 +581,22 @@
 
 /* Tema claro */
 :root:not([data-theme="dark"]) {
-  --bg-page: #0f0a0d;
-  --bg-page-alt: #1a1118;
-  --card-bg: rgba(26, 17, 24, 0.8);
-  --card-border: rgba(135, 23, 69, 0.2);
-  --text-main: #f5f0f3;
-  --text-sub: #a89ba3;
-  --shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.6);
-
-  --background: 330 20% 6%;
-  --foreground: 330 15% 95%;
-  --card: 330 20% 10%;
-  --card-foreground: 330 15% 95%;
-  --primary: 338 65% 42%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 330 15% 15%;
-  --secondary-foreground: 330 15% 85%;
-  --muted: 330 12% 18%;
-  --muted-foreground: 330 12% 55%;
-  --accent: 338 65% 42%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 70% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 330 15% 18%;
-  --input: 330 12% 20%;
-  --ring: 338 65% 42%;
-
-  --chat-user: 338 65% 42%;
-  --chat-user-foreground: 0 0% 100%;
-  --chat-assistant: 330 15% 15%;
-  --chat-assistant-foreground: 330 15% 90%;
+  --bg-page: var(--bg-page-light);
+  --card-bg: var(--card-bg-light);
+  --card-border: var(--card-border-light);
+  --text-main: var(--text-main-light);
+  --text-sub: var(--text-sub-light);
+  --shadow: var(--shadow-light);
 }
 
 /* Tema escuro */
 [data-theme="dark"] {
-  --bg-page: #0f0a0d;
-  --bg-page-alt: #1a1118;
-  --card-bg: rgba(26, 17, 24, 0.8);
-  --card-border: rgba(135, 23, 69, 0.2);
-  --text-main: #f5f0f3;
-  --text-sub: #a89ba3;
-  --shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.6);
-
-  --background: 330 20% 6%;
-  --foreground: 330 15% 95%;
-  --card: 330 20% 10%;
-  --card-foreground: 330 15% 95%;
-  --primary: 338 65% 42%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 330 15% 15%;
-  --secondary-foreground: 330 15% 85%;
-  --muted: 330 12% 18%;
-  --muted-foreground: 330 12% 55%;
-  --accent: 338 65% 42%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 70% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 330 15% 18%;
-  --input: 330 12% 20%;
-  --ring: 338 65% 42%;
-
-  --chat-user: 338 65% 42%;
-  --chat-user-foreground: 0 0% 100%;
-  --chat-assistant: 330 15% 15%;
-  --chat-assistant-foreground: 330 15% 90%;
+  --bg-page: var(--bg-page-dark);
+  --card-bg: var(--card-bg-dark);
+  --card-border: var(--card-border-dark);
+  --text-main: var(--text-main-dark);
+  --text-sub: var(--text-sub-dark);
+  --shadow: var(--shadow-dark);
 }
 
 /* ========================================
