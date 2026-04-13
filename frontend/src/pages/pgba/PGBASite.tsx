@@ -32,13 +32,13 @@ import {
   X,
 } from 'lucide-react';
 
-/* ─── ANIMATION VARIANTS ─── */
+/* ─── ANIMATION VARIANTS (OTIMIZADAS) ─── */
 const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: [0.25, 0.4, 0.25, 1] },
+    transition: { duration: 0.35, ease: [0.25, 0.4, 0.25, 1] },
   },
 };
 
@@ -46,7 +46,7 @@ const fadeIn: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { duration: 0.8 },
+    transition: { duration: 0.4 },
   },
 };
 
@@ -54,19 +54,21 @@ const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.12, delayChildren: 0.2 },
+    transition: {
+      staggerChildren: 0.06,  // Era 0.12 → 2x mais rápido
+      delayChildren: 0.05,    // Era 0.2 → 4x mais rápido
+    },
   },
 };
 
 const scaleIn: Variants = {
-  hidden: { opacity: 0, scale: 0.9 },
+  hidden: { opacity: 0, scale: 0.95 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.5, ease: [0.25, 0.4, 0.25, 1] },
+    transition: { duration: 0.3, ease: [0.25, 0.4, 0.25, 1] },
   },
 };
-
 /* ─── DATA ─── */
 const SERVICES = [
   {
@@ -155,7 +157,7 @@ const TIMELINE = [
   },
   {
     icon: Database,
-    period: 'Atualmente',
+    period: 'Contratação de Serviços - Suprimentos',
     role: 'Analista de Dados',
     description:
       'Automação de processos, BI, aplicações Power Platform e integrações SAP em empresa do setor de energia.',
@@ -261,14 +263,14 @@ export default function PGBASite() {
         <PGBALogo isDarkMode={isDarkMode} />
 
         {/* Tagline abaixo do logo */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.8 }}
-          className={`relative z-10 mt-6 text-sm md:text-base font-medium tracking-wide text-center px-4 ${
-            isDarkMode ? 'text-slate-400' : 'text-slate-500'
-          }`}
-        >
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className={`relative z-10 mt-6 text-sm md:text-base font-medium tracking-wide text-center px-4 ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-500'
+            }`}
+          >
           Transformamos dados, processos e sistemas em{' '}
           <span className="text-cyan-500 font-semibold">
             decisão, eficiência e crescimento.
@@ -279,7 +281,8 @@ export default function PGBASite() {
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 0.8 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+
           onClick={scrollToContent}
           className={`absolute bottom-8 z-10 flex flex-col items-center gap-2 cursor-pointer group ${
             isDarkMode ? 'text-slate-500' : 'text-slate-400'
@@ -1074,7 +1077,7 @@ export default function PGBASite() {
               {/* Botões de CTA */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a
-                  href="mailto:contato@pgbasolutions.com.br"
+                  href="mailto:suporte@pgbasolutions.com.br"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold text-sm sm:text-lg transition-all duration-200 shadow-[0_0_30px_-5px_rgba(6,182,212,0.5)] hover:shadow-[0_0_40px_-5px_rgba(6,182,212,0.7)] hover:scale-105 group"
                 >
                   <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1083,7 +1086,7 @@ export default function PGBASite() {
                 </a>
 
                 <a
-                  href="https://wa.me/5571999999999"
+                  href="https://wa.me/5571999772054"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-full font-semibold text-sm sm:text-base transition-all duration-200 backdrop-blur-sm ${
@@ -1109,7 +1112,7 @@ export default function PGBASite() {
                   }`}
                 >
                   <Mail className="w-4 h-4 text-cyan-500" />
-                  contato@pgbasolutions.com.br
+                  suporte@pgbasolutions.com.br
                 </div>
                 <div
                   className={`flex items-center gap-2 text-xs sm:text-sm ${

@@ -1,4 +1,4 @@
-// src/components/pgba/PGBACanvas.tsx - Canvas responsivo
+// src/components/pgba/PGBACanvas.tsx - Canvas responsivo OTIMIZADO
 import React, { useEffect, useRef } from 'react';
 
 interface Particle {
@@ -17,7 +17,7 @@ interface PGBACanvasProps {
 export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -26,15 +26,16 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // ═══════════════════════════════════════════
+    // CONFIGURAÇÃO RESPONSIVA
+    // ═══════════════════════════════════════════
+    const isMobile = window.innerWidth < 768;
+
     const updateCanvasSize = () => {
-      const isMobile = window.innerWidth < 768;
-      
       if (isMobile) {
-        // Mobile: Canvas ocupa toda a tela como fundo
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
       } else {
-        // Desktop: Canvas apenas no canto esquerdo
         canvas.width = window.innerWidth * 0.4;
         canvas.height = window.innerHeight;
       }
@@ -44,106 +45,146 @@ export const PGBACanvas: React.FC<PGBACanvasProps> = ({ isDarkMode }) => {
 
     const resizeCanvas = () => {
       updateCanvasSize();
-      
-      // Reposiciona partículas se necessário
-      particlesRef.current.forEach(particle => {
-        if (particle.x > canvas.width) particle.x = canvas.width - 50;
-        if (particle.y > canvas.height) particle.y = canvas.height - 50;
-      });
-    };
-
-    // Configurações responsivas
-    const isMobile = window.innerWidth < 768;
-    const numParticles = isMobile ? 40 : 60; // Menos partículas no mobile
-    const connectionDistance = isMobile ? 120 : 180;
-    
-    particlesRef.current = Array.from({ length: numParticles }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.3), // Movimento mais lento no mobile
-      vy: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.3),
-      radius: Math.random() * (isMobile ? 1.2 : 1.5) + (isMobile ? 0.8 : 1), // Partículas menores no mobile
-      type: Math.random() > 0.5 ? 1 : 2,
-    }));
-
-    const getParticleColor = (type: number) => {
-      if (isDarkMode) {
-        return type === 1 ? '#38bdf8' : '#c026d3';
-      } else {
-        return type === 1 ? '#0066ff' : '#cc0099';
+      const particles = particlesRef.current;
+      for (let i = 0; i < particles.length; i++) {
+        if (particles[i].x > canvas.width) particles[i].x = canvas.width - 50;
+        if (particles[i].y > canvas.height) particles[i].y = canvas.height - 50;
       }
     };
 
+    // ═══════════════════════════════════════════
+    // PARÂMETROS DE PERFORMANCE
+    // ═══════════════════════════════════════════
+    const numParticles = isMobile ? 35 : 60;
+    const connectionDistance = isMobile ? 120 : 180;
+    // ✅ PRÉ-CALCULAR o quadrado da distância (evita sqrt no loop)
+    const connectionDistSq = connectionDistance * connectionDistance;
+
+    // ✅ PRÉ-CALCULAR cores (evita recalcular a cada frame)
+    const particleColor1 = isDarkMode ? '#38bdf8' : '#0066ff';
+    const particleColor2 = isDarkMode ? '#c026d3' : '#cc0099';
+    const lineRgbDark = '139, 92, 246';
+    const lineRgb1Light = '0, 102, 255';
+    const lineRgb2Light = '204, 0, 153';
+
+    const particleShadowBlur = isDarkMode
+      ? (isMobile ? 4 : 6)
+      : (isMobile ? 8 : 10);
+
+    const lineWidthThick = isMobile ? 1.5 : 2;
+    const lineWidthThin = isMobile ? 1 : 1.5;
+
+    // ═══════════════════════════════════════════
+    // INICIALIZAR PARTÍCULAS
+    // ═══════════════════════════════════════════
+    particlesRef.current = Array.from({ length: numParticles }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.3),
+      vy: (Math.random() - 0.5) * (isMobile ? 0.2 : 0.3),
+      radius: Math.random() * (isMobile ? 1.2 : 1.5) + (isMobile ? 0.8 : 1),
+      type: Math.random() > 0.5 ? 1 : 2,
+    }));
+
+    const getParticleColor = (type: number): string => {
+      return type === 1 ? particleColor1 : particleColor2;
+    };
+
+    // ═══════════════════════════════════════════
+    // LOOP DE ANIMAÇÃO OTIMIZADO
+    // ═══════════════════════════════════════════
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      particlesRef.current.forEach((particle, i) => {
-        // Update position
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-        
-        if (particle.x < 0 || particle.x > canvas.width) {
-          particle.vx *= -1;
-          particle.x = Math.max(0, Math.min(canvas.width, particle.x));
-        }
-        if (particle.y < 0 || particle.y > canvas.height) {
-          particle.vy *= -1;
-          particle.y = Math.max(0, Math.min(canvas.height, particle.y));
-        }
 
-        // Draw particle
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        ctx.fillStyle = getParticleColor(particle.type);
-        ctx.shadowBlur = isDarkMode ? (isMobile ? 6 : 8) : (isMobile ? 10 : 15);
-        ctx.shadowColor = getParticleColor(particle.type);
-        ctx.fill();
+      const particles = particlesRef.current;
+      const len = particles.length;
+      const w = canvas.width;
+      const h = canvas.height;
 
-        // Draw connections
-        particlesRef.current.slice(i + 1).forEach((otherParticle) => {
-          const dx = particle.x - otherParticle.x;
-          const dy = particle.y - otherParticle.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < connectionDistance) {
-            ctx.beginPath();
-            const opacity = 1 - (distance / connectionDistance);
-            
-            let rgbLine, lineOpacity;
-            if (isDarkMode) {
-              rgbLine = '139, 92, 246';
-              lineOpacity = opacity * 0.6;
-            } else {
-              rgbLine = particle.type === 1 ? '0, 102, 255' : '204, 0, 153';
-              lineOpacity = opacity * 0.8;
-            }
-            
-            ctx.strokeStyle = `rgba(${rgbLine}, ${lineOpacity})`;
-            ctx.lineWidth = opacity > 0.7 ? (isMobile ? 1.5 : 2) : (isMobile ? 1 : 1.5);
-            ctx.moveTo(particle.x, particle.y);
-            ctx.lineTo(otherParticle.x, otherParticle.y);
-            
-            if (!isDarkMode) {
-              ctx.shadowBlur = isMobile ? 3 : 5;
-              ctx.shadowColor = `rgba(${rgbLine}, 0.4)`;
-            }
-            
-            ctx.stroke();
-            
-            if (opacity > 0.8) {
-              if (isDarkMode) {
-                ctx.strokeStyle = `rgba(139, 92, 246, ${opacity * 0.2})`;
-                ctx.lineWidth = isMobile ? 1.5 : 2;
-              } else {
-                ctx.strokeStyle = `rgba(${rgbLine}, ${opacity * 0.3})`;
-                ctx.lineWidth = isMobile ? 2 : 2.5;
-                ctx.shadowBlur = isMobile ? 6 : 8;
-              }
-              ctx.stroke();
-            }
+      // ─── FASE 1: Atualizar posições (separado do draw) ───
+      for (let i = 0; i < len; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0 || p.x > w) {
+          p.vx *= -1;
+          p.x = p.x < 0 ? 0 : w;
+        }
+        if (p.y < 0 || p.y > h) {
+          p.vy *= -1;
+          p.y = p.y < 0 ? 0 : h;
+        }
+      }
+
+      // ─── FASE 2: Desenhar conexões (SEM shadowBlur) ───
+      // ✅ CRÍTICO: shadowBlur = 0 durante conexões
+      //    shadowBlur força composição por pixel = MUITO caro
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+
+      for (let i = 0; i < len; i++) {
+        const p = particles[i];
+
+        for (let j = i + 1; j < len; j++) {
+          const other = particles[j];
+          const dx = p.x - other.x;
+          const dy = p.y - other.y;
+
+          // ✅ EARLY EXIT: se um eixo já excede, pula
+          //    Evita sqrt em ~60% dos pares
+          if (dx > connectionDistance || dx < -connectionDistance) continue;
+          if (dy > connectionDistance || dy < -connectionDistance) continue;
+
+          // ✅ Comparar distância ao quadrado (evita sqrt)
+          const distSq = dx * dx + dy * dy;
+          if (distSq >= connectionDistSq) continue;
+
+          // Só calcula sqrt quando realmente precisa da opacity
+          const distance = Math.sqrt(distSq);
+          const opacity = 1 - (distance / connectionDistance);
+
+          let rgbLine: string;
+          if (isDarkMode) {
+            rgbLine = lineRgbDark;
+          } else {
+            rgbLine = p.type === 1 ? lineRgb1Light : lineRgb2Light;
           }
-        });
-      });
+
+          const lineOpacity = isDarkMode
+            ? opacity * 0.6
+            : opacity * 0.8;
+
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(${rgbLine}, ${lineOpacity})`;
+          ctx.lineWidth = opacity > 0.7 ? lineWidthThick : lineWidthThin;
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(other.x, other.y);
+          ctx.stroke();
+
+          // ✅ REMOVIDO: segundo ctx.stroke() duplicado
+          //    O original fazia stroke() duas vezes para opacity > 0.8
+          //    Isso dobrava draw calls sem ganho visual perceptível
+        }
+      }
+
+      // ─── FASE 3: Desenhar partículas (COM shadowBlur, uma vez) ───
+      // ✅ Ativar shadowBlur apenas para partículas (poucos elementos)
+      for (let i = 0; i < len; i++) {
+        const p = particles[i];
+        const color = getParticleColor(p.type);
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.shadowBlur = particleShadowBlur;
+        ctx.shadowColor = color;
+        ctx.fill();
+      }
+
+      // ✅ Reset shadow para próximo frame (evita leak)
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
 
       animationRef.current = requestAnimationFrame(animate);
     };
