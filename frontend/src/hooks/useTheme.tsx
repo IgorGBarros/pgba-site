@@ -11,7 +11,7 @@ interface ThemeCtx {
 const ThemeContext = createContext<ThemeCtx>({
   theme: "system",
   setTheme: () => {},
-  resolved: "light",
+  resolved: "dark",
 });
 
 function getSystemTheme(): "light" | "dark" {
