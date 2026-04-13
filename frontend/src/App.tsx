@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./hooks/useTheme";
 
 // Páginas
-import PGBA from "./pages/pgba/PGBA";
+
 import PGBANeural from "./pages/pgba/PGBANeural";
 import PGBASite from "./pages/pgba/PGBASite";
 
@@ -34,8 +34,8 @@ const App = () => (
         >
           <AppLayout>
             <Routes>
-              <Route path="/" element={<Navigate to="/pgba" replace />} />
-              <Route path="/pgba" element={<PGBA />} />
+              <Route path="/" element={<Navigate to="/site" replace />} />
+ 
               <Route path="/site" element={<PGBASite />} />
               <Route path="/neural" element={<PGBANeural />} />
             </Routes>
