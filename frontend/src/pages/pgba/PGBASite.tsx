@@ -11,6 +11,9 @@ import { useTheme } from '../../hooks/useTheme';
 import { PGBACanvas } from '../../components/pgba/PGBACanvas';
 import { PGBALogo } from '../../components/pgba/PGBALogo';
 import { ThemeToggle } from '../../components/pgba/ThemeToggle';
+
+import { CookieConsentBanner } from '../../components/pgba/CookieConsentBanner';
+import { useAnalytics } from '../../hooks/useAnalytics';
 import {
   ArrowRight, ArrowDown, BarChart4, Cpu, Code2, Terminal, Globe,
   Factory, LineChart, CheckCircle, Mail, Phone, MapPin, ShoppingBag,
@@ -242,6 +245,7 @@ const NAV_LINKS = [
 /* ─── MAIN COMPONENT ─── */
 export default function PGBASite() {
   const { theme, setTheme } = useTheme();
+  const { trackPageView, trackEvent } = useAnalytics();
   const isDark = theme === 'dark';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -257,14 +261,64 @@ export default function PGBASite() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+   // Track pageview ao carregar e ao mudar de hash (SPA navigation)
+  useEffect(() => {
+    trackPageView(window.location.pathname + window.location.hash, document.title);
+    
+    const handleHashChange = () => {
+      trackPageView(window.location.pathname + window.location.hash, document.title);
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [trackPageView]);
+
+  // Helper para classes condicionais
+
+
   // Helper for conditional classes
   const dc = (dark: string, light: string) => (isDark ? dark : light);
 
   return (
+    
     <div className={`min-h-screen font-outfit selection:bg-cyan-500/30 overflow-x-hidden transition-colors duration-500 ${
       dc('bg-slate-950 text-slate-50', 'bg-slate-50 text-slate-900')
     }`}>
-
+      <CookieConsentBanner />
+      {/* ← Script do GA4 com Consent Mode v2 (carrega sempre, mas só envia dados com consentimento) */}
+ 
+{/* ─── GOOGLE ANALYTICS 4 + CONSENT MODE V2 ─── */}
+{import.meta.env.VITE_GA4_ID && (
+  <>
+    <script async src={`https://www.googletagmanager.com/gtag/js?id=${import.meta.env.VITE_GA4_ID}`} />
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          
+          // Consent Mode v2 - padrão: NEGADO até usuário aceitar (LGPD)
+          gtag('consent', 'default', {
+            'ad_storage': 'denied',
+            'analytics_storage': 'denied',
+            'ad_user_data': 'denied',
+            'ad_personalization': 'denied',
+            'wait_for_update': 500
+          });
+          
+          // Inicializa GA4 com configurações de privacidade
+          gtag('js', new Date());
+          gtag('config', '${import.meta.env.VITE_GA4_ID}', {
+            'anonymize_ip': true,
+            'allow_google_signals': false,
+            'allow_ad_personalization_signals': false,
+            'page_path': window.location.pathname
+          });
+        `,
+      }}
+    />
+  </>
+)}
       {/* ═══════════════════════════════════════
           SECTION 0 — NEURAL HERO (CAPA)
          ═══════════════════════════════════════ */}
