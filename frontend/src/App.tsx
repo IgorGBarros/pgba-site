@@ -11,6 +11,8 @@ import { ThemeProvider } from "./hooks/useTheme";
 import PGBANeural from "./pages/pgba/PGBANeural";
 import PGBASite from "./pages/pgba/PGBASite";
 import Portfolio from "./pages/pgba/Portfolio";
+import TermsOfUse from "./pages/TermsOfUse";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -36,7 +38,9 @@ const App = () => (
           <AppLayout>
             <Routes>
               <Route path="/" element={<Navigate to="/site" replace />} />
-             <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/privacidade" element={<PrivacyPolicy />} />
+              <Route path="/termos" element={<TermsOfUse />} />
               <Route path="/site" element={<PGBASite />} />
               <Route path="/neural" element={<PGBANeural />} />
             </Routes>

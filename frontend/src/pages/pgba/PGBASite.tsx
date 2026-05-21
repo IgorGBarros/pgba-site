@@ -1250,6 +1250,7 @@ export default function PGBASite() {
                 >
                   {link.label}
                 </a>
+                
               ))}
             </div>
           </div>
@@ -1260,6 +1261,14 @@ export default function PGBASite() {
               dc('border-slate-800/50 text-slate-500', 'border-slate-200 text-slate-400')
             }`}
           >
+            {/* No footer do PGBASite.tsx */}
+            <a href="/privacidade" className="hover:text-cyan-500 transition-colors">
+              Política de Privacidade
+            </a>
+            {' • '}
+            <a href="/termos" className="hover:text-cyan-500 transition-colors">
+              Termos de Uso
+            </a>
             <p className="mb-2 font-medium">
               © {new Date().getFullYear()} PGBA Solutions Technologies.
               Todos os direitos reservados.
