@@ -1,9 +1,10 @@
 // src/pages/PGBASite.tsx
 // Decisão arquitetural: Este componente é o orquestrador da página.
 // Cada seção é um componente separado para evitar re-renders desnecessários.
-// Dados estáticos ficam em pgbaSiteData.ts.
+// Dados estáticos ficam inline (migrar para pgbaSiteData.ts quando crescer).
+// v2.0 — Adicionada vertical IoT & Smart Kiosk Systems como produto destaque.
 
-import React, { useRef, useState, lazy, Suspense } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../hooks/useTheme';
 import { PGBACanvas } from '../../components/pgba/PGBACanvas';
@@ -15,6 +16,8 @@ import {
   Factory, LineChart, CheckCircle, Mail, Phone, MapPin, ShoppingBag,
   Brain, Database, Shield, Users, TrendingUp, Sparkles, ExternalLink,
   ChevronRight, Menu, X,
+  // Novos ícones para IoT/Kiosk
+  Wifi, Thermometer, CreditCard, Monitor, Box, Zap, Settings, Radio,
 } from 'lucide-react';
 
 /* ─── ANIMATION VARIANTS ─── */
@@ -84,11 +87,22 @@ const COLOR_MAP = {
     iconColor: 'text-emerald-400',
     checkColor: 'text-emerald-400',
   },
+  amber: {
+    text: 'text-amber-400', textLight: 'text-amber-600',
+    bg: 'bg-amber-500/10', bgLight: 'bg-amber-50',
+    hoverBorder: 'hover:border-amber-500/50', hoverBorderLight: 'hover:border-amber-300',
+    glow: 'from-amber-500/5',
+    gradient: 'from-amber-500/20 to-orange-500/20',
+    ring: 'ring-amber-500/20',
+    iconColor: 'text-amber-400',
+    checkColor: 'text-amber-400',
+  },
 } as const;
 
 type ColorKey = keyof typeof COLOR_MAP;
 
 /* ─── DATA ─── */
+
 const SERVICES = [
   {
     icon: BarChart4,
@@ -110,6 +124,13 @@ const SERVICES = [
     description: 'Desenvolvimento fullstack end-to-end. Construímos SaaS internos, portais e integramos modelos de IA treinados nos seus dados.',
     features: ['React / Node / Python', 'Deploy com Docker & Cloud', 'IA aplicada a negócios'],
     color: 'blue' as ColorKey,
+  },
+  {
+    icon: Radio,
+    title: 'IoT & Sistemas Kiosk',
+    description: 'Sistemas completos para vending machines e kiosks inteligentes com integração IoT, sensores, pagamento automatizado e monitoramento remoto.',
+    features: ['Raspberry Pi & Sensores', 'Pagamento PIX / Cartão integrado', 'Painel de monitoramento remoto'],
+    color: 'amber' as ColorKey,
   },
 ];
 
@@ -152,6 +173,12 @@ const CASES = [
     description: 'Workflows automatizados com Power Platform, integrações SAP e eliminação de processos manuais repetitivos.',
     tags: ['Power Automate', 'SAP', 'RPA'], icon: Cpu, color: 'blue' as ColorKey,
   },
+  {
+    sector: 'Varejo & IoT', title: 'Vending Machine Inteligente',
+    description: 'Sistema completo de vending machine com arquitetura em 3 camadas: backend centralizado com API REST, painel administrativo web e cliente embarcado com integração IoT, sensores de telemetria e pagamento PIX automatizado.',
+    tags: ['Django', 'React', 'Raspberry Pi', 'IoT', 'PIX'],
+    icon: Radio, color: 'amber' as ColorKey,
+  },
 ];
 
 const MINHA_AMORA_FEATURES = [
@@ -159,6 +186,17 @@ const MINHA_AMORA_FEATURES = [
   { icon: TrendingUp, title: 'Apoio à Decisão', description: 'Saiba exatamente o que comprar, quando comprar e quanto investir baseado nos seus dados.' },
   { icon: Users, title: 'Feito para Consultoras', description: 'Interface simples e intuitiva, pensada para quem não é técnica mas precisa de controle.' },
   { icon: Sparkles, title: 'Diferente de Tudo', description: 'Não é planilha, não é genérico. É inteligência real para o seu negócio de revenda.' },
+];
+
+const IOT_KIOSK_FEATURES = [
+  { icon: Monitor, title: 'Kiosk Fullscreen', description: 'Interface touchscreen otimizada para TVs e displays comerciais com autostart e modo quiosque.' },
+  { icon: Thermometer, title: 'Sensores & Telemetria', description: 'Monitoramento em tempo real de temperatura, umidade, energia, vazão e conectividade.' },
+  { icon: CreditCard, title: 'Pagamento Integrado', description: 'PIX com QR Code em tempo real, polling automático de confirmação e suporte a cartão.' },
+  { icon: Wifi, title: 'Monitoramento Remoto', description: 'Heartbeat automático, detecção online/offline, alertas e painel administrativo centralizado.' },
+  { icon: Box, title: 'Controle de Estoque', description: 'Gestão de produtos e variantes com preços dinâmicos configuráveis remotamente.' },
+  { icon: Zap, title: 'Acionamento IoT', description: 'Controle GPIO para relés e atuadores com validação de segurança via backend antes da liberação.' },
+  { icon: Settings, title: 'Replicação Automatizada', description: 'Script de setup para novas máquinas com hostname único, configuração automática e deploy simplificado.' },
+  { icon: Shield, title: 'Segurança por API Key', description: 'Cada dispositivo possui chave de autenticação única com comunicação segura via Bearer Token.' },
 ];
 
 const NAV_LINKS = [
@@ -277,11 +315,9 @@ export default function PGBASite() {
                 </svg>
               )}
             </button>
-
             <a href="#contato" className="hidden sm:inline-flex px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-full hover:from-cyan-400 hover:to-blue-400 transition-all duration-200 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-105">
               Fale Conosco
             </a>
-
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={`lg:hidden p-2 rounded-lg ${dc('text-slate-400 hover:bg-slate-800', 'text-slate-500 hover:bg-slate-100')}`}
@@ -292,7 +328,7 @@ export default function PGBASite() {
           </div>
         </div>
 
-        {/* Mobile Menu — com AnimatePresence para exit animation */}
+        {/* Mobile Menu */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
@@ -353,14 +389,10 @@ export default function PGBASite() {
               <Users className="w-3.5 h-3.5" />
               Nossa Origem
             </motion.div>
-
             <motion.h2 variants={fadeUp} className={`text-2xl sm:text-3xl md:text-4xl font-bold mb-4 ${dc('text-white', 'text-slate-900')}`}>
               Tecnologia com{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-violet-500">visão de negócio.</span>
-
-
             </motion.h2>
-
             <motion.p
               variants={fadeUp}
               className={`text-base sm:text-lg leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}
@@ -374,9 +406,7 @@ export default function PGBASite() {
 
           {/* Timeline do Fundador */}
           <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
+            initial="hidden" whileInView="visible" viewport={{ once: true }}
             variants={staggerContainer}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
@@ -388,29 +418,19 @@ export default function PGBASite() {
                   variants={fadeUp}
                   className={`relative p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 group ${
                     isDark
-                      ? `bg-slate-900/50 border-slate-800/50 hover:bg-slate-800/50`
-                      : `bg-white/80 border-slate-200 hover:bg-slate-50 hover:shadow-lg`
+                      ? 'bg-slate-900/50 border-slate-800/50 hover:bg-slate-800/50'
+                      : 'bg-white/80 border-slate-200 hover:bg-slate-50 hover:shadow-lg'
                   }`}
                 >
-                  {/* Connector line (desktop) */}
                   {i < TIMELINE.length - 1 && (
                     <div className="hidden lg:block absolute top-1/2 -right-3 w-6 h-px bg-gradient-to-r from-slate-600 to-transparent" />
                   )}
-
-                  <div
-                    className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}
-                  >
+                  <div className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
                     <item.icon className={`w-6 h-6 ${colors.text}`} />
                   </div>
-
-                  <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${colors.text}`}>
-                    {item.period}
-                  </div>
-
-                  <h3 className={`text-base font-bold mb-2 ${dc('text-white', 'text-slate-900')}`}>
+                                   <h3 className={`text-base font-bold mb-2 ${dc('text-white', 'text-slate-900')}`}>
                     {item.role}
                   </h3>
-
                   <p className={`text-sm leading-relaxed ${dc('text-slate-400', 'text-slate-500')}`}>
                     {item.description}
                   </p>
@@ -448,7 +468,7 @@ export default function PGBASite() {
       </section>
 
       {/* ═══════════════════════════════════════
-          SECTION 2 — SERVIÇOS
+          SECTION 2 — SERVIÇOS (agora com 4 cards incluindo IoT)
          ═══════════════════════════════════════ */}
       <section
         id="servicos"
@@ -473,7 +493,6 @@ export default function PGBASite() {
               <Terminal className="w-3.5 h-3.5" />
               Serviços
             </motion.div>
-
             <motion.h2
               variants={fadeUp}
               className={`text-2xl sm:text-3xl md:text-4xl font-bold mb-4 ${dc('text-white', 'text-slate-900')}`}
@@ -483,7 +502,6 @@ export default function PGBASite() {
                 impactam seu resultado.
               </span>
             </motion.h2>
-
             <motion.p
               variants={fadeUp}
               className={`text-base sm:text-lg leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}
@@ -493,13 +511,13 @@ export default function PGBASite() {
             </motion.p>
           </motion.div>
 
-          {/* Service Cards — usando COLOR_MAP para classes JIT-safe */}
+          {/* Service Cards — 4 cards (2x2 em desktop grande, 1 col em mobile) */}
           <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
             variants={staggerContainer}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8"
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 sm:gap-8"
           >
             {SERVICES.map((service, i) => {
               const colors = COLOR_MAP[service.color];
@@ -518,15 +536,12 @@ export default function PGBASite() {
                   >
                     <service.icon className={`w-6 h-6 sm:w-7 sm:h-7 ${colors.iconColor}`} />
                   </div>
-
                   <h3 className={`text-lg sm:text-xl font-bold mb-3 ${dc('text-white', 'text-slate-900')}`}>
                     {service.title}
                   </h3>
-
                   <p className={`leading-relaxed mb-6 text-sm sm:text-base ${dc('text-slate-300', 'text-slate-600')}`}>
                     {service.description}
                   </p>
-
                   <ul className="space-y-2">
                     {service.features.map((feature, j) => (
                       <li
@@ -546,7 +561,9 @@ export default function PGBASite() {
       </section>
 
       {/* ═══════════════════════════════════════
-          SECTION 3 — PRODUTOS (MINHA AMORA)
+          SECTION 3 — PRODUTOS (MINHA AMORA + IoT KIOSK)
+          Decisão: Dois produtos com destaque equivalente.
+          Minha Amora = pink/rose, IoT Kiosk = amber/orange.
          ═══════════════════════════════════════ */}
       <section
         id="produtos"
@@ -565,34 +582,31 @@ export default function PGBASite() {
             <motion.div
               variants={fadeUp}
               className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest mb-6 backdrop-blur-sm ${
-                dc('bg-slate-900/80 border-slate-700/50 text-violet-400', 'bg-slate-50/80 border-slate-200/50 text-violet-600')
+                dc('bg-slate-900/80 border-slate-700/50 text-cyan-400', 'bg-slate-50/80 border-slate-200/50 text-cyan-600')
               }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              Nossos Produtos
+              <Sparkles className="w-3.5 h-3.5" />
+              Nossos Produtos & Soluções
             </motion.div>
-
             <motion.h2
               variants={fadeUp}
               className={`text-2xl sm:text-3xl md:text-4xl font-bold mb-4 ${dc('text-white', 'text-slate-900')}`}
             >
-              Minha Amora
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-500">
-                {' '}🌸
+              Tecnologia própria para{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-amber-500 to-orange-500">
+                negócios reais.
               </span>
             </motion.h2>
-
             <motion.p
               variants={fadeUp}
               className={`text-base sm:text-lg leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}
             >
-              Gestão de estoque inteligente para consultoras e revendedoras.
-              Diferente de tudo que existe no mercado — feito por quem entende
-              de dados e de negócio.
+              Do varejo inteligente à automação industrial — desenvolvemos
+              produtos que resolvem problemas reais com engenharia de verdade.
             </motion.p>
           </motion.div>
 
-          {/* Product Hero Card */}
+          {/* ─── PRODUTO 1: MINHA AMORA ─── */}
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -605,7 +619,6 @@ export default function PGBASite() {
               )
             }`}
           >
-            {/* Glow decorativo */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-pink-500/10 to-rose-500/10 blur-3xl" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-violet-500/10 to-cyan-500/10 blur-3xl" />
 
@@ -621,24 +634,22 @@ export default function PGBASite() {
                       )
                     }`}
                   >
-                    <Sparkles className="w-3 h-3" />
+                    <ShoppingBag className="w-3 h-3" />
                     SaaS — Produto Próprio PGBA
                   </div>
-
                   <h3 className={`text-2xl sm:text-3xl font-bold ${dc('text-white', 'text-slate-900')}`}>
-                    O estoque da sua revenda,{' '}
+                    Minha Amora 🌸
+                    <br />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-500">
-                      finalmente inteligente.
+                      Estoque finalmente inteligente.
                     </span>
                   </h3>
-
                   <p className={`text-sm sm:text-base leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}>
                     Pensado para consultoras da Natura, Avon, Boticário, Mary
                     Kay e outras marcas. Não é planilha, não é genérico. É uma
                     ferramenta que entende o seu negócio e te ajuda a tomar
                     decisões melhores todos os dias.
                   </p>
-
                   <div className="flex flex-col sm:flex-row gap-3">
                     <a
                       href="#contato"
@@ -692,11 +703,196 @@ export default function PGBASite() {
               </div>
             </div>
           </motion.div>
+
+          {/* ─── PRODUTO 2: IoT & SMART KIOSK SYSTEMS ───
+              Decisão arquitetural: Mesmo nível de destaque que Minha Amora.
+              Identidade visual: amber/orange (diferencia do pink/rose).
+              Anonimizado: não cita "Oogelo" ou "ICE Machine" [1].
+              8 features para mostrar profundidade técnica.
+          ─── */}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={fadeUp}
+            className={`relative rounded-2xl sm:rounded-3xl border overflow-hidden ${
+              dc(
+                'bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20 border-slate-800/50',
+                'bg-gradient-to-br from-white via-white to-amber-50 border-slate-200 shadow-xl'
+              )
+            }`}
+          >
+            {/* Glows decorativos */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-orange-500/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-cyan-500/10 to-emerald-500/10 blur-3xl" />
+
+            <div className="relative z-10 p-8 sm:p-12 md:p-16">
+              <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-center">
+                {/* Left: Info */}
+                <div className="lg:w-1/2 space-y-6">
+                  <div
+                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                      dc(
+                        'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20',
+                        'bg-amber-50 text-amber-600 ring-1 ring-amber-200'
+                      )
+                    }`}
+                  >
+                    <Radio className="w-3 h-3" />
+                    IoT & Sistemas Embarcados — Expertise PGBA
+                  </div>
+                  <h3 className={`text-2xl sm:text-3xl font-bold ${dc('text-white', 'text-slate-900')}`}>
+                    Smart Kiosk &{' '}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500">
+                      Vending Machine Systems
+                    </span>
+                  </h3>
+                  <p className={`text-sm sm:text-base leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}>
+                    Desenvolvimento end-to-end de sistemas inteligentes para
+                    vending machines e kiosks de autoatendimento. Arquitetura em
+                    3 camadas — backend centralizado, painel administrativo web e
+                    cliente embarcado com IoT — integrando sensores, pagamento
+                    automatizado e monitoramento remoto em tempo real.
+                  </p>
+
+                  {/* Tech Stack Tags */}
+                  <div className="flex flex-wrap gap-2">
+                    {['Django', 'React', 'Raspberry Pi', 'IoT Sensors', 'PIX / Cartão', 'Docker', 'PostgreSQL', 'GPIO'].map((tag) => (
+                      <span
+                        key={tag}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          dc(
+                            'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20',
+                            'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                          )
+                        }`}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <a
+                      href="#contato"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-105 group"
+                    >
+                      Solicitar Orçamento
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </a>
+                    <span
+                      className={`inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-medium ${
+                        dc(
+                          'text-slate-400 bg-slate-800/50 ring-1 ring-slate-700/50',
+                          'text-slate-500 bg-slate-100 ring-1 ring-slate-200'
+                        )
+                      }`}
+                    >
+                      Projetos sob demanda
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right: Features Grid — 8 features (4x2) */}
+                <div className="lg:w-1/2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {IOT_KIOSK_FEATURES.map((feature, i) => (
+                    <motion.div
+                      key={i}
+                      variants={scaleIn}
+                      className={`p-5 rounded-xl border transition-all duration-300 group ${
+                        dc(
+                          'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/60 hover:border-amber-500/30',
+                          'bg-white/80 border-slate-200 hover:shadow-lg hover:border-amber-300'
+                        )
+                      }`}
+                    >
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform ${
+                          dc('bg-amber-500/10', 'bg-amber-50')
+                        }`}
+                      >
+                        <feature.icon className={`w-5 h-5 ${dc('text-amber-400', 'text-amber-500')}`} />
+                      </div>
+                      <h4 className={`text-sm font-bold mb-1 ${dc('text-white', 'text-slate-900')}`}>
+                        {feature.title}
+                      </h4>
+                      <p className={`text-xs leading-relaxed ${dc('text-slate-400', 'text-slate-500')}`}>
+                        {feature.description}
+                      </p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Arquitetura Visual — Diagrama simplificado */}
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+                className={`mt-12 p-6 sm:p-8 rounded-2xl border ${
+                  dc('bg-slate-800/30 border-slate-700/50', 'bg-slate-50 border-slate-200')
+                }`}
+              >
+                <h4 className={`text-sm font-bold uppercase tracking-wider mb-6 text-center ${
+                  dc('text-amber-400', 'text-amber-600')
+                }`}>
+                  Arquitetura do Sistema
+                </h4>
+                <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
+                  {/* Kiosk */}
+                  <div className={`flex flex-col items-center p-4 rounded-xl border min-w-[160px] ${
+                    dc('bg-slate-900/50 border-slate-700/50', 'bg-white border-slate-200')
+                  }`}>
+                    <Monitor className={`w-8 h-8 mb-2 ${dc('text-amber-400', 'text-amber-500')}`} />
+                    <span className={`text-xs font-bold ${dc('text-white', 'text-slate-900')}`}>Kiosk / Display</span>
+                    <span className={`text-[10px] mt-1 ${dc('text-slate-500', 'text-slate-400')}`}>React Fullscreen</span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className={`text-2xl ${dc('text-slate-600', 'text-slate-300')} rotate-90 md:rotate-0`}>→</div>
+
+                  {/* Raspberry Pi */}
+                  <div className={`flex flex-col items-center p-4 rounded-xl border min-w-[160px] ${
+                    dc('bg-slate-900/50 border-slate-700/50', 'bg-white border-slate-200')
+                  }`}>
+                    <Cpu className={`w-8 h-8 mb-2 ${dc('text-emerald-400', 'text-emerald-500')}`} />
+                    <span className={`text-xs font-bold ${dc('text-white', 'text-slate-900')}`}>Raspberry Pi</span>
+                    <span className={`text-[10px] mt-1 ${dc('text-slate-500', 'text-slate-400')}`}>IoT + Sensores + GPIO</span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className={`text-2xl ${dc('text-slate-600', 'text-slate-300')} rotate-90 md:rotate-0`}>→</div>
+
+                  {/* Backend */}
+                  <div className={`flex flex-col items-center p-4 rounded-xl border min-w-[160px] ${
+                    dc('bg-slate-900/50 border-slate-700/50', 'bg-white border-slate-200')
+                  }`}>
+                    <Database className={`w-8 h-8 mb-2 ${dc('text-blue-400', 'text-blue-500')}`} />
+                    <span className={`text-xs font-bold ${dc('text-white', 'text-slate-900')}`}>Backend Central</span>
+                    <span className={`text-[10px] mt-1 ${dc('text-slate-500', 'text-slate-400')}`}>Django + PostgreSQL</span>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className={`text-2xl ${dc('text-slate-600', 'text-slate-300')} rotate-90 md:rotate-0`}>→</div>
+
+                  {/* Admin Panel */}
+                  <div className={`flex flex-col items-center p-4 rounded-xl border min-w-[160px] ${
+                    dc('bg-slate-900/50 border-slate-700/50', 'bg-white border-slate-200')
+                  }`}>
+                    <BarChart4 className={`w-8 h-8 mb-2 ${dc('text-violet-400', 'text-violet-500')}`} />
+                    <span className={`text-xs font-bold ${dc('text-white', 'text-slate-900')}`}>Painel Admin</span>
+                    <span className={`text-[10px] mt-1 ${dc('text-slate-500', 'text-slate-400')}`}>React + Dashboard</span>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ═══════════════════════════════════════
-          SECTION 4 — CASES ANONIMIZADOS
+          SECTION 4 — CASES ANONIMIZADOS (agora com 4 cases)
           Decisão: Cases são anonimizados por setor,
           sem citar empresas como clientes da PGBA [1]
          ═══════════════════════════════════════ */}
@@ -723,7 +919,6 @@ export default function PGBASite() {
               <Shield className="w-3.5 h-3.5" />
               Projetos & Cases
             </motion.div>
-
             <motion.h2
               variants={fadeUp}
               className={`text-2xl sm:text-3xl md:text-4xl font-bold mb-4 ${dc('text-white', 'text-slate-900')}`}
@@ -733,7 +928,6 @@ export default function PGBASite() {
                 setores reais.
               </span>
             </motion.h2>
-
             <motion.p
               variants={fadeUp}
               className={`text-base sm:text-lg leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}
@@ -744,13 +938,13 @@ export default function PGBASite() {
             </motion.p>
           </motion.div>
 
-          {/* Cases Grid — COLOR_MAP para classes JIT-safe */}
+          {/* Cases Grid — 4 cards (2x2) com COLOR_MAP para JIT-safe */}
           <motion.div
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
             variants={staggerContainer}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
             {CASES.map((caseItem, i) => {
               const colors = COLOR_MAP[caseItem.color];
@@ -768,28 +962,23 @@ export default function PGBASite() {
                   <div
                     className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colors.glow} to-transparent blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
                   />
-
                   <div className="relative z-10">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
                       isDark ? colors.bg : colors.bgLight
                     }`}>
                       <caseItem.icon className={`w-6 h-6 ${isDark ? colors.text : colors.textLight}`} />
                     </div>
-
                     <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${
                       isDark ? colors.text : colors.textLight
                     }`}>
                       {caseItem.sector}
                     </div>
-
                     <h3 className={`text-lg font-bold mb-3 ${dc('text-white', 'text-slate-900')}`}>
                       {caseItem.title}
                     </h3>
-
                     <p className={`text-sm leading-relaxed mb-4 ${dc('text-slate-400', 'text-slate-500')}`}>
                       {caseItem.description}
                     </p>
-
                     <div className="flex flex-wrap gap-2">
                       {caseItem.tags.map((tag, j) => (
                         <span
@@ -844,10 +1033,9 @@ export default function PGBASite() {
                   seu negócio?
                 </span>
               </h2>
-
               <p className={`text-base sm:text-lg mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}>
                 Vamos conversar sobre como a PGBA Solutions pode ajudar sua
-                empresa com dados, automação, software e inteligência
+                empresa com dados, automação, software, IoT e inteligência
                 artificial. Agende uma conversa sem compromisso.
               </p>
 
@@ -861,7 +1049,6 @@ export default function PGBASite() {
                   Enviar E-mail
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
                 </a>
-
                 <a
                   href="https://wa.me/5571999772054"
                   target="_blank"
@@ -879,10 +1066,7 @@ export default function PGBASite() {
               </div>
 
               {/* Info de Contato */}
-      
-
-              <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 mt-8 sm:mt-12 pt-6 sm:pt-8 border-t ${dc('border-slate-800/50', 'border-slate-200')} relative z-10`}
-              >
+              <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 mt-8 sm:mt-12 pt-6 sm:pt-8 border-t ${dc('border-slate-800/50', 'border-slate-200')} relative z-10`}>
                 <div className={`flex items-center gap-2 text-xs sm:text-sm ${dc('text-slate-400', 'text-slate-500')}`}>
                   <Mail className="w-4 h-4 text-cyan-500" />
                   suporte@pgbasolutions.com.br
@@ -986,3 +1170,4 @@ export default function PGBASite() {
     </div>
   );
 }
+                    
