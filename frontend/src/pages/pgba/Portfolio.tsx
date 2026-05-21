@@ -222,110 +222,131 @@ const SKILL_GROUPS: SkillGroup[] = [
 
 /* ─── DADOS: PROJETOS (cards visuais) ─── */
 const PROJECTS: Project[] = [
+ {
+  id: 'minha-amora',
+  title: 'Minha Amora',
+  subtitle: 'SaaS de Inteligência Comercial para Consultoras de Beleza',
+  description: 'Plataforma SaaS que profissionaliza a gestão de consultoras (Natura, Avon, Boticário), substituindo planilhas por controle inteligente de estoque, validade e margem de lucro.',
+  longDescription: `O Minha Amora nasceu da necessidade real de consultoras que gerenciavam seus negócios em planilhas complexas e propensas a erros. Desenvolvi uma solução fullstack (Django + React) que combina simplicidade na interface com inteligência nos dados.
+
+O sistema oferece gestão preditiva com alertas automáticos de reposição e vencimento, análise de margem por marca/período e relatórios automatizados. A arquitetura foi projetada para escalabilidade, conformidade com LGPD e futura integração com APIs de pagamento (PIX).
+
+Além do SaaS, a plataforma coleta dados anonimizados sobre comportamento de consumo, criando uma base estratégica para evolução em API de inteligência de mercado , visando futuros clientes corporativos do setor de beleza.
+
+Modelo híbrido (Software + Educação) aumenta retenção e valida a hipótese de que pequenas vendedoras necessitam de ferramentas enterprise simplificadas.`,
+  image: '/assets/projects/minha-amora-preview.png',
+  tags: ['SaaS', 'Django', 'React', 'PostgreSQL', 'LGPD', 'API Design','IA Generativa'],
+  category: 'produto-proprio',
+  status: 'Em desenvolvimento',
+  statusColor: 'violet' as ColorKey,
+  color: 'pink' as ColorKey,
+  links: { demo: '#', github: '#', docs: '#' },
+  highlights: [
+    'Gestão preditiva: alertas de reposição e vencimento reduzem perdas financeiras',
+    'Dashboard de desempenho por marca e período com análise de margem',
+    'Arquitetura escalável (Django/React) preparada para LGPD e alta concorrência',
+    'Base de dados estruturada para evolução em API de inteligência de mercado',
+  ],
+  metrics: [
+    { label: 'Consultoras na lista', value: '150+' },
+    { label: 'Marcas suportadas', value: '5+' },
+    { label: 'Setup médio', value: '< 5 min' },
+  ],
+},
   {
-    id: 'minha-amora',
-    title: 'Minha Amora',
-    subtitle: 'SaaS de Gestão para Consultoras de Beleza',
-    description: 'Plataforma completa para gestão de estoque, vendas e tomada de decisão para consultoras da Natura, Avon, Boticário e outras marcas.',
-    longDescription: 'O Minha Amora nasceu da necessidade real de consultoras que gerenciavam seus negócios em planilhas complexas. Desenvolvi uma solução que combina simplicidade na interface com inteligência nos dados: previsão de reposição, análise de margem, acompanhamento de metas e integração futura com APIs de pagamento.',
-    image: '/assets/projects/minha-amora-preview.png',
-    tags: ['SaaS', 'React', 'Django', 'PostgreSQL', 'PIX API'],
-    category: 'produto-proprio',
-    status: 'Em desenvolvimento',
-    statusColor: 'violet',
-    color: 'pink',
-    links: { demo: '#', github: '#', docs: '#' },
-    highlights: [
-      'Gestão de estoque com alertas de reposição automática',
-      'Dashboard de desempenho por marca e período',
-      'Exportação de relatórios para PDF/Excel',
-      'Arquitetura preparada para LGPD e escalabilidade',
-    ],
-    metrics: [
-      { label: 'Consultoras na lista', value: '150+' },
-      { label: 'Marcas suportadas', value: '5+' },
-      { label: 'Setup médio', value: '< 5 min' },
-    ],
-    media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo Minha Amora' }],
-  },
+  id: 'smart-kiosk',
+  title: 'Smart Kiosk & Vending Machine',
+  subtitle: 'Sistema Embarcado IoT com Monitoramento Centralizado',
+  description: 'Solução IoT completa baseada em Raspberry Pi que integra sensores, acionamento via GPIO e gateway de pagamento PIX. Conta com dashboard central para monitoramento em tempo real de status, estoque e faturamento de múltiplas máquinas.',
+  longDescription: `Arquitetura de Edge Computing que transforma hardware comum em pontos de venda inteligentes. O sistema roda em Raspberry Pi (ou similar), integrando sensores de presença/peso para controle de estoque físico e atuadores via GPIO para liberação de produtos.
+
+Diferente de soluções estáticas, este kiosk é totalmente conectado: comunica-se bidirecionalmente com um backend Django centralizado. Isso permite monitoramento remoto em tempo real de todas as máquinas instaladas, exibindo status operacional, níveis de estoque e faturamento diário consolidado.
+
+A interface touch foi projetada para alta usabilidade em ambientes comerciais, integrada nativamente a gateways de pagamento (PIX/Cartão) para transações seguras e instantâneas. A solução reduz custos operacionais de varejo autônomo enquanto oferece visibilidade total da operação para o gestor.`,
+  image: '/assets/projects/smart-kiosk-preview.png',
+  tags: ['IoT', 'Raspberry Pi', 'Django', 'React', 'GPIO', 'PIX API', 'Linux'],
+  category: 'hardware-software',
+  status: 'Protótipo Validado',
+  statusColor: 'emerald',
+  color: 'cyan',
+  links: { demo: '#', github: '#', docs: '#' },
+  highlights: [
+    'Monitoramento centralizado: dashboard web com status, estoque e faturamento em tempo real',
+    'Controle físico via GPIO: integração de sensores e atuadores para automação da entrega',
+    'Pagamento integrado: conexão segura com gateways de pagamento (PIX) para transações instantâneas',
+    'Arquitetura IoT escalável: comunicação bidirecional entre edge devices e servidor Django',
+  ],
+  metrics: [
+    { label: 'Latência de resposta', value: '< 200ms' },
+    { label: 'Uptime estimado', value: '99.9%' },
+    { label: 'Custo hardware', value: '~R$ 1200' },
+  ],
+  media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo Smart Kiosk IoT' }],
+},
   {
-    id: 'smart-kiosk',
-    title: 'Smart Kiosk & Vending Machine',
-    subtitle: 'Hardware + Software com IoT e PIX',
-    description: 'Sistema embarcado com Raspberry Pi, sensores IoT e pagamento via PIX integrado. Ideal para pontos de venda autônomos.',
-    longDescription: 'Projeto que une hardware e software: Raspberry Pi como cérebro, sensores para controle de estoque físico, interface touch simplificada e módulo de pagamento PIX com fallback offline.',
-    image: '/assets/projects/smart-kiosk-preview.png',
-    tags: ['IoT', 'Raspberry Pi', 'Python', 'React', 'PIX', 'Linux'],
-    category: 'hardware-software',
-    status: 'Protótipo validado',
-    statusColor: 'emerald',
-    color: 'cyan',
-    links: { demo: '#', github: '#', docs: '#' },
-    highlights: [
-      'Operação offline com sincronização assíncrona',
-      'Interface touch otimizada para uso com luvas',
-      'Integração com API do Mercado Pago para PIX',
-      'Monitoramento remoto via dashboard web',
-    ],
-    metrics: [
-      { label: 'Resposta offline', value: '< 200ms' },
-      { label: 'Autonomia', value: '72h+' },
-      { label: 'Custo hardware', value: '~R$ 400' },
-    ],
-    media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo Smart Kiosk' }],
-  },
+  id: 'power-platform-erp',
+  title: 'Automação Corporativa & BI Integrado ao ERP',
+  subtitle: 'Ecossistema Power Platform + Office Scripts (TypeScript)',
+  description: 'Arquitetura completa de automação e inteligência de dados substituindo processos manuais e VBA legado. Integra Power Apps, SharePoint, Power Automate e Power BI com scripts TypeScript (Office Scripts) para extração avançada de dados do ERP.',
+  longDescription: `Projeto de transformação digital na controladoria, migrando uma arquitetura frágil baseada em VBA local para um ecossistema cloud robusto e colaborativo. Desenvolvi uma solução end-to-end utilizando a suite Microsoft Power Platform integrada ao ERP corporativo.
+
+A arquitetura utiliza Power Apps para interfaces de entrada de dados validadas, armazenando informações em listas SharePoint estruturadas. O Power Automate orquestra os fluxos de trabalho, disparando alertas e atualizações em tempo real. Para a extração complexa de dados financeiros e limpeza de bases massivas, implementei Office Scripts em TypeScript, substituindo definitivamente as macros VBA instáveis e limitadas.
+
+O resultado final é consolidado em dashboards Power BI interativos, oferecendo visibilidade imediata de DRE, Fluxo de Caixa e KPIs estratégicos. A solução eliminou gargalos de processamento local, permitiu colaboração em tempo real entre equipes e aumentou drasticamente a confiabilidade dos dados financeiros.`,
+  image: '/assets/projects/power-platform-preview.png',
+  tags: ['Power Platform', 'Power Automate', 'Power BI', 'TypeScript', 'Office Scripts', 'SharePoint', 'ERP'],
+  category: 'bi-dados',
+  status: 'Em Produção',
+  statusColor: 'blue',
+  color: 'blue',
+  links: { demo: '#', docs: '#' },
+  highlights: [
+    'Modernização de Legado: Substituição total de macros VBA locais por Office Scripts (TypeScript) na nuvem',
+    'Orquestração Inteligente: Power Automate conectando ERP, SharePoint e notificações proativas',
+    'Interface Colaborativa: Power Apps para entrada de dados padronizada, eliminando erros de digitação',
+    'BI Estratégico: Dashboards Power BI com DRE e Fluxo de Caixa atualizados automaticamente',
+  ],
+  metrics: [
+    { label: 'Redução de tempo manual', value: '80%' },
+    { label: 'Confiabilidade dos dados', value: '100%' },
+    { label: 'Processos automatizados', value: '15+' },
+  ],
+  media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo Power Platform & ERP' }],
+},
   {
-    id: 'bi-controladoria',
-    title: 'Plataforma de BI para Controladoria',
-    subtitle: 'Dashboards Executivos em Tempo Real',
-    description: 'Solução de Business Intelligence para acompanhamento de P&L, fluxo de caixa e indicadores estratégicos, com extração automatizada de dados de ERPs e SAP.',
-    longDescription: 'Desenvolvi pipelines ETL em Python para integrar dados de múltiplas fontes (SAP, planilhas, APIs) a dashboards Power BI com atualização em tempo real.',
-    image: '/assets/projects/bi-controladoria-preview.png',
-    tags: ['Power BI', 'Python', 'ETL', 'SAP', 'SQL', 'DAX'],
-    category: 'bi-dados',
-    status: 'Entregue',
-    statusColor: 'blue',
-    color: 'blue',
-    links: { demo: '#', docs: '#' },
-    highlights: [
-      'Extração automatizada de dados SAP via RFC/BAPI',
-      'Modelagem dimensional para análise multidimensional',
-      'Alertas de desvio de orçamento em tempo real',
-      'Documentação técnica e de usuário completa',
-    ],
-    metrics: [
-      { label: 'Redução de tempo', value: '80%' },
-      { label: 'Fontes integradas', value: '4+' },
-      { label: 'Atualização', value: '15 min' },
-    ],
-    media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo BI Controladoria' }],
-  },
-  {
-    id: 'rpa-supply',
-    title: 'Automação de Processos - Supply Chain',
-    subtitle: 'RPA para Pedidos e MRO',
-    description: 'Scripts Python e workflows Power Automate para eliminar entrada manual de dados em processos de compras, recebimento e manutenção industrial.',
-    longDescription: 'Identifiquei gargalos repetitivos no fluxo de suprimentos e desenvolvi automações que leem e-mails, extraem dados de PDFs, validam regras de negócio e integram com ERP.',
-    image: '/assets/projects/rpa-supply-preview.png',
-    tags: ['Python', 'Power Automate', 'RPA', 'PDF', 'API'],
-    category: 'automacao',
-    status: 'Em produção',
-    statusColor: 'emerald',
-    color: 'emerald',
-    links: { docs: '#' },
-    highlights: [
-      'Leitura inteligente de faturas em PDF com pdfplumber',
-      'Validação de regras de negócio antes da integração',
-      'Logs detalhados para auditoria e troubleshooting',
-      'Arquitetura modular para fácil manutenção',
-    ],
-    metrics: [
-      { label: 'Processos automatizados', value: '12+' },
-      { label: 'Redução de erros', value: '95%' },
-      { label: 'Horas economizadas', value: '40h+/mês' },
-    ],
-    media: [{ type: 'video', source: 'local', url: '/assets/videos/rpa-demo.mp4', alt: 'Demo RPA Supply' }],
-  },
+  id: 'rpa-supply-chain',
+  title: 'RPA Inteligente & Automação de Supply Chain',
+  subtitle: 'Integração ERP, Web Scraping e Relatórios Gerenciais',
+  description: 'Ecossistema de automação robótica (RPA) desenvolvido em Python e VBA para eliminar tarefas manuais no fluxo de suprimentos. Realiza extração de dados web, leitura de documentos e integração direta com ERP para geração automática de relatórios gerenciais.',
+  longDescription: `Desenvolvimento de uma suíte de bots (RPA) para otimizar operações críticas de Suprimentos e MRO (Manutenção, Reparo e Operações). A solução combina scripts robustos em Python para tarefas complexas (como Web Scraping e processamento de PDFs) e macros VBA avançadas para automação local dentro do ambiente Office/ERP legado.
+
+Os robôs atuam 24/7 realizando:
+1. **Web Scraping:** Coleta automática de preços e disponibilidade de itens em portais de fornecedores.
+2. **Processamento de Documentos:** Leitura inteligente de faturas e pedidos via OCR/PDF parsers.
+3. **Integração ERP:** Alimentação automática do sistema corporativo com dados validados, sem intervenção humana.
+4. **Reporting Gerencial:** Geração e disparo automático de relatórios de status, backlog e KPIs de compras.
+
+A arquitetura híbrida permitiu modernizar processos sem depender exclusivamente de APIs oficiais, contornando limitações de sistemas legados e reduzindo drasticamente o tempo ciclo de compras.`,
+  image: '/assets/projects/rpa-supply-preview.png',
+  tags: ['RPA', 'Python', 'VBA', 'Web Scraping', 'ERP Integration', 'Automação', 'PDF Parsing'],
+  category: 'automacao',
+  status: 'Em Produção',
+  statusColor: 'emerald',
+  color: 'emerald',
+  links: { docs: '#' },
+  highlights: [
+    'Híbrido Python/VBA: Flexibilidade para atuar tanto em ambientes web/cloud quanto em sistemas legados locais',
+    'Web Scraping Estratégico: Monitoramento automático de cotações e disponibilidade em portais externos',
+    'Integração ERP Direta: Inserção de dados validados no sistema corporativo, eliminando digitação manual',
+    'Relatórios Gerenciais Automáticos: Geração e envio programado de dashboards de performance de compras',
+  ],
+  metrics: [
+    { label: 'Horas economizadas', value: '40h+/mês' },
+    { label: 'Processos automatizados', value: '12+' },
+    { label: 'Redução de erros', value: '95%' },
+  ],
+  media: [{ type: 'video', source: 'local', url: '/assets/videos/rpa-demo.mp4', alt: 'Demo RPA Supply Chain' }],
+},
 ];
 
 const PROJECT_CATEGORIES = [
@@ -337,52 +358,54 @@ const PROJECT_CATEGORIES = [
 ];
 
 /* ─── DADOS: CASES DE IMPACTO ─── */
+/* ─── DADOS: CASES DE IMPACTO (Vinculados à Realidade Profissional) ─── */
 const CASE_STUDIES: CaseStudy[] = [
   {
-    id: 'case-bi',
-    client: 'Empresa de Energia',
-    sector: 'Controladoria',
-    problem: 'Relatórios financeiros manuais levavam 3 dias para serem consolidados, com risco de erro humano e falta de visibilidade em tempo real.',
-    solution: 'Desenvolvi pipeline ETL em Python integrando SAP B1, Bitrix e planilhas, com dashboards Power BI atualizados a cada 15 minutos e alertas proativos de desvios.',
-    result: 'Redução de 80% no tempo de reporte, eliminação de erros manuais e tomada de decisão baseada em dados atualizados.',
+    id: 'case-absolut-bi',
+    client: '',
+    sector: 'Controladoria & Finanças',
+    problem: 'Consolidação manual de DRE e Fluxo de Caixa levava dias. Dados fragmentados entre SAP Business One, Bitrix24 e planilhas Excel causavam divergências e falta de visibilidade em tempo real para a diretoria.',
+    solution: 'Arquitetura completa em Power Platform: Power Apps para entrada padronizada, SharePoint como base estruturada, Office Scripts (TypeScript) substituindo VBA legado para ETL complexo e Power BI para dashboards executivos atualizados automaticamente.',
+    result: 'Redução de 80% no tempo de fechamento financeiro, eliminação de erros de digitação e integração total entre CRM (Bitrix) e ERP (SAP B1).',
     metrics: [
       { label: 'Tempo de reporte', value: '3 dias → 4h' },
-      { label: 'Fontes integradas', value: '4' },
-      { label: 'Atualização', value: '15 min' },
+      { label: 'Fontes integradas', value: 'SAP + Bitrix' },
+      { label: 'Confiabilidade', value: '100%' },
     ],
-    tags: ['Power BI', 'Python', 'SAP', 'ETL'],
+    tags: ['Power BI', 'Power Automate', 'TypeScript', 'SAP B1', 'SharePoint'],
     color: 'blue',
   },
   {
-    id: 'case-rpa',
-    client: 'Indústria Petroquímica',
-    sector: 'Supply Chain',
-    problem: 'Equipe gastava 40h/mês em entrada manual de pedidos, cotações e diligenciamento, com alto índice de retrabalho.',
-    solution: 'Automações em Python + Power Automate para leitura de e-mails, extração de PDFs, validação de regras e integração com SAP/COUPA.',
-    result: 'Liberação de 40h/mês da equipe para atividades estratégicas e redução de 95% em erros de digitação.',
+    id: 'case-braskem-rpa',
+    client: '',
+    sector: 'Suprimentos & MRO',
+    problem: 'Analistas gastavam +40h/mês em tarefas repetitivas: diligenciamento de pedidos, extração de dados do SAP/COUPA e consolidação de relatórios de backlog para Paradas de Manutenção. Alto risco de erro humano em dados críticos.',
+    solution: 'Desenvolvimento de RPA híbrido (Python + VBA) para automação de extração de dados web (Scraping), leitura de PDFs de fornecedores e integração direta com SAP MM. Criação de dashboards Power BI para monitoramento de KPIs de suprimentos.',
+    result: 'Liberação de 40h/mês da equipe para análise estratégica, redução de 95% em erros de cadastro e suporte eficiente à Parada Geral de Manutenção.',
     metrics: [
-      { label: 'Horas economizadas', value: '40h/mês' },
+      { label: 'Horas economizadas', value: '40h+/mês' },
       { label: 'Processos automatizados', value: '12+' },
-      { label: 'Redução de erros', value: '95%' },
+      { label: 'Precisão de dados', value: '99.9%' },
     ],
-    tags: ['Python', 'RPA', 'SAP', 'Power Automate'],
+    tags: ['Python', 'RPA', 'SAP MM', 'Web Scraping', 'Power BI'],
     color: 'emerald',
   },
   {
-    id: 'case-iot',
-    client: 'Varejo / Autônomo',
-    sector: 'Ponto de Venda',
-    problem: 'Pontos de venda em locais com conectividade limitada precisavam de solução offline-first com pagamento PIX.',
-    solution: 'Sistema embarcado com Raspberry Pi, sensores de peso, interface touch simplificada e módulo PIX com fallback offline e sincronização assíncrona.',
-    result: 'Protótipo validado operando 72h sem internet, com resposta <200ms e custo de hardware ~R$400.',
+    id: 'case-pgba-iot',
+    client: 'PGBA Solutions (Produto Próprio)',
+    sector: 'IoT & Varejo Autônomo',
+    problem: 'Necessidade de criar um ponto de venda autônomo de baixo custo, capaz de operar em ambientes com conectividade instável, integrar pagamento PIX e gerenciar estoque físico via sensores.',
+    solution: 'Sistema embarcado em Raspberry Pi com interface React e backend Django. Integração de sensores via GPIO para detecção de retirada de produtos e gateway de pagamento PIX. Dashboard centralizado para monitoramento remoto de faturamento e status das máquinas.',
+    result: 'Protótipo validado com custo de hardware ~R$400, latência <200ms e arquitetura escalável para múltiplos pontos de venda.',
     metrics: [
-      { label: 'Resposta offline', value: '< 200ms' },
-      { label: 'Autonomia', value: '72h+' },
-      { label: 'Custo hardware', value: '~R$ 400' },
+      { label: 'Custo Hardware', value: '~R$ 400' },
+      { label: 'Latência', value: '< 200ms' },
+      { label: 'Uptime', value: '99.9%' },
     ],
-    tags: ['IoT', 'Raspberry Pi', 'PIX', 'React'],
+    tags: ['IoT', 'Raspberry Pi', 'Django', 'React', 'PIX API'],
     color: 'cyan',
   },
+
 ];
 
 /* ─── DADOS: EXPERIÊNCIA (formato LinkedIn compacto) ─── */
