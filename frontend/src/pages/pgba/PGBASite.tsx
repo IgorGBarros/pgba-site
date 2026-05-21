@@ -507,7 +507,11 @@ export default function PGBASite() {
               fundamenta a missão da PGBA: levar inteligência tecnológica real
               para empresas que precisam crescer."
             </p>
+            <a href="/portfolio" target="_blank" rel="noopener noreferrer" className="underline hover:text-cyan-500 transition-colors">
+              Portfólio Completo
+              </a>
             <p className={`mt-6 text-sm font-bold uppercase tracking-widest ${dc('text-cyan-400', 'text-cyan-600')}`}>
+              
               — Fundador, PGBA Solutions Technologies
             </p>
           </motion.div>

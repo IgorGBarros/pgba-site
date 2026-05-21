@@ -1,6 +1,6 @@
-// src/pages/Portfolio.tsx
-// Decisão arquitetural: Foco em conversão — Skills e Projetos em destaque.
-// Estrutura inspirada em portfólios de alta performance (Attekita, Rhuan, Iuri).
+// src/pages/pgba/Portfolio.tsx
+// Decisão arquitetural: Foco em conversão — Skills, Projetos e Cases Reais.
+// Estrutura inspirada em portfólios de alta performance.
 // Mantém design system PGBA: COLOR_MAP, animações, tema dark/light.
 
 import React, { useState } from 'react';
@@ -357,12 +357,11 @@ const PROJECT_CATEGORIES = [
   { id: 'automacao', label: 'Automação', icon: Zap },
 ];
 
-/* ─── DADOS: CASES DE IMPACTO ─── */
 /* ─── DADOS: CASES DE IMPACTO (Vinculados à Realidade Profissional) ─── */
 const CASE_STUDIES: CaseStudy[] = [
   {
     id: 'case-absolut-bi',
-    client: '',
+    client: 'Absolut Technologies',
     sector: 'Controladoria & Finanças',
     problem: 'Consolidação manual de DRE e Fluxo de Caixa levava dias. Dados fragmentados entre SAP Business One, Bitrix24 e planilhas Excel causavam divergências e falta de visibilidade em tempo real para a diretoria.',
     solution: 'Arquitetura completa em Power Platform: Power Apps para entrada padronizada, SharePoint como base estruturada, Office Scripts (TypeScript) substituindo VBA legado para ETL complexo e Power BI para dashboards executivos atualizados automaticamente.',
@@ -377,7 +376,7 @@ const CASE_STUDIES: CaseStudy[] = [
   },
   {
     id: 'case-braskem-rpa',
-    client: '',
+    client: 'Braskem S.A.',
     sector: 'Suprimentos & MRO',
     problem: 'Analistas gastavam +40h/mês em tarefas repetitivas: diligenciamento de pedidos, extração de dados do SAP/COUPA e consolidação de relatórios de backlog para Paradas de Manutenção. Alto risco de erro humano em dados críticos.',
     solution: 'Desenvolvimento de RPA híbrido (Python + VBA) para automação de extração de dados web (Scraping), leitura de PDFs de fornecedores e integração direta com SAP MM. Criação de dashboards Power BI para monitoramento de KPIs de suprimentos.',
@@ -939,59 +938,98 @@ export default function Portfolio() {
             <span className={`font-bold text-lg ${dc('text-white', 'text-slate-900')}`}>Igor Guimarães Barros<span className="text-cyan-500">.</span></span>
           </a>
           <div className="flex items-center gap-3">
-            <ThemeToggle isDarkMode={isDark} onToggle={toggleTheme} />
-            <a href="/pgba" className={`hidden sm:inline-flex px-4 py-2 text-sm font-medium rounded-full ${
+            
+            <a href="/site" className={`hidden sm:inline-flex px-4 py-2 text-sm font-medium rounded-full ${
               dc('text-slate-400 hover:text-white hover:bg-slate-800', 'text-slate-500 hover:text-slate-900 hover:bg-slate-100')
             }`}>PGBA Solutions →</a>
           </div>
         </div>
       </header>
 
-      {/* ─── HERO: PROPOSTA DE VALOR + SOCIAL PROOF ─── */}
+      {/* ─── HERO: PROPOSTA DE VALOR + SOCIAL PROOF + FOTO ─── */}
       <section className="relative py-20 sm:py-28 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest mb-6 ${
-              dc('bg-slate-900/80 border-slate-700/50 text-cyan-400', 'bg-slate-50/80 border-slate-200/50 text-cyan-600')
-            }`}>
-              <Sparkles className="w-3.5 h-3.5" /> Portfólio Profissional
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col-reverse lg:flex-row items-center gap-12 lg:gap-16">
+            
+            {/* Texto do Hero */}
+            <div className="flex-1 text-center lg:text-left">
+              <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+                <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest mb-6 ${
+                  dc('bg-slate-900/80 border-slate-700/50 text-cyan-400', 'bg-slate-50/80 border-slate-200/50 text-cyan-600')
+                }`}>
+                  <Sparkles className="w-3.5 h-3.5" /> Portfólio Profissional
+                </div>
+
+                <h1 className={`text-3xl sm:text-4xl md:text-5xl font-bold mb-6 leading-tight ${dc('text-white', 'text-slate-900')}`}>
+                  Transformo dados brutos em{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-violet-500">decisão</span>,
+                  {' '}processos manuais em{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-pink-500">automação</span>,
+                  {' '}ideias em{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-500">software</span>.
+                </h1>
+
+                <p className={`text-base sm:text-lg mb-8 max-w-2xl mx-auto lg:mx-0 ${dc('text-slate-300', 'text-slate-600')}`}>
+                  Engenheiro mecatrônico, desenvolvedor fullstack e especialista em dados. 
+                  8+ anos unindo código, dados e negócio para entregar resultado mensurável.
+                </p>
+
+                {/* Social Proof */}
+                <div className={`flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 mb-10 text-sm ${dc('text-slate-400', 'text-slate-500')}`}>
+                  <span className="flex items-center gap-1.5"><Star className="w-4 h-4 text-amber-400" /> 50+ projetos entregues</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="flex items-center gap-1.5"><Award className="w-4 h-4 text-cyan-400" /> 8+ anos de experiência</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-violet-400" /> Salvador/BA · Presencial - Remoto</span>
+                </div>
+
+                {/* CTAs */}
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                  <a href="#projetos" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm hover:from-cyan-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/25 hover:scale-105">
+                    Ver Projetos <ArrowRight className="w-4 h-4" />
+                  </a>
+                  <a href="/assets/cv-igor.pdf" download className={`inline-flex items-center gap-2 px-6 py-3 rounded-full font-medium text-sm ${
+                    dc('text-slate-300 hover:text-white hover:bg-slate-800', 'text-slate-600 hover:text-slate-900 hover:bg-slate-100')
+                  }`}>
+                    <Download className="w-4 h-4" /> Baixar CV
+                  </a>
+                </div>
+              </motion.div>
             </div>
 
-            <h1 className={`text-3xl sm:text-4xl md:text-5xl font-bold mb-6 leading-tight ${dc('text-white', 'text-slate-900')}`}>
-              Transformo dados brutos em{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-violet-500">decisão</span>,
-              {' '}processos manuais em{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-pink-500">automação</span>,
-              {' '}ideias em{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-500">software</span>.
-            </h1>
+            <div className="flex-shrink-0 flex justify-center lg:justify-end">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }} 
+                animate={{ opacity: 1, scale: 1 }} 
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="relative group"
+              >
+                {/* Glow Effect no Fundo */}
+                <div className={`absolute inset-0 bg-gradient-to-tr from-cyan-500 to-violet-500 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500`} />
+                
+                {/* Container da Foto */}
+                <div className={`relative w-48 h-48 sm:w-64 sm:h-64 rounded-full overflow-hidden border-4 shadow-2xl ${
+                  isDark ? 'border-slate-800 ring-4 ring-cyan-500/20' : 'border-white ring-4 ring-cyan-100'
+                }`}>
+                  <img 
+                    // Caminho relativo: sobe dois níveis (pgba -> pages -> src) e entra em assets
+                    src="/src/assets/Igor.png" 
+                    alt="Igor Guimarães Barros" 
+                    // object-cover garante que preencha o círculo sem distorcer
+                    // object-center tenta centralizar. Se cortar a cabeça, mude para 'object-top'
+                    className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
+                    style={{ objectPosition: 'center 0%' }}
+                  />
+                  
+                  {/* Overlay gradiente suave para integrar melhor (opcional) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
+                </div>
+                
 
-            <p className={`text-base sm:text-lg mb-8 max-w-3xl mx-auto ${dc('text-slate-300', 'text-slate-600')}`}>
-              Engenheiro mecatrônico, desenvolvedor fullstack e especialista em dados. 
-              8 anos unindo código, dados e negócio para entregar resultado mensurável.
-            </p>
-
-            {/* Social Proof */}
-            <div className={`flex flex-wrap items-center justify-center gap-4 sm:gap-6 mb-10 text-sm ${dc('text-slate-400', 'text-slate-500')}`}>
-              <span className="flex items-center gap-1.5"><Star className="w-4 h-4 text-amber-400" /> 50+ projetos entregues</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="flex items-center gap-1.5"><Award className="w-4 h-4 text-cyan-400" /> 8+ anos de experiência</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-violet-400" /> Salvador/BA · Presencial - Remoto</span>
+              </motion.div>
             </div>
 
-            {/* CTAs */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <a href="#projetos" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-sm hover:from-cyan-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/25 hover:scale-105">
-                Ver Projetos <ArrowRight className="w-4 h-4" />
-              </a>
-              <a href="/assets/cv-igor.pdf" download className={`inline-flex items-center gap-2 px-6 py-3 rounded-full font-medium text-sm ${
-                dc('text-slate-300 hover:text-white hover:bg-slate-800', 'text-slate-600 hover:text-slate-900 hover:bg-slate-100')
-              }`}>
-                <Download className="w-4 h-4" /> Baixar CV
-              </a>
-            </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
