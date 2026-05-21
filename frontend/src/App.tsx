@@ -10,6 +10,7 @@ import { ThemeProvider } from "./hooks/useTheme";
 
 import PGBANeural from "./pages/pgba/PGBANeural";
 import PGBASite from "./pages/pgba/PGBASite";
+import Portfolio from "./pages/pgba/Portfolio";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +36,7 @@ const App = () => (
           <AppLayout>
             <Routes>
               <Route path="/" element={<Navigate to="/site" replace />} />
- 
+             <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/site" element={<PGBASite />} />
               <Route path="/neural" element={<PGBANeural />} />
             </Routes>

@@ -9,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { PGBACanvas } from '../../components/pgba/PGBACanvas';
 import { PGBALogo } from '../../components/pgba/PGBALogo';
 import { ThemeToggle } from '../../components/pgba/ThemeToggle';
+import { SobreMim } from '../../components/pgba/SobreMim';
 import {
   ArrowRight, ArrowDown, BarChart4, Cpu, Code2, Terminal, Globe,
   Factory, LineChart, CheckCircle, Mail, Phone, MapPin, ShoppingBag,
@@ -161,6 +162,7 @@ const MINHA_AMORA_FEATURES = [
 ];
 
 const NAV_LINKS = [
+  { href: '#sobre-mim', label: 'Sobre Mim' },
   { href: '#quem-somos', label: 'Quem Somos' },
   { href: '#servicos', label: 'Serviços' },
   { href: '#produtos', label: 'Produtos' },
