@@ -52,7 +52,11 @@
     --sidebar-border: 145 15% 88%;
     --sidebar-ring: 152 55% 28%;
 
-    /* Design System Medieval - Paleta de Cores */
+    /* ========================================
+       DESIGN SYSTEM MEDIEVAL - CODEX TURNAROUND
+       ======================================== */
+
+    /* Paleta Parchment (Pergaminho) */
     --parchment-50: #fffdf7;
     --parchment-100: #fff8eb;
     --parchment-200: #ffead9;
@@ -65,6 +69,7 @@
     --parchment-900: #4a3b2a;
     --parchment-950: #2a1f14;
 
+    /* Paleta Ink (Tinta) */
     --ink-50: #f5f1ea;
     --ink-100: #e8dfd0;
     --ink-200: #c9b89a;
@@ -77,6 +82,7 @@
     --ink-900: #0f0b07;
     --ink-950: #070503;
 
+    /* Paleta Vermillion (Selo Vermelho) */
     --vermillion-50: #fef2f2;
     --vermillion-100: #fde3e3;
     --vermillion-200: #fccbcb;
@@ -89,6 +95,7 @@
     --vermillion-900: #6b1616;
     --vermillion-950: #3d0a0a;
 
+    /* Paleta Gold (Dourado) */
     --gold-50: #fffbeb;
     --gold-100: #fef3c7;
     --gold-200: #fde68a;
@@ -101,6 +108,7 @@
     --gold-900: #4a3807;
     --gold-950: #2a1f04;
 
+    /* Paleta Sage (Sálvia - contratos bons) */
     --sage-50: #f4f7f4;
     --sage-100: #e4ebe4;
     --sage-200: #c8d6c8;
@@ -112,6 +120,33 @@
     --sage-800: #2b392b;
     --sage-900: #232f23;
     --sage-950: #131a13;
+
+    /* ========================================
+       CORES SEMÂNTICAS DO CFO PESSOAL
+       ======================================== */
+    --color-essential: var(--sage-600);
+    --color-good: var(--sage-500);
+    --color-warning: var(--gold-600);
+    --color-bad: var(--vermillion-700);
+    --color-critical: var(--vermillion-900);
+    --color-behavior-cost: var(--vermillion-800);
+
+    /* Espaçamentos */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    --space-3xl: 4rem;
+
+    /* Sombras */
+    --shadow-parchment: 0 0 60px rgba(101, 94, 71, 0.15), inset 0 0 100px rgba(101, 94, 71, 0.1);
+    --shadow-parchment-deep: 0 20px 60px rgba(0, 0, 0, 0.3), inset 0 0 100px rgba(101, 94, 71, 0.2);
+    --shadow-candle: 0 0 40px rgba(253, 224, 71, 0.15), 0 0 80px rgba(253, 224, 71, 0.08);
+    --shadow-wax: 0 4px 12px rgba(0, 0, 0, 0.4), inset -2px -2px 4px rgba(0, 0, 0, 0.3), inset 2px 2px 4px rgba(255, 255, 255, 0.1);
+    --shadow-illuminated: 0 0 20px rgba(212, 160, 23, 0.3), 0 0 40px rgba(212, 160, 23, 0.1);
+    --shadow-quill: 2px 2px 8px rgba(0, 0, 0, 0.2);
 
     font-family: 'DM Sans', system-ui, sans-serif;
   }
@@ -190,8 +225,164 @@
   100% { transform: scale(1) rotate(0deg); }
 }
 
-.animate-flicker {
-  animation: flicker 4s ease-in-out infinite;
+@keyframes pulseCritical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes inkSpread {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-flicker { animation: flicker 4s ease-in-out infinite; }
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-fade-in { animation: fadeIn 0.8s ease-out; }
+.animate-slide-up { animation: slideUp 0.6s ease-out; }
+.animate-ink-spread { animation: inkSpread 1.2s ease-out; }
+
+/* ========================================
+   TIPOGRAFIA MEDIEVAL (CODEX)
+   ======================================== */
+.font-display { font-family: 'Cinzel', serif; }
+.font-headline { font-family: 'Cinzel', serif; }
+.font-title { font-family: 'Cormorant Garamond', serif; }
+.font-body { font-family: 'EB Garamond', serif; }
+.font-label { font-family: 'Cinzel', serif; }
+
+/* Tamanhos de tipografia */
+.text-display-lg {
+  font-family: 'Cinzel', serif;
+  font-size: 3.5rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-display-md {
+  font-family: 'Cinzel', serif;
+  font-size: 2.75rem;
+  line-height: 1.15;
+  font-weight: 700;
+}
+
+.text-headline-lg {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.text-headline-md {
+  font-family: 'Cinzel', serif;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.text-headline-sm {
+  font-family: 'Cinzel', serif;
+  font-size: 1.25rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.text-title-lg {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.375rem;
+  line-height: 1.4;
+  font-weight: 500;
+  font-style: italic;
+}
+
+.text-title-md {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.125rem;
+  line-height: 1.45;
+  font-weight: 500;
+  font-style: italic;
+}
+
+.text-body-lg {
+  font-family: 'EB Garamond', serif;
+  font-size: 1.25rem;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+.text-body-md {
+  font-family: 'EB Garamond', serif;
+  font-size: 1.125rem;
+  line-height: 1.65;
+  font-weight: 400;
+}
+
+.text-body-sm {
+  font-family: 'EB Garamond', serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.text-label-caps {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  line-height: 1;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.text-label-sm {
+  font-family: 'Cinzel', serif;
+  font-size: 0.625rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ========================================
+   SCROLLBAR CUSTOMIZADA
+   ======================================== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ink-800);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--gold-600), var(--vermillion-700));
+  border-radius: 5px;
+  border: 2px solid var(--ink-800);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--vermillion-700), var(--vermillion-600));
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-600) var(--ink-800);
 }
 
 /* ========================================
@@ -245,15 +436,8 @@
   animation: sealPress 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.wax-seal-sm {
-  width: 40px;
-  height: 40px;
-}
-
-.wax-seal-lg {
-  width: 96px;
-  height: 96px;
-}
+.wax-seal-sm { width: 40px; height: 40px; }
+.wax-seal-lg { width: 96px; height: 96px; }
 
 /* Divisor Sagrado */
 .sacred-divider {
@@ -427,7 +611,24 @@
   filter: drop-shadow(0 2px 4px rgba(212, 160, 23, 0.3));
 }
 
-/* Badges */
+/* Candle Glow */
+.candle-glow {
+  position: relative;
+}
+
+.candle-glow::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(ellipse at center, rgba(253, 224, 71, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  animation: flicker 4s ease-in-out infinite;
+  z-index: -1;
+}
+
+/* ========================================
+   BADGES - CLASSIFICAÇÃO FINANCEIRA
+   ======================================== */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -478,12 +679,182 @@
   border: 1px solid var(--vermillion-700);
 }
 
-@keyframes pulseCritical {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+/* ========================================
+   BOTÕES MEDIEVAIS
+   ======================================== */
+.btn-primary {
+  background: linear-gradient(135deg, var(--vermillion-700) 0%, var(--vermillion-800) 100%);
+  color: var(--parchment-100);
+  border: none;
+  padding: var(--space-md) var(--space-xl);
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 700;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(139, 29, 29, 0.3);
 }
 
-/* Item de Navegação */
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--vermillion-600) 0%, var(--vermillion-700) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 29, 29, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--gold-700);
+  border: 2px solid var(--gold-600);
+  padding: var(--space-md) var(--space-xl);
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 700;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(212, 160, 23, 0.1);
+  border-color: var(--gold-500);
+  transform: translateY(-2px);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-600);
+  border: 1px solid rgba(120, 89, 25, 0.2);
+  padding: var(--space-sm) var(--space-md);
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-ghost:hover {
+  background: rgba(212, 160, 23, 0.08);
+  border-color: var(--gold-600);
+  color: var(--ink-800);
+}
+
+/* ========================================
+   TABELAS MEDIEVAIS
+   ======================================== */
+.codex-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'EB Garamond', serif;
+  background: var(--parchment-100);
+  border: 1px solid var(--parchment-400);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.codex-table thead {
+  background: linear-gradient(135deg, var(--parchment-300) 0%, var(--parchment-400) 100%);
+}
+
+.codex-table th {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-700);
+  padding: var(--space-md);
+  text-align: left;
+  border-bottom: 2px solid var(--gold-600);
+  font-weight: 700;
+}
+
+.codex-table td {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--parchment-300);
+  color: var(--ink-600);
+  font-size: 1rem;
+}
+
+.codex-table tr:last-child td {
+  border-bottom: none;
+}
+
+.codex-table tr:hover {
+  background: rgba(212, 160, 23, 0.05);
+}
+
+.codex-table tr.row-critical {
+  background: rgba(170, 36, 36, 0.05);
+}
+
+.codex-table tr.row-warning {
+  background: rgba(212, 160, 23, 0.05);
+}
+
+.codex-table tr.row-good {
+  background: rgba(85, 112, 85, 0.05);
+}
+
+/* ========================================
+   ALERTAS
+   ======================================== */
+.alert {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: 2px;
+  margin: var(--space-md) 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  font-family: 'EB Garamond', serif;
+  font-size: 1rem;
+}
+
+.alert-warning {
+  background: rgba(212, 160, 23, 0.1);
+  border: 1px solid var(--gold-500);
+  color: var(--gold-800);
+  border-left: 4px solid var(--gold-600);
+}
+
+.alert-danger {
+  background: rgba(170, 36, 36, 0.1);
+  border: 1px solid var(--vermillion-600);
+  color: var(--vermillion-800);
+  border-left: 4px solid var(--vermillion-700);
+}
+
+.alert-success {
+  background: rgba(85, 112, 85, 0.1);
+  border: 1px solid var(--sage-500);
+  color: var(--sage-700);
+  border-left: 4px solid var(--sage-600);
+}
+
+.alert-info {
+  background: rgba(184, 134, 11, 0.08);
+  border: 1px solid var(--gold-400);
+  color: var(--ink-700);
+  border-left: 4px solid var(--gold-500);
+}
+
+.alert-icon {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+/* ========================================
+   ITEM DE NAVEGAÇÃO
+   ======================================== */
 .nav-item {
   display: flex;
   align-items: center;
@@ -523,17 +894,464 @@
   border-radius: 0 2px 2px 0;
 }
 
-/* Candle Glow */
-.candle-glow {
+/* ========================================
+   MODO TURNAROUND - INDICADORES VISUAIS
+   ======================================== */
+.turnaround-active {
+  position: relative;
+  border: 2px solid var(--vermillion-700);
+  background: linear-gradient(135deg, rgba(170, 36, 36, 0.05) 0%, rgba(107, 22, 22, 0.08) 100%);
+}
+
+.turnaround-active::before {
+  content: "MODO TURNAROUND";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--vermillion-800);
+  color: var(--parchment-100);
+  padding: 2px 12px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+.turnaround-banner {
+  background: linear-gradient(135deg, var(--vermillion-800) 0%, var(--vermillion-900) 100%);
+  color: var(--parchment-100);
+  padding: var(--space-md) var(--space-lg);
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+  border-left: 4px solid var(--gold-600);
+}
+
+.turnaround-banner strong {
+  color: var(--gold-400);
+}
+
+/* ========================================
+   CLASSIFICAÇÕES FINANCEIRAS (CFO PESSOAL)
+   ======================================== */
+.classification-contrato {
+  background: rgba(85, 112, 85, 0.1);
+  border-left: 3px solid var(--sage-600);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 0 2px 2px 0;
+}
+
+.classification-spot {
+  background: rgba(212, 160, 23, 0.08);
+  border-left: 3px solid var(--gold-600);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 0 2px 2px 0;
+}
+
+.classification-custo-comportamento {
+  background: rgba(170, 36, 36, 0.08);
+  border-left: 3px solid var(--vermillion-700);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 0 2px 2px 0;
   position: relative;
 }
 
-.candle-glow::before {
+.classification-custo-comportamento::after {
+  content: "⚠ CUSTO DE COMPORTAMENTO";
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  background: var(--vermillion-800);
+  color: var(--parchment-100);
+  padding: 1px 8px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+/* ========================================
+   PROGRESS BAR
+   ======================================== */
+.progress-bar {
+  height: 6px;
+  background: var(--parchment-400);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin: var(--space-sm) 0;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--vermillion-700) 0%, var(--gold-500) 100%);
+  border-radius: 9999px;
+  transition: width 0.6s ease;
+}
+
+.progress-bar-fill.good {
+  background: linear-gradient(90deg, var(--sage-600) 0%, var(--sage-400) 100%);
+}
+
+.progress-bar-fill.warning {
+  background: linear-gradient(90deg, var(--gold-600) 0%, var(--gold-400) 100%);
+}
+
+.progress-bar-fill.critical {
+  background: linear-gradient(90deg, var(--vermillion-800) 0%, var(--vermillion-600) 100%);
+  animation: pulseCritical 2s infinite;
+}
+
+/* ========================================
+   JOURNAL ENTRY (DIÁRIO DE TURNAROUND)
+   ======================================== */
+.journal-entry {
+  background: var(--parchment-100);
+  border: 1px solid var(--parchment-400);
+  border-radius: 2px;
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  text-align: left;
+  box-shadow: var(--shadow-quill);
+  position: relative;
+}
+
+.journal-entry::before {
   content: "";
   position: absolute;
-  inset: -20px;
-  background: radial-gradient(ellipse at center, rgba(253, 224, 71, 0.15) 0%, transparent 70%);
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(to bottom, var(--gold-600), var(--vermillion-700));
+}
+
+.journal-entry .entry-date {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  color: var(--vermillion-700);
+  text-transform: uppercase;
+  margin-bottom: var(--space-sm);
+  font-weight: 700;
+}
+
+.journal-entry .entry-section {
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px dashed rgba(120, 89, 25, 0.2);
+}
+
+.journal-entry .entry-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.journal-entry .entry-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--gold-700);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+
+.journal-entry .entry-content {
+  font-family: 'EB Garamond', serif;
+  font-size: 1rem;
+  color: var(--ink-700);
+  line-height: 1.5;
+}
+
+/* ========================================
+   ANCHOR PHRASE (FRASE-ÂNCORA)
+   ======================================== */
+.anchor-phrase {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1.125rem;
+  color: var(--ink-600);
+  padding: var(--space-md) var(--space-lg);
+  border-left: 3px solid var(--gold-600);
+  background: rgba(212, 160, 23, 0.05);
+  margin: var(--space-md) 0;
+  line-height: 1.6;
+}
+
+/* ========================================
+   TOOLTIP MEDIEVAL
+   ======================================== */
+.tooltip-medieval {
+  position: relative;
+}
+
+.tooltip-medieval::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--ink-800);
+  color: var(--gold-400);
+  padding: 0.5rem 0.75rem;
+  border-radius: 2px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  opacity: 0;
   pointer-events: none;
-  animation: flicker 4s ease-in-out infinite;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(212, 160, 23, 0.3);
+}
+
+.tooltip-medieval:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ========================================
+   SECTION HEADER ORNATE
+   ======================================== */
+.section-header {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.5rem;
+}
+
+.section-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--gold-600), transparent);
+}
+
+/* ========================================
+   ANIMATED UNDERLINE
+   ======================================== */
+.animated-underline {
+  position: relative;
+  display: inline-block;
+}
+
+.animated-underline::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--vermillion-700);
+  transition: width 0.4s ease;
+}
+
+.animated-underline:hover::after {
+  width: 100%;
+}
+
+/* ========================================
+   STAIN EFFECT (TEXTURA DE PERGAMINHO)
+   ======================================== */
+.stain-effect {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(120, 89, 25, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(20px);
+}
+
+/* ========================================
+   FOLIO NUMBER (NÚMERO DE FÓLIO)
+   ======================================== */
+.folio-number {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: rgba(120, 89, 25, 0.5);
+  text-transform: uppercase;
+}
+
+/* ========================================
+   ILLUMINATED BORDER
+   ======================================== */
+.illuminated-border {
+  position: relative;
+  border: 1px solid rgba(212, 160, 23, 0.4);
+}
+
+.illuminated-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, rgba(212, 160, 23, 0.4), transparent 30%, transparent 70%, rgba(212, 160, 23, 0.4));
+  pointer-events: none;
   z-index: -1;
 }
+
+/* ========================================
+   CFO DASHBOARD CARDS
+   ======================================== */
+.cfo-card {
+  background: linear-gradient(135deg, var(--parchment-100) 0%, var(--parchment-200) 100%);
+  border: 1px solid var(--parchment-400);
+  border-radius: 2px;
+  padding: var(--space-lg);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.cfo-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gold-600);
+}
+
+.cfo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.cfo-card.critical::before {
+  background: var(--vermillion-700);
+}
+
+.cfo-card.warning::before {
+  background: var(--gold-600);
+}
+
+.cfo-card.good::before {
+  background: var(--sage-600);
+}
+
+.cfo-card .cfo-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin-bottom: var(--space-xs);
+  font-weight: 700;
+}
+
+.cfo-card .cfo-value {
+  font-family: 'Cinzel', serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--ink-800);
+  line-height: 1.2;
+}
+
+.cfo-card .cfo-subtitle {
+  font-family: 'EB Garamond', serif;
+  font-size: 0.9rem;
+  color: var(--ink-500);
+  margin-top: var(--space-xs);
+}
+
+/* ========================================
+   FINANCIAL TIMELINE
+   ======================================== */
+.timeline-month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-sm);
+  border-right: 1px dashed rgba(120, 89, 25, 0.2);
+  min-width: 80px;
+}
+
+.timeline-month:last-child {
+  border-right: none;
+}
+
+.timeline-month .month-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-600);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.timeline-month .month-value {
+  font-family: 'EB Garamond', serif;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: var(--space-xs);
+}
+
+.timeline-month.negative .month-value {
+  color: var(--vermillion-700);
+}
+
+.timeline-month.positive .month-value {
+  color: var(--sage-700);
+}
+
+/* ========================================
+   RESPONSIVIDADE
+   ======================================== */
+@media (max-width: 768px) {
+  .text-display-lg { font-size: 2.5rem; }
+  .text-display-md { font-size: 2rem; }
+  .text-headline-lg { font-size: 1.5rem; }
+  .text-headline-md { font-size: 1.25rem; }
+  
+  .drop-cap::first-letter { font-size: 3.5rem; }
+  
+  .wax-seal { width: 48px; height: 48px; }
+  .wax-seal-lg { width: 72px; height: 72px; }
+  
+  .corner-ornament { width: 24px; height: 24px; }
+  
+  .quote-medieval {
+    font-size: 1.1rem;
+    padding: 1rem 1.25rem;
+  }
+  
+  .codex-table {
+    font-size: 0.9rem;
+  }
+  
+  .codex-table th,
+  .codex-table td {
+    padding: var(--space-sm);
+  }
+}
+
+/* ========================================
+   UTILITÁRIOS DE COR DO DESIGN SYSTEM
+   ======================================== */
+.text-parchment { color: var(--parchment-200); }
+.text-ink { color: var(--ink-700); }
+.text-vermillion { color: var(--vermillion-700); }
+.text-gold { color: var(--gold-600); }
+.text-sage { color: var(--sage-600); }
+
+.bg-parchment { background-color: var(--parchment-200); }
+.bg-ink { background-color: var(--ink-800); }
+.bg-vermillion { background-color: var(--vermillion-700); }
+.bg-gold { background-color: var(--gold-600); }
+.bg-sage { background-color: var(--sage-600); }
+
+.border-parchment { border-color: var(--parchment-400); }
+.border-ink { border-color: var(--ink-600); }
+.border-vermillion { border-color: var(--vermillion-600); }
+.border-gold { border-color: var(--gold-600); }
+.border-sage { border-color: var(--sage-600); }
