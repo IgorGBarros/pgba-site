@@ -1,16 +1,14 @@
 /* ========================================
    CODEX TURNAROUND - DESIGN SYSTEM MEDIEVAL
-   Escopado apenas em .codex-theme
+   Versão com animações de livro e pergaminhos
    ======================================== */
 
-/* Import de fontes específicas do Codex */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap');
 
 /* ========================================
-   VARIÁVEIS DO CODEX (escopadas)
+   VARIÁVEIS DO CODEX
    ======================================== */
 .codex-theme {
-  /* Paleta Parchment */
   --codex-parchment-50: #fffdf7;
   --codex-parchment-100: #fff8eb;
   --codex-parchment-200: #ffead9;
@@ -23,7 +21,6 @@
   --codex-parchment-900: #4a3b2a;
   --codex-parchment-950: #2a1f14;
 
-  /* Paleta Ink */
   --codex-ink-50: #f5f1ea;
   --codex-ink-100: #e8dfd0;
   --codex-ink-200: #c9b89a;
@@ -36,7 +33,6 @@
   --codex-ink-900: #0f0b07;
   --codex-ink-950: #070503;
 
-  /* Paleta Vermillion */
   --codex-vermillion-50: #fef2f2;
   --codex-vermillion-100: #fde3e3;
   --codex-vermillion-200: #fccbcb;
@@ -49,7 +45,6 @@
   --codex-vermillion-900: #6b1616;
   --codex-vermillion-950: #3d0a0a;
 
-  /* Paleta Gold */
   --codex-gold-50: #fffbeb;
   --codex-gold-100: #fef3c7;
   --codex-gold-200: #fde68a;
@@ -62,7 +57,6 @@
   --codex-gold-900: #4a3807;
   --codex-gold-950: #2a1f04;
 
-  /* Paleta Sage */
   --codex-sage-50: #f4f7f4;
   --codex-sage-100: #e4ebe4;
   --codex-sage-200: #c8d6c8;
@@ -75,23 +69,14 @@
   --codex-sage-900: #232f23;
   --codex-sage-950: #131a13;
 
-  /* Fontes do Codex */
   --codex-font-display: 'Cinzel', serif;
   --codex-font-headline: 'Cinzel', serif;
   --codex-font-title: 'Cormorant Garamond', serif;
   --codex-font-body: 'EB Garamond', serif;
-
-  /* Espaçamentos */
-  --codex-space-xs: 0.25rem;
-  --codex-space-sm: 0.5rem;
-  --codex-space-md: 1rem;
-  --codex-space-lg: 1.5rem;
-  --codex-space-xl: 2rem;
-  --codex-space-2xl: 3rem;
 }
 
 /* ========================================
-   TIPOGRAFIA DO CODEX (escopada)
+   TIPOGRAFIA
    ======================================== */
 .codex-theme {
   font-family: var(--codex-font-body);
@@ -114,107 +99,9 @@
 .codex-theme .font-body { font-family: var(--codex-font-body); }
 .codex-theme .font-label { font-family: var(--codex-font-headline); }
 
-/* Tamanhos */
-.codex-theme .text-display-lg {
-  font-family: var(--codex-font-display);
-  font-size: 3.5rem;
-  line-height: 1.1;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.codex-theme .text-headline-lg {
-  font-family: var(--codex-font-headline);
-  font-size: 2rem;
-  line-height: 1.25;
-  font-weight: 600;
-}
-
-.codex-theme .text-headline-md {
-  font-family: var(--codex-font-headline);
-  font-size: 1.5rem;
-  line-height: 1.3;
-  font-weight: 600;
-}
-
-.codex-theme .text-title-lg {
-  font-family: var(--codex-font-title);
-  font-size: 1.375rem;
-  line-height: 1.4;
-  font-weight: 500;
-  font-style: italic;
-}
-
-.codex-theme .text-body-lg {
-  font-family: var(--codex-font-body);
-  font-size: 1.25rem;
-  line-height: 1.7;
-}
-
-.codex-theme .text-body-md {
-  font-family: var(--codex-font-body);
-  font-size: 1.125rem;
-  line-height: 1.65;
-}
-
-.codex-theme .text-label-caps {
-  font-family: var(--codex-font-headline);
-  font-size: 0.75rem;
-  letter-spacing: 0.15em;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
 /* ========================================
-   ANIMAÇÕES DO CODEX
+   PERGAMINHO BASE
    ======================================== */
-@keyframes codex-flicker {
-  0%, 100% { opacity: 1; filter: brightness(1); }
-  50% { opacity: 0.92; filter: brightness(1.05); }
-}
-
-@keyframes codex-sealPress {
-  0% { transform: scale(1.2) rotate(-10deg); }
-  50% { transform: scale(0.9) rotate(5deg); }
-  100% { transform: scale(1) rotate(0deg); }
-}
-
-@keyframes codex-pulseCritical {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.codex-theme .animate-flicker {
-  animation: codex-flicker 4s ease-in-out infinite;
-}
-
-/* ========================================
-   SCROLLBAR DO CODEX (escopada)
-   ======================================== */
-.codex-theme ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.codex-theme ::-webkit-scrollbar-track {
-  background: var(--codex-ink-800);
-}
-
-.codex-theme ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, var(--codex-gold-600), var(--codex-vermillion-700));
-  border-radius: 5px;
-  border: 2px solid var(--codex-ink-800);
-}
-
-.codex-theme ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, var(--codex-vermillion-700), var(--codex-vermillion-600));
-}
-
-/* ========================================
-   COMPONENTES MEDIEVAIS (escopados)
-   ======================================== */
-
-/* Pergaminho */
 .codex-theme .parchment-surface {
   background-color: var(--codex-parchment-200);
   background-image: 
@@ -229,7 +116,249 @@
   border-radius: 2px;
 }
 
-/* Selo de Cera */
+/* ========================================
+   ANIMAÇÕES DE LIVRO
+   ======================================== */
+
+/* Animação de abertura de livro */
+@keyframes bookOpen {
+  0% {
+    transform: perspective(1200px) rotateY(-90deg);
+    opacity: 0;
+  }
+  50% {
+    transform: perspective(1200px) rotateY(-45deg);
+    opacity: 0.5;
+  }
+  100% {
+    transform: perspective(1200px) rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+.codex-theme .book-open {
+  animation: bookOpen 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform-origin: left center;
+}
+
+/* Animação de virar página */
+@keyframes pageFlip {
+  0% {
+    transform: perspective(1200px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(1200px) rotateY(-180deg);
+  }
+}
+
+.codex-theme .page-flip {
+  animation: pageFlip 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform-origin: left center;
+}
+
+/* Animação de pergaminho desenrolando */
+@keyframes scrollUnroll {
+  0% {
+    max-height: 0;
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scaleY(0.5);
+  }
+  100% {
+    max-height: 1000px;
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.codex-theme .scroll-unroll {
+  animation: scrollUnroll 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform-origin: top center;
+}
+
+/* Animação de pergaminho enrolando */
+@keyframes scrollRoll {
+  0% {
+    max-height: 1000px;
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    max-height: 0;
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+.codex-theme .scroll-roll {
+  animation: scrollRoll 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform-origin: top center;
+}
+
+/* Animação de fade in suave */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.codex-theme .fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Animação de brilho dourado */
+@keyframes goldenGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(212, 160, 23, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(212, 160, 23, 0.6);
+  }
+}
+
+.codex-theme .golden-glow {
+  animation: goldenGlow 3s ease-in-out infinite;
+}
+
+/* Animação de flutuação */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.codex-theme .float-animation {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* ========================================
+   COMPONENTES INTERATIVOS
+   ======================================== */
+
+/* Frase que abre pergaminho */
+.codex-theme .scrollable-quote {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.codex-theme .scrollable-quote:hover {
+  color: var(--codex-vermillion-700);
+  transform: scale(1.02);
+}
+
+.codex-theme .scrollable-quote::after {
+  content: '📜';
+  position: absolute;
+  right: -30px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.codex-theme .scrollable-quote:hover::after {
+  opacity: 1;
+}
+
+/* Container do pergaminho expandido */
+.codex-theme .scroll-container {
+  background: linear-gradient(
+    to bottom,
+    var(--codex-parchment-100) 0%,
+    var(--codex-parchment-200) 50%,
+    var(--codex-parchment-100) 100%
+  );
+  border: 2px solid var(--codex-gold-600);
+  border-radius: 8px;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.3),
+    inset 0 0 60px rgba(101, 94, 71, 0.1);
+}
+
+/* Bordas decorativas do pergaminho */
+.codex-theme .scroll-container::before,
+.codex-theme .scroll-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(
+    to right,
+    var(--codex-gold-600) 0%,
+    var(--codex-gold-400) 50%,
+    var(--codex-gold-600) 100%
+  );
+  opacity: 0.3;
+}
+
+.codex-theme .scroll-container::before {
+  top: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.codex-theme .scroll-container::after {
+  bottom: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Livro 3D */
+.codex-theme .book-3d {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.codex-theme .book-cover {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.codex-theme .book-cover.open {
+  transform: rotateY(-180deg);
+}
+
+.codex-theme .book-front,
+.codex-theme .book-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+}
+
+.codex-theme .book-front {
+  background: linear-gradient(135deg, var(--codex-parchment-300), var(--codex-parchment-200));
+  border: 3px solid var(--codex-gold-600);
+  border-radius: 4px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    inset 0 0 40px rgba(101, 94, 71, 0.2);
+}
+
+.codex-theme .book-back {
+  background: var(--codex-parchment-100);
+  transform: rotateY(180deg);
+  border: 3px solid var(--codex-gold-600);
+  border-radius: 4px;
+}
+
+/* Selo de cera melhorado */
 .codex-theme .wax-seal {
   width: 64px;
   height: 64px;
@@ -257,14 +386,10 @@
     0 0 50px rgba(170, 53, 49, 0.4);
 }
 
-.codex-theme .wax-seal:active {
-  animation: codex-sealPress 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
 .codex-theme .wax-seal-sm { width: 40px; height: 40px; }
 .codex-theme .wax-seal-lg { width: 96px; height: 96px; }
 
-/* Divisor Sagrado */
+/* Divisor sagrado */
 .codex-theme .sacred-divider {
   display: flex;
   align-items: center;
@@ -283,13 +408,60 @@
   background: linear-gradient(to right, transparent, var(--codex-gold-600), transparent);
 }
 
-.codex-theme .divider-icon {
-  color: var(--codex-gold-600);
-  font-size: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+/* Ornamentos de canto */
+.codex-theme .corner-ornament {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  pointer-events: none;
+  opacity: 0.6;
 }
 
-/* Citação Medieval */
+.codex-theme .corner-ornament.top-left {
+  top: 16px;
+  left: 16px;
+  border-top: 2px solid var(--codex-gold-600);
+  border-left: 2px solid var(--codex-gold-600);
+}
+
+.codex-theme .corner-ornament.top-right {
+  top: 16px;
+  right: 16px;
+  border-top: 2px solid var(--codex-gold-600);
+  border-right: 2px solid var(--codex-gold-600);
+}
+
+.codex-theme .corner-ornament.bottom-left {
+  bottom: 16px;
+  left: 16px;
+  border-bottom: 2px solid var(--codex-gold-600);
+  border-left: 2px solid var(--codex-gold-600);
+}
+
+.codex-theme .corner-ornament.bottom-right {
+  bottom: 16px;
+  right: 16px;
+  border-bottom: 2px solid var(--codex-gold-600);
+  border-right: 2px solid var(--codex-gold-600);
+}
+
+/* Letra capitular */
+.codex-theme .drop-cap::first-letter {
+  float: left;
+  font-family: var(--codex-font-display);
+  font-size: 5rem;
+  line-height: 0.85;
+  padding-right: 12px;
+  padding-top: 8px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--codex-gold-600) 0%, var(--codex-vermillion-700) 50%, var(--codex-vermillion-900) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.15));
+}
+
+/* Citação medieval */
 .codex-theme .quote-medieval {
   position: relative;
   padding: 1.5rem 2rem;
@@ -313,20 +485,28 @@
   font-size: 3.5rem;
   color: var(--codex-vermillion-700);
   opacity: 0.3;
+  font-family: serif;
 }
 
-.codex-theme .quote-source {
-  display: block;
-  margin-top: 1rem;
-  font-family: var(--codex-font-headline);
-  font-size: 0.75rem;
-  letter-spacing: 0.15em;
+/* Texto iluminado */
+.codex-theme .illuminated-text {
+  background: linear-gradient(135deg, var(--codex-gold-600) 0%, var(--codex-gold-400) 50%, var(--codex-gold-600) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 4px rgba(212, 160, 23, 0.3));
+}
+
+/* Rubric */
+.codex-theme .rubric {
   color: var(--codex-vermillion-700);
-  font-style: normal;
-  text-align: right;
+  font-family: var(--codex-font-headline);
+  font-weight: 700;
+  font-size: 1.1em;
+  letter-spacing: 0.05em;
 }
 
-/* Card de Princípio */
+/* Card de princípio */
 .codex-theme .principle-card {
   position: relative;
   padding: 1.5rem;
@@ -340,7 +520,9 @@
 .codex-theme .principle-card::before {
   content: "";
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 3px;
   background: linear-gradient(to right, transparent, var(--codex-gold-600), transparent);
   opacity: 0.5;
@@ -362,74 +544,7 @@
   color: var(--codex-vermillion-700);
 }
 
-/* Ornamentos de Canto */
-.codex-theme .corner-ornament {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-.codex-theme .corner-ornament.top-left {
-  top: 16px; left: 16px;
-  border-top: 2px solid var(--codex-gold-600);
-  border-left: 2px solid var(--codex-gold-600);
-}
-
-.codex-theme .corner-ornament.top-right {
-  top: 16px; right: 16px;
-  border-top: 2px solid var(--codex-gold-600);
-  border-right: 2px solid var(--codex-gold-600);
-}
-
-.codex-theme .corner-ornament.bottom-left {
-  bottom: 16px; left: 16px;
-  border-bottom: 2px solid var(--codex-gold-600);
-  border-left: 2px solid var(--codex-gold-600);
-}
-
-.codex-theme .corner-ornament.bottom-right {
-  bottom: 16px; right: 16px;
-  border-bottom: 2px solid var(--codex-gold-600);
-  border-right: 2px solid var(--codex-gold-600);
-}
-
-/* Letra Capitular */
-.codex-theme .drop-cap::first-letter {
-  float: left;
-  font-family: var(--codex-font-display);
-  font-size: 5rem;
-  line-height: 0.85;
-  padding-right: 12px;
-  padding-top: 8px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--codex-gold-600) 0%, var(--codex-vermillion-700) 50%, var(--codex-vermillion-900) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.15));
-}
-
-/* Rubric */
-.codex-theme .rubric {
-  color: var(--codex-vermillion-700);
-  font-family: var(--codex-font-headline);
-  font-weight: 700;
-  font-size: 1.1em;
-  letter-spacing: 0.05em;
-}
-
-/* Texto Iluminado */
-.codex-theme .illuminated-text {
-  background: linear-gradient(135deg, var(--codex-gold-600) 0%, var(--codex-gold-400) 50%, var(--codex-gold-600) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 2px 4px rgba(212, 160, 23, 0.3));
-}
-
-/* Candle Glow */
+/* Candle glow */
 .codex-theme .candle-glow {
   position: relative;
 }
@@ -442,6 +557,11 @@
   pointer-events: none;
   animation: codex-flicker 4s ease-in-out infinite;
   z-index: -1;
+}
+
+@keyframes codex-flicker {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.92; filter: brightness(1.05); }
 }
 
 /* Badges */
@@ -495,51 +615,12 @@
   border: 1px solid var(--codex-vermillion-700);
 }
 
-/* Botões */
-.codex-theme .btn-primary {
-  background: linear-gradient(135deg, var(--codex-vermillion-700) 0%, var(--codex-vermillion-800) 100%);
-  color: var(--codex-parchment-100);
-  border: none;
-  padding: var(--codex-space-md) var(--codex-space-xl);
-  font-family: var(--codex-font-headline);
-  font-size: 0.85rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  font-weight: 700;
-  border-radius: 2px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(139, 29, 29, 0.3);
+@keyframes codex-pulseCritical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-.codex-theme .btn-primary:hover {
-  background: linear-gradient(135deg, var(--codex-vermillion-600) 0%, var(--codex-vermillion-700) 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 29, 29, 0.4);
-}
-
-.codex-theme .btn-secondary {
-  background: transparent;
-  color: var(--codex-gold-700);
-  border: 2px solid var(--codex-gold-600);
-  padding: var(--codex-space-md) var(--codex-space-xl);
-  font-family: var(--codex-font-headline);
-  font-size: 0.85rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  font-weight: 700;
-  border-radius: 2px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.codex-theme .btn-secondary:hover {
-  background: rgba(212, 160, 23, 0.1);
-  border-color: var(--codex-gold-500);
-  transform: translateY(-2px);
-}
-
-/* Nav Item */
+/* Nav item */
 .codex-theme .nav-item {
   display: flex;
   align-items: center;
@@ -579,101 +660,8 @@
   border-radius: 0 2px 2px 0;
 }
 
-/* Tabelas */
-.codex-theme .codex-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--codex-font-body);
-  background: var(--codex-parchment-100);
-  border: 1px solid var(--codex-parchment-400);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.codex-theme .codex-table thead {
-  background: linear-gradient(135deg, var(--codex-parchment-300) 0%, var(--codex-parchment-400) 100%);
-}
-
-.codex-theme .codex-table th {
-  font-family: var(--codex-font-headline);
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--codex-ink-700);
-  padding: var(--codex-space-md);
-  text-align: left;
-  border-bottom: 2px solid var(--codex-gold-600);
-  font-weight: 700;
-}
-
-.codex-theme .codex-table td {
-  padding: var(--codex-space-md);
-  border-bottom: 1px solid var(--codex-parchment-300);
-  color: var(--codex-ink-600);
-}
-
-.codex-theme .codex-table tr:hover {
-  background: rgba(212, 160, 23, 0.05);
-}
-
-/* Alerts */
-.codex-theme .alert {
-  padding: var(--codex-space-md) var(--codex-space-lg);
-  border-radius: 2px;
-  margin: var(--codex-space-md) 0;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--codex-space-md);
-  font-family: var(--codex-font-body);
-}
-
-.codex-theme .alert-warning {
-  background: rgba(212, 160, 23, 0.1);
-  border: 1px solid var(--codex-gold-500);
-  color: var(--codex-gold-800);
-  border-left: 4px solid var(--codex-gold-600);
-}
-
-.codex-theme .alert-danger {
-  background: rgba(170, 36, 36, 0.1);
-  border: 1px solid var(--codex-vermillion-600);
-  color: var(--codex-vermillion-800);
-  border-left: 4px solid var(--codex-vermillion-700);
-}
-
-.codex-theme .alert-success {
-  background: rgba(85, 112, 85, 0.1);
-  border: 1px solid var(--codex-sage-500);
-  color: var(--codex-sage-700);
-  border-left: 4px solid var(--codex-sage-600);
-}
-
-/* Progress Bar */
-.codex-theme .progress-bar {
-  height: 6px;
-  background: var(--codex-parchment-400);
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.codex-theme .progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--codex-vermillion-700) 0%, var(--codex-gold-500) 100%);
-  border-radius: 9999px;
-  transition: width 0.6s ease;
-}
-
-/* Folio Number */
-.codex-theme .folio-number {
-  font-family: var(--codex-font-headline);
-  font-size: 0.75rem;
-  letter-spacing: 0.2em;
-  color: rgba(120, 89, 25, 0.5);
-  text-transform: uppercase;
-}
-
 /* ========================================
-   UTILITÁRIOS DE COR (escopados)
+   UTILITÁRIOS
    ======================================== */
 .codex-theme .text-parchment { color: var(--codex-parchment-200); }
 .codex-theme .text-ink-codex { color: var(--codex-ink-700); }
@@ -685,21 +673,8 @@
 .codex-theme .bg-ink-codex { background-color: var(--codex-ink-800); }
 .codex-theme .bg-vermillion { background-color: var(--codex-vermillion-700); }
 .codex-theme .bg-gold { background-color: var(--codex-gold-600); }
+.codex-theme .bg-sage { background-color: var(--codex-sage-600); }
 
 .codex-theme .border-parchment { border-color: var(--codex-parchment-400); }
 .codex-theme .border-gold { border-color: var(--codex-gold-600); }
 .codex-theme .border-vermillion { border-color: var(--codex-vermillion-600); }
-
-/* ========================================
-   RESPONSIVIDADE DO CODEX
-   ======================================== */
-@media (max-width: 768px) {
-  .codex-theme .text-display-lg { font-size: 2.5rem; }
-  .codex-theme .text-headline-lg { font-size: 1.5rem; }
-  .codex-theme .text-headline-md { font-size: 1.25rem; }
-  .codex-theme .drop-cap::first-letter { font-size: 3.5rem; }
-  .codex-theme .wax-seal { width: 48px; height: 48px; }
-  .codex-theme .wax-seal-lg { width: 72px; height: 72px; }
-  .codex-theme .corner-ornament { width: 24px; height: 24px; }
-  .codex-theme .quote-medieval { font-size: 1.1rem; padding: 1rem 1.25rem; }
-}

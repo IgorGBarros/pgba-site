@@ -13,7 +13,7 @@ import PGBASite from "./pages/pgba/PGBASite";
 import Portfolio from "./pages/pgba/Portfolio";
 import TermsOfUse from "./pages/TermsOfUse";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Conhecimento from "./pages/pgba/Conhecimento";
+import Conhecimento from "./pages/pgba/ManualTurnaround";
 
 const queryClient = new QueryClient();
 
