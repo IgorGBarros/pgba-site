@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pergaminho do Turnaround - Manual Universal</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* Cores do Design System */
+            --pergaminho: #F2E7C9;
+            --pergaminho-escuro: #E5D4A8;
+            --areia-antiga: #E5D8B0;
+            --marrom-tinta: #4A3520;
+            --marrom-escuro: #2C1F16;
+            --vermelho-cera: #8B1E1E;
+            --vermelho-escuro: #5C1414;
+            --dourado: #C8A258;
+            --dourado-claro: #D4B76A;
+            --preto-soft: #1E1A16;
+            --sombra: rgba(44, 31, 22, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Lora', serif;
+            background: linear-gradient(135deg, #2C1F16 0%, #4A3520 100%);
+            color: var(--marrom-tinta);
+            line-height: 1.7;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Container Principal */
+        .pergaminho-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--pergaminho);
+            background-image: 
+                url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E"),
+                linear-gradient(to bottom, var(--pergaminho), var(--areia-antiga));
+            box-shadow: 
+                0 0 60px var(--sombra),
+                inset 0 0 120px rgba(139, 30, 30, 0.05);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Bordas Decorativas */
+        .pergaminho-container::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border: 2px solid var(--dourado);
+            border-radius: 4px;
+            pointer-events: none;
+            box-shadow: inset 0 0 20px rgba(200, 162, 88, 0.2);
+        }
+
+        .pergaminho-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 30%, rgba(200, 162, 88, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(139, 30, 30, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 60px 40px 40px;
+            position: relative;
+            border-bottom: 3px double var(--dourado);
+            margin-bottom: 40px;
+        }
+
+        .header::before,
+        .header::after {
+            content: '❧';
+            position: absolute;
+            font-size: 24px;
+            color: var(--dourado);
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .header::before {
+            left: 40px;
+        }
+
+        .header::after {
+            right: 40px;
+        }
+
+        .titulo-principal {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 900;
+            color: var(--marrom-tinta);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .subtitulo {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(1rem, 2.5vw, 1.3rem);
+            color: var(--vermelho-cera);
+            font-weight: 600;
+            font-style: italic;
+            letter-spacing: 1px;
+        }
+
+        .decoracao-header {
+            width: 200px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--dourado), transparent);
+            margin: 20px auto;
+        }
+
+        /* Navegação */
+        .navegacao {
+            background: rgba(139, 30, 30, 0.05);
+            padding: 30px 40px;
+            border-bottom: 1px solid var(--dourado);
+            margin-bottom: 40px;
+        }
+
+        .navegacao-titulo {
+            font-family: 'Cinzel', serif;
+            font-size: 1.3rem;
+            color: var(--marrom-tinta);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .navegacao-lista {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            list-style: none;
+        }
+
+        .navegacao-item a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--marrom-tinta);
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .navegacao-item a:hover {
+            background: rgba(200, 162, 88, 0.2);
+            color: var(--vermelho-cera);
+            transform: translateX(5px);
+        }
+
+        .navegacao-item i {
+            color: var(--dourado);
+            font-size: 0.9rem;
+        }
+
+        /* Conteúdo Principal */
+        .conteudo {
+            padding: 0 50px 60px;
+        }
+
+        /* Seções */
+        .secao {
+            margin-bottom: 60px;
+            scroll-margin-top: 20px;
+        }
+
+        .secao-titulo {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+            color: var(--marrom-tinta);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--dourado);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .secao-titulo i {
+            color: var(--vermelho-cera);
+            font-size: 1.5rem;
+        }
+
+        .secao-subtitulo {
+            font-family: 'Cinzel', serif;
+            font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+            color: var(--vermelho-cera);
+            margin: 35px 0 20px;
+            font-weight: 600;
+        }
+
+        /* Parágrafos e Textos */
+        p {
+            margin-bottom: 20px;
+            text-align: justify;
+            hyphens: auto;
+        }
+
+        /* Citações */
+        .citacao {
+            background: rgba(139, 30, 30, 0.08);
+            border-left: 4px solid var(--vermelho-cera);
+            padding: 25px 30px;
+            margin: 30px 0;
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .citacao::before {
+            content: '"';
+            font-family: 'Cinzel', serif;
+            font-size: 4rem;
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            color: var(--dourado);
+            opacity: 0.4;
+            line-height: 1;
+        }
+
+        .citacao-autor {
+            display: block;
+            margin-top: 15px;
+            font-weight: 600;
+            color: var(--marrom-tinta);
+            font-style: normal;
+            text-align: right;
+        }
+
+        /* Cards de Pergunta e Resposta */
+        .card-pergunta {
+            background: linear-gradient(135deg, rgba(200, 162, 88, 0.15), rgba(139, 30, 30, 0.08));
+            border: 1px solid var(--dourado);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 30px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .pergunta {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            color: var(--vermelho-cera);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .pergunta i {
+            color: var(--dourado);
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .resposta {
+            padding-left: 30px;
+            border-left: 3px solid var(--dourado);
+        }
+
+        /* Referências */
+        .referencia {
+            background: rgba(44, 31, 22, 0.05);
+            border-radius: 6px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .referencia-titulo {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            color: var(--marrom-tinta);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .referencia-titulo i {
+            color: var(--dourado);
+        }
+
+        .referencia-texto {
+            font-style: italic;
+            color: var(--marrom-tinta);
+            padding-left: 28px;
+        }
+
+        .referencia-explicacao {
+            margin-top: 12px;
+            padding-left: 28px;
+            font-size: 0.95rem;
+        }
+
+        .referencia-explicacao strong {
+            color: var(--vermelho-cera);
+        }
+
+        /* Tabelas */
+        .tabela-container {
+            overflow-x: auto;
+            margin: 30px 0;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--pergaminho);
+        }
+
+        thead {
+            background: linear-gradient(135deg, var(--marrom-tinta), var(--marrom-escuro));
+            color: var(--pergaminho);
+        }
+
+        th {
+            font-family: 'Cinzel', serif;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid var(--dourado);
+        }
+
+        tbody tr:hover {
+            background: rgba(200, 162, 88, 0.1);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Listas */
+        ul, ol {
+            margin: 20px 0 20px 30px;
+        }
+
+        li {
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        ul li::marker {
+            color: var(--dourado);
+            content: '❧ ';
+        }
+
+        /* Checklist */
+        .checklist {
+            list-style: none;
+            margin: 20px 0;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 12px 20px 12px 45px;
+            position: relative;
+            background: rgba(200, 162, 88, 0.1);
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 3px solid var(--dourado);
+        }
+
+        .checklist li::before {
+            content: '☐';
+            position: absolute;
+            left: 15px;
+            color: var(--vermelho-cera);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Código e Blocos Técnicos */
+        .codigo-bloco {
+            background: var(--marrom-escuro);
+            color: var(--pergaminho);
+            padding: 25px;
+            border-radius: 6px;
+            margin: 25px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            border: 1px solid var(--dourado);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+        }
+
+        /* Símbolos e Ícones Decorativos */
+        .simbolo-central {
+            text-align: center;
+            font-size: 3rem;
+            color: var(--dourado);
+            margin: 40px 0;
+            opacity: 0.6;
+        }
+
+        .divisor {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 40px 0;
+            color: var(--dourado);
+        }
+
+        .divisor::before,
+        .divisor::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--dourado), transparent);
+        }
+
+        /* Footer */
+        .footer {
+            background: linear-gradient(135deg, var(--marrom-tinta), var(--marrom-escuro));
+            color: var(--pergaminho);
+            padding: 50px 40px;
+            text-align: center;
+            border-top: 3px double var(--dourado);
+            margin-top: 60px;
+        }
+
+        .footer-frase {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--dourado);
+        }
+
+        .footer-texto {
+            font-style: italic;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+
+        .footer-assinatura {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            color: var(--dourado-claro);
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(200, 162, 88, 0.3);
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .pergaminho-container::before {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+            }
+
+            .header {
+                padding: 40px 20px 30px;
+            }
+
+            .header::before,
+            .header::after {
+                display: none;
+            }
+
+            .conteudo {
+                padding: 0 25px 40px;
+            }
+
+            .navegacao {
+                padding: 20px;
+            }
+
+            .navegacao-lista {
+                grid-template-columns: 1fr;
+            }
+
+            .card-pergunta,
+            .citacao,
+            .referencia {
+                padding: 20px;
+            }
+
+            .codigo-bloco {
+                padding: 15px;
+                font-size: 0.85rem;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .pergaminho-container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+
+            .navegacao {
+                page-break-inside: avoid;
+            }
+
+            .secao {
+                page-break-inside: avoid;
+            }
+
+            .card-pergunta {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* Animações sutis */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .secao {
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        /* Scroll suave */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Destaque para palavras-chave */
+        strong {
+            color: var(--vermelho-cera);
+            font-weight: 600;
+        }
+
+        em {
+            color: var(--marrom-tinta);
+            font-style: italic;
+        }
+
+        /* Box de alerta/importante */
+        .alerta {
+            background: linear-gradient(135deg, rgba(139, 30, 30, 0.1), rgba(200, 162, 88, 0.1));
+            border: 2px solid var(--vermelho-cera);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .alerta::before {
+            content: '⚠';
+            position: absolute;
+            top: -15px;
+            left: 30px;
+            background: var(--pergaminho);
+            padding: 0 10px;
+            color: var(--vermelho-cera);
+            font-size: 1.5rem;
+        }
+
+        .alerta-titulo {
+            font-family: 'Cinzel', serif;
+            color: var(--vermelho-cera);
+            font-weight: 700;
+            margin-bottom: 10px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="pergaminho-container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="titulo-principal">Pergaminho do Turnaround</h1>
+            <div class="decoracao-header"></div>
+            <p class="subtitulo">Manual Universal: O Método de Reestruturação Humana</p>
+            <p style="margin-top: 15px; font-style: italic; color: var(--marrom-tinta);">
+                Previsibilidade, Comportamento e Sistema Financeiro Baseado em Princípios Eternos
+            </p>
+        </header>
+
+        <!-- Navegação -->
+        <nav class="navegacao">
+            <h2 class="navegacao-titulo">
+                <i class="fas fa-compass"></i>
+                Navegação do Pergaminho
+            </h2>
+            <ul class="navegacao-lista">
+                <li class="navegacao-item">
+                    <a href="#introducao">
+                        <i class="fas fa-scroll"></i>
+                        Introdução
+                    </a>
+                </li>
+                <li class="navegacao-item">
+                    <a href="#fundamentos">
+                        <i class="fas fa-columns"></i>
+                        Fundamentos
+                    </a>
+                </li>
+                <li class="navegacao-item">
+                    <a href="#metodo">
+                        <i class="fas fa-cogs"></i>
+                        O Método
+                    </a>
+                </li>
+                <li class="navegacao-item">
+                    <a href="#comportamento">
+                        <i class="fas fa-brain"></i>
+                        Comportamento
+                    </a>
+                </li>
+                <li class="navegacao-item">
+                    <a href="#sistema">
+                        <i class="fas fa-sitemap"></i>
+                        Sistema
+                    </a>
+                </li>
+                <li class="navegacao-item">
+                    <a href="#humanidade">
+                        <i class="fas fa-users"></i>
+                        Humanidade
+                    </a>
+                </li>
+                <li class="navegacao-item">
+                    <a href="#conclusao">
+                        <i class="fas fa-flag-checkered"></i>
+                        Conclusão
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Conteúdo Principal -->
+        <main class="conteudo">
+            <!-- Introdução -->
+            <section id="introducao" class="secao">
+                <h2 class="secao-titulo">
+                    <i class="fas fa-book-open"></i>
+                    Introdução: Por Que Este Material Existe
+                </h2>
+                
+                <div class="citacao">
+                    "O sábio edifica sua casa sobre a rocha; o insensato, sobre a areia."
+                    <span class="citacao-autor">— Mateus 7:24</span>
+                </div>
+
+                <p>
+                    Este manual não é sobre dinheiro. É sobre <strong>governança pessoal</strong>.
+                </p>
+                <p>
+                    Não é sobre enriquecer. É sobre <strong>sobreviver com dignidade</strong>.
+                </p>
+                <p>
+                    Não é sobre motivação. É sobre <strong>método</strong>.
+                </p>
+
+                <div class="alerta">
+                    <div class="alerta-titulo">Ideia Central</div>
+                    <p style="margin: 0;">
+                        <strong>Pessoas quebram pelo mesmo motivo que empresas:</strong> falta de previsibilidade, contratos mal estruturados e decisões sob impulso.
+                    </p>
+                </div>
+
+                <p>
+                    Este documento consolida conceitos de:
+                </p>
+                <ul>
+                    <li>📜 <strong>Bíblia e sabedoria antiga</strong></li>
+                    <li>🏛️ <strong>Mitologia e arquétipos humanos</strong></li>
+                    <li>🧠 <strong>Neurociência e dopamina</strong></li>
+                    <li>🔄 <strong>Comportamento e padrões repetitivos</strong></li>
+                    <li>🏗️ <strong>Sistemas e previsibilidade</strong></li>
+                    <li>👨‍👩‍ <strong>Família como unidade econômica</strong></li>
+                    <li>💰 <strong>Finanças pessoais com mentalidade corporativa</strong></li>
+                    <li>🔄 <strong>Turnaround: reestruturação de crise</strong></li>
+                </ul>
+            </section>
+
+            <div class="divisor">
+                <i class="fas fa-feather-alt"></i>
+            </div>
+
+            <!-- Parte 1: Fundamentos -->
+            <section id="fundamentos" class="secao">
+                <h2 class="secao-titulo">
+                    <i class="fas fa-columns"></i>
+                    Parte 1: Fundamentos — O Ser Humano e o Estímulo
+                </h2>
+
+                <h3 class="secao-subtitulo">1.1 Por que o ser humano busca dopamina?</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Por que repetimos comportamentos que nos prejudicam, mesmo sabendo que são ruins?</span>
+                    </div>
+                    <div class="resposta">
+                        <p>
+                            Porque o cérebro humano foi projetado para <strong>buscar recompensa</strong>, não para <strong>planejar longo prazo</strong>.
+                        </p>
+                        <p>
+                            A dopamina não é o neurotransmissor do prazer. É o neurotransmissor da <strong>expectativa</strong>.
+                        </p>
+                        <p>
+                            Quando o cérebro antecipa uma recompensa:
+                        </p>
+                        <ul>
+                            <li>ele libera dopamina</li>
+                            <li>ele foca na busca</li>
+                            <li>ele ignora consequências futuras</li>
+                        </ul>
+                        <p>
+                            Isso funcionava bem quando a recompensa era comida e o esforço era caçar. Hoje, a recompensa é notificação, like, ganho rápido, compra impulsiva, trade, vídeo curto. E o ciclo é <strong>instantâneo</strong>.
+                        </p>
+                        <div class="citacao" style="margin-top: 20px;">
+                            <strong>Resultado:</strong> O cérebro antigo em ambiente moderno = busca constante por estímulo.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="referencia">
+                    <div class="referencia-titulo">
+                        <i class="fas fa-bible"></i>
+                        Referência Bíblica
+                    </div>
+                    <div class="referencia-texto">
+                        "Tudo me é permitido, mas nem tudo convém. Tudo me é permitido, mas eu não me deixarei dominar por nada."
+                        <br>— 1 Coríntios 6:12
+                    </div>
+                    <div class="referencia-explicacao">
+                        <strong>Explicação profunda:</strong> Paulo não está pregando restrição por restrição. Ele está ensinando <strong>governança pessoal</strong>. A liberdade absoluta sem governança vira escravidão química. Quando o cérebro busca dopamina sem filtro, a "liberdade" de fazer o que quer se torna "escravidão" ao impulso.
+                    </div>
+                </div>
+
+                <div class="referencia">
+                    <div class="referencia-titulo">
+                        <i class="fas fa-landmark"></i>
+                        Referência Mitológica
+                    </div>
+                    <div class="referencia-texto">
+                        <strong>Sísifo</strong>, condenado a empurrar uma pedra montanha acima para sempre
+                    </div>
+                    <div class="referencia-explicacao">
+                        <strong>Explicação profunda:</strong> Sísifo representa o ciclo de esforço sem conclusão. Muitas pessoas vivem o ciclo de Sísifo financeiro: ganham → gastam → se endividam → tentam recuperar → repetem. Sem método (um sistema para segurar a pedra no topo), o ciclo se repete eternamente. <strong>Esforço sem sistema é apenas movimento</strong>.
+                    </div>
+                </div>
+
+                <h3 class="secao-subtitulo">1.2 Por que pessoas inteligentes sofrem mais com impulsividade?</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Por que pessoas analíticas, responsáveis e técnicas parecem mais vulneráveis a vícios de dopamina?</span>
+                    </div>
+                    <div class="resposta">
+                        <p>
+                            Porque usam intensamente o <strong>córtex pré-frontal</strong> (planejamento, análise, controle), que consome muita energia mental.
+                        </p>
+                        <p>
+                            Quando esse sistema cansa:
+                        </p>
+                        <ul>
+                            <li>o cérebro busca recompensa rápida</li>
+                            <li>a impulsividade aumenta</li>
+                            <li>a justificativa racional aparece ("só dessa vez")</li>
+                        </ul>
+                        <p>
+                            Isso não é fraqueza. É <strong>sobrecarga cognitiva</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="referencia">
+                    <div class="referencia-titulo">
+                        <i class="fas fa-brain"></i>
+                        Neurociência Aplicada
+                    </div>
+                    <ul style="margin: 0; padding-left: 20px;">
+                        <li><strong>Córtex pré-frontal:</strong> controle, planejamento, responsabilidade</li>
+                        <li><strong>Sistema límbico:</strong> emoção, impulso, recompensa</li>
+                        <li><strong>Núcleo accumbens:</strong> centro de prazer e repetição</li>
+                    </ul>
+                    <p style="margin-top: 10px;">
+                        Quanto mais o pré-frontal trabalha, mais o límbico pede alívio.
+                    </p>
+                </div>
+
+                <div class="referencia">
+                    <div class="referencia-titulo">
+                        <i class="fas fa-bible"></i>
+                        Referência Bíblica
+                    </div>
+                    <div class="referencia-texto">
+                        "Melhor é o longânimo do que o herói da guerra, e o que domina o seu espírito do que o que toma uma cidade."
+                        <br>— Provérbios 16:32
+                    </div>
+                    <div class="referencia-explicacao">
+                        <strong>Explicação profunda:</strong> Salomão reconheceu que a conquista externa (tomar uma cidade) é mais fácil que a conquista interna (dominar o espírito). Pessoas inteligentes conquistam "cidades" (projetos, metas, conhecimento), mas falham em dominar o "espírito" (impulso, ansiedade, dopamina). <strong>Inteligência sem autodomínio é vulnerabilidade disfarçada</strong>.
+                    </div>
+                </div>
+
+                <div class="referencia">
+                    <div class="referencia-titulo">
+                        <i class="fas fa-landmark"></i>
+                        Referência Mitológica
+                    </div>
+                    <div class="referencia-texto">
+                        <strong>Ulisses e as Sereias</strong>
+                    </div>
+                    <div class="referencia-explicacao">
+                        <strong>Explicação profunda:</strong> Ulisses sabia que o canto das sereias era irresistível. Ele não confiou em sua força de vontade. Ordenou que os marinheiros o amarrassem ao mastro. Esta é a <strong>gestão de impulso por design</strong>, não por força de vontade. Modernamente: deletar apps de trade, bloquear cartões, criar barreiras físicas. A sabedoria não é resistir à tentação; é <strong>projetar um ambiente onde a tentação não possa chegar</strong>.
+                    </div>
+                </div>
+            </section>
+
+            <div class="divisor">
+                <i class="fas fa-feather-alt"></i>
+            </div>
+
+            <!-- Parte 2: Método -->
+            <section id="metodo" class="secao">
+                <h2 class="secao-titulo">
+                    <i class="fas fa-cogs"></i>
+                    Parte 2: O Método — Turnaround Pessoal
+                </h2>
+
+                <h3 class="secao-subtitulo">2.1 O que é Turnaround Pessoal?</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>O que significa "turnaround" aplicado à vida pessoal?</span>
+                    </div>
+                    <div class="resposta">
+                        <p>
+                            Turnaround é um termo corporativo para <strong>reestruturação de crise</strong>.
+                        </p>
+                        <p>
+                            Aplicado à pessoa física, significa:
+                        </p>
+                        <div class="citacao" style="margin: 20px 0;">
+                            Parar de sangrar → Estabilizar → Reconstruir → Crescer
+                        </div>
+                        <p>
+                            Não é sobre cortar tudo. É sobre <strong>eliminar contratos ruins</strong> e <strong>proteger contratos essenciais</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="tabela-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fase</th>
+                                <th>Objetivo</th>
+                                <th>Duração Típica</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>1. Contenção</strong></td>
+                                <td>Parar a sangria imediata</td>
+                                <td>0-30 dias</td>
+                            </tr>
+                            <tr>
+                                <td><strong>2. Estabilização</strong></td>
+                                <td>Criar previsibilidade básica</td>
+                                <td>30-90 dias</td>
+                            </tr>
+                            <tr>
+                                <td><strong>3. Reconstrução</strong></td>
+                                <td>Eliminar passivos tóxicos</td>
+                                <td>90-180 dias</td>
+                            </tr>
+                            <tr>
+                                <td><strong>4. Crescimento</strong></td>
+                                <td>Investir com governança</td>
+                                <td>180+ dias</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="secao-subtitulo">2.2 Classificação de Contratos: O Coração do Método</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Como classificar gastos para tomar decisões melhores?</span>
+                    </div>
+                    <div class="resposta">
+                        <p>
+                            Toda movimentação financeira deve ser classificada em <strong>três categorias</strong>:
+                        </p>
+
+                        <h4 style="font-family: 'Cinzel', serif; color: var(--marrom-tinta); margin: 25px 0 15px;">
+                            🔹 CONTRATO ESSENCIAL
+                        </h4>
+                        <ul>
+                            <li>Mantém a vida funcionando</li>
+                            <li>É previsível e inevitável</li>
+                            <li>Não carrega juros abusivos</li>
+                        </ul>
+                        <p><strong>Exemplos:</strong> Moradia, Alimentação básica, Saúde, Educação dos filhos, Transporte para trabalho, Ferramentas de trabalho</p>
+                        <p style="color: var(--vermelho-cera); font-weight: 600;">✅ Regra: Não se corta. Se renegocia.</p>
+
+                        <h4 style="font-family: 'Cinzel', serif; color: var(--marrom-tinta); margin: 25px 0 15px;">
+                            🔹 CONTRATO RUIM
+                        </h4>
+                        <ul>
+                            <li>Juros altos ou embutidos</li>
+                            <li>Consumo emocional ou impulsivo</li>
+                            <li>Prazo indefinido ou muito longo</li>
+                            <li>Não gera retorno</li>
+                        </ul>
+                        <p><strong>Exemplos:</strong> Rotativo de cartão, Cheque especial, Parcelamento de lazer, Crédito para aliviar ansiedade</p>
+                        <p style="color: var(--vermelho-cera); font-weight: 600;">❌ Regra: Eliminar prioritariamente.</p>
+
+                        <h4 style="font-family: 'Cinzel', serif; color: var(--marrom-tinta); margin: 25px 0 15px;">
+                            🔹 CUSTO DE COMPORTAMENTO
+                        </h4>
+                        <ul>
+                            <li>Despesa evitável causada por impulso, dopamina ou estresse</li>
+                            <li>Não sustenta a operação</li>
+                            <li>Gera arrependimento ou tentativa de "recuperar"</li>
+                        </ul>
+                        <p><strong>Exemplos:</strong> Trade emocional, Apostas, Compras por ansiedade, Juros por atraso evitável</p>
+                        <p style="color: var(--vermelho-cera); font-weight: 600;">⚠️ Regra: Nunca mascarar como despesa normal. Registrar separadamente.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="divisor">
+                <i class="fas fa-feather-alt"></i>
+            </div>
+
+            <!-- Parte 3: Comportamento -->
+            <section id="comportamento" class="secao">
+                <h2 class="secao-titulo">
+                    <i class="fas fa-brain"></i>
+                    Parte 3: Comportamento — Quebrando Ciclos
+                </h2>
+
+                <h3 class="secao-subtitulo">3.1 O Ciclo Dopaminérgico Financeiro</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Por que pessoas entram em ciclos de ganhar e perder dinheiro repetidamente?</span>
+                    </div>
+                    <div class="resposta">
+                        <p>
+                            Porque o cérebro interpreta <strong>ganho aleatório</strong> como <strong>habilidade</strong>, mesmo quando é sorte.
+                        </p>
+                        <p><strong>O ciclo típico:</strong></p>
+                        <ol>
+                            <li>Estresse ou tédio → busca por estímulo</li>
+                            <li>Operação/decisão rápida → ganho pequeno</li>
+                            <li>Dopamina libera → "eu consigo!"</li>
+                            <li>Nova operação → risco maior</li>
+                            <li>Perda → frustração</li>
+                            <li>Tentativa de recuperar → perda maior</li>
+                            <li>Culpa → mais estresse → volta ao passo 1</li>
+                        </ol>
+                        <p>
+                            Isso não é falta de inteligência. É <strong>reforço intermitente</strong>, o mesmo mecanismo de cassinos.
+                        </p>
+                    </div>
+                </div>
+
+                <h3 class="secao-subtitulo">3.2 Substituição de Estímulo: A Chave da Mudança</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Como parar um comportamento impulsivo sem sofrer com abstinência?</span>
+                    </div>
+                    <div class="resposta">
+                        <div class="citacao">
+                            Não elimine o estímulo. <strong>Substitua a fonte</strong>.
+                        </div>
+                        <p>
+                            O cérebro precisa de dopamina. Se você tira uma fonte sem oferecer outra, ele busca a mais forte disponível.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="tabela-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Estímulo Nocivo</th>
+                                <th>Substituição Saudável</th>
+                                <th>Por que funciona</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Trade / apostas</td>
+                                <td>Exercício físico</td>
+                                <td>Libera dopamina + endorfina sem risco financeiro</td>
+                            </tr>
+                            <tr>
+                                <td>Scroll infinito</td>
+                                <td>Leitura focada / estudo técnico</td>
+                                <td>Estímulo cognitivo com progresso real</td>
+                            </tr>
+                            <tr>
+                                <td>Compras impulsivas</td>
+                                <td>Construir algo (projeto, sistema)</td>
+                                <td>Sensação de conquista duradoura</td>
+                            </tr>
+                            <tr>
+                                <td>Decisão sob ansiedade</td>
+                                <td>Registrar + esperar 24h</td>
+                                <td>Ativa o pré-frontal antes do impulso</td>
+                            </tr>
+                            <tr>
+                                <td>Tela excessiva</td>
+                                <td>Música instrumental</td>
+                                <td>Regula emoção sem superestimular</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="divisor">
+                <i class="fas fa-feather-alt"></i>
+            </div>
+
+            <!-- Parte 4: Sistema -->
+            <section id="sistema" class="secao">
+                <h2 class="secao-titulo">
+                    <i class="fas fa-sitemap"></i>
+                    Parte 4: Sistema — Construindo Previsibilidade
+                </h2>
+
+                <h3 class="secao-subtitulo">4.1 O Modelo de ERP Pessoal</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Como estruturar finanças pessoais com mentalidade corporativa?</span>
+                    </div>
+                    <div class="resposta">
+                        <div class="citacao">
+                            Trate sua vida como uma <strong>microempresa com um único cliente: você mesmo</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <h4 style="font-family: 'Cinzel', serif; color: var(--marrom-tinta); margin: 25px 0 15px;">
+                    Estrutura Mínima do ERP Pessoal
+                </h4>
+
+                <div class="checklist">
+                    <li><strong>Módulo 1: Receitas</strong> — Fixas, Variáveis previsíveis, Extraordinárias (não contar como base)</li>
+                    <li><strong>Módulo 2: Contratos</strong> — Essenciais, Financeiros, Ruins (a eliminar prioritariamente)</li>
+                    <li><strong>Módulo 3: Fluxo de Caixa</strong> — Projeção mensal, trimestral, Alertas de risco</li>
+                    <li><strong>Módulo 4: Comportamento</strong> — Registro de custos, Gatilhos, Substituições</li>
+                    <li><strong>Módulo 5: Metas e Marcos</strong> — Curto (30 dias), Médio (90 dias), Longo (180+ dias)</li>
+                </div>
+
+                <h3 class="secao-subtitulo">4.2 A Regra dos 90 Dias</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Por que 90 dias é o horizonte ideal para mudança comportamental?</span>
+                    </div>
+                    <div class="resposta">
+                        <p>Porque é tempo suficiente para:</p>
+                        <ul>
+                            <li>criar novo hábito</li>
+                            <li>reduzir impulso antigo</li>
+                            <li>ver resultado tangível</li>
+                            <li>ajustar o método</li>
+                        </ul>
+                        <p>E é tempo curto o bastante para:</p>
+                        <ul>
+                            <li>não desanimar</li>
+                            <li>manter foco</li>
+                            <li>medir progresso</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <div class="divisor">
+                <i class="fas fa-feather-alt"></i>
+            </div>
+
+            <!-- Parte 5: Humanidade -->
+            <section id="humanidade" class="secao">
+                <h2 class="secao-titulo">
+                    <i class="fas fa-users"></i>
+                    Parte 5: Conceitos de Humanidade — Além do Financeiro
+                </h2>
+
+                <h3 class="secao-subtitulo">5.1 O Ser Humano Como Sistema</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Por que tratar a vida como "sistema" funciona melhor que tratar como "vontade"?</span>
+                    </div>
+                    <div class="resposta">
+                        <div class="citacao">
+                            Porque <strong>sistemas são previsíveis; vontades são voláteis</strong>.
+                        </div>
+                        <p>O ser humano é composto por:</p>
+                        <ul>
+                            <li><strong>Corpo</strong> (físico, energia, saúde)</li>
+                            <li><strong>Mente</strong> (pensamento, análise, planejamento)</li>
+                            <li><strong>Emoção</strong> (sentimento, impulso, conexão)</li>
+                            <li><strong>Espírito</strong> (propósito, valores, legado)</li>
+                        </ul>
+                        <p>Quando um desses pilares está desalinhado, o sistema inteiro oscila.</p>
+                        <div class="codigo-bloco" style="margin: 20px 0;">
+Estabilidade = Corpo + Mente + Emoção + Espírito em sincronia
+                        </div>
+                        <p>Se um falha, os outros compensam — até quebrar.</p>
+                    </div>
+                </div>
+
+                <h3 class="secao-subtitulo">5.2 Influência e Padrão: O Poder do Exemplo</h3>
+
+                <div class="card-pergunta">
+                    <div class="pergunta">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Por que mudar a si mesmo é mais eficaz que cobrar mudança dos outros?</span>
+                    </div>
+                    <div class="resposta">
+                        <div class="citacao">
+                            Porque <strong>seres humanos aprendem por observação, não por discurso</strong>.
+                        </div>
+                        <p>Crianças, cônjuges, colegas — todos absorvem <strong>padrão</strong>, não palavra.</p>
+                        <p>Se você:</p>
+                        <ul>
+                            <li>fala de disciplina mas age por impulso</li>
+                            <li>prega previsibilidade mas decide sob pressão</li>
+                            <li>cobra controle mas vive no improviso</li>
+                        </ul>
+                        <p>O sistema inteiro desconfia.</p>
+                        <p>Mas se você executa antes de explicar, mostra resultado antes de pedir adesão, mantém regra mesmo quando ninguém vê... <strong>O ambiente muda sozinho</strong>.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer" id="conclusao">
+            <div class="footer-frase">
+                "A verdade vos libertará."
+            </div>
+            <p style="font-style: italic; margin-bottom: 20px;">— João 8:32</p>
+            <p class="footer-texto">
+                Mas a verdade só liberta quem a <strong>encara</strong>, <strong>organiza</strong> e <strong>age</strong>.
+            </p>
+            <p class="footer-texto">
+                Este manual não promete enriquecimento rápido, vida sem esforço ou felicidade constante.
+            </p>
+            <p class="footer-texto">
+                Promete apenas: clareza sobre o que está acontecendo, método para sair do caos, disciplina para não voltar, dignidade para reconstruir.
+            </p>
+            <div class="decoracao-header" style="margin: 30px auto;"></div>
+            <div class="citacao" style="background: rgba(200, 162, 88, 0.1); border-color: var(--dourado); max-width: 700px; margin: 30px auto;">
+                "O sistema cria o caos para vender conforto.<br>
+                O método conforta porque devolve o controle."
+            </div>
+            <p class="footer-assinatura">
+                <i class="fas fa-feather-alt" style="margin-right: 10px;"></i>
+                Pergaminho do Turnaround
+                <i class="fas fa-feather-alt" style="margin-left: 10px;"></i>
+                <br>
+                <span style="font-size: 0.9rem; opacity: 0.8; margin-top: 10px; display: block;">
+                    Documento finalizado para replicação educacional<br>
+                    Baseado em princípios universais de comportamento, neurociência, sabedoria antiga e gestão corporativa
+                </span>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Script para navegação suave e interatividade -->
+    <script>
+        // Smooth scroll para links de navegação
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Animação de entrada das seções ao scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.secao').forEach(secao => {
+            secao.style.opacity = '0';
+            secao.style.transform = 'translateY(20px)';
+            secao.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            observer.observe(secao);
+        });
+
+        // Highlight da navegação ativa
+        window.addEventListener('scroll', () => {
+            let current = '';
+            document.querySelectorAll('.secao').forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (scrollY >= (sectionTop - 200)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            document.querySelectorAll('.navegacao-item a').forEach(link => {
+                link.style.background = '';
+                link.style.color = '';
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.style.background = 'rgba(200, 162, 88, 0.3)';
+                    link.style.color = 'var(--vermelho-cera)';
+                }
+            });
+        });
+
+        // Funcionalidade de impressão/PDF
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
+    </script>
+</body>
+</html>
