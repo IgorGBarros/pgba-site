@@ -13,6 +13,7 @@ import PGBASite from "./pages/pgba/PGBASite";
 import Portfolio from "./pages/pgba/Portfolio";
 import TermsOfUse from "./pages/TermsOfUse";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Conhecimento from "./pages/pgba/Conhecimento";
 
 const queryClient = new QueryClient();
 
@@ -43,7 +44,7 @@ const App = () => (
               <Route path="/termos" element={<TermsOfUse />} />
               <Route path="/site" element={<PGBASite />} />
               <Route path="/neural" element={<PGBANeural />} />
-              <Route path="conhecimento" element={<Navigate to="/site#conhecimento" replace />} />
+              <Route path="/conhecimento" element={<Conhecimento />} />
             </Routes>
           </AppLayout>
         </BrowserRouter>
