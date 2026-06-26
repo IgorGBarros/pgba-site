@@ -36,7 +36,7 @@ import {
   Layers,
   CircleDot,
 } from 'lucide-react';
-
+import '../../styles/codex.css';
 // ============================================================
 // TIPOS E INTERFACES
 // ============================================================
