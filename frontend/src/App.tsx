@@ -43,6 +43,7 @@ const App = () => (
               <Route path="/termos" element={<TermsOfUse />} />
               <Route path="/site" element={<PGBASite />} />
               <Route path="/neural" element={<PGBANeural />} />
+              <Route path="conhecimento" element={<Navigate to="/site#conhecimento" replace />} />
             </Routes>
           </AppLayout>
         </BrowserRouter>
