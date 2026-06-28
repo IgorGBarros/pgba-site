@@ -678,3 +678,125 @@
 .codex-theme .border-parchment { border-color: var(--codex-parchment-400); }
 .codex-theme .border-gold { border-color: var(--codex-gold-600); }
 .codex-theme .border-vermillion { border-color: var(--codex-vermillion-600); }
+
+/* ============================================
+   PAGEFLIP - ESTILOS DO LIVRO
+   ============================================ */
+
+.demoPage {
+  background-color: var(--codex-parchment-100);
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.page-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: linear-gradient(135deg, 
+    var(--codex-parchment-50) 0%, 
+    var(--codex-parchment-100) 50%, 
+    var(--codex-parchment-200) 100%);
+  box-shadow: 
+    inset 0 0 80px rgba(101, 94, 71, 0.15),
+    inset 0 0 20px rgba(101, 94, 71, 0.08);
+  overflow: hidden;
+}
+
+.page-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(to right, rgba(74,59,42,0.12), transparent 6%, transparent 94%, rgba(74,59,42,0.12)),
+    linear-gradient(to bottom, rgba(74,59,42,0.08), transparent 4%, transparent 96%, rgba(74,59,42,0.08));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.page-content::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.75 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.3'/%3E%3C/svg%3E");
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-number {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  z-index: 10;
+}
+
+/* Container do livro */
+.book-container {
+  perspective: 2000px;
+  transform-style: preserve-3d;
+}
+
+/* Sombra do livro */
+.stf__wrapper {
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.5),
+    0 10px 20px rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+/* Animação de página virando */
+.stf__item {
+  background: linear-gradient(135deg, 
+    var(--codex-parchment-50) 0%, 
+    var(--codex-parchment-100) 100%);
+}
+
+/* Canto da página para virar */
+.stf__block {
+  background: linear-gradient(135deg, 
+    var(--codex-parchment-100) 0%, 
+    var(--codex-parchment-200) 100%);
+}
+
+/* Responsividade */
+@media (max-width: 640px) {
+  .page-content {
+    padding: 16px;
+  }
+  
+  .stf__wrapper {
+    box-shadow: 
+      0 15px 30px rgba(0, 0, 0, 0.4),
+      0 5px 10px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Efeito de profundidade nas páginas */
+.stf__item {
+  transition: box-shadow 0.3s ease;
+}
+
+.stf__item:hover {
+  box-shadow: inset 0 0 30px rgba(212, 160, 23, 0.1);
+}
+
+/* Scrollbar customizada dentro das páginas */
+.page-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.page-content::-webkit-scrollbar-track {
+  background: var(--codex-parchment-200);
+}
+
+.page-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--codex-gold-600), var(--codex-vermillion-700));
+  border-radius: 4px;
+}
+
+.page-content::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--codex-vermillion-700), var(--codex-vermillion-600));
+}
