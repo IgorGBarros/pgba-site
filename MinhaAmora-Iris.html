@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iris - Você é a Peça-Chave | Minha Amora</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* HERO SECTION */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            position: relative;
+            overflow: hidden;
+            padding: 40px 20px;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+        }
+
+        .hero-content {
+            text-align: center;
+            max-width: 900px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero h1 {
+            font-size: 4em;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.1;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .hero .subtitle {
+            font-size: 1.8em;
+            opacity: 0.95;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+
+        .hero .highlight {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 20px;
+            border-radius: 30px;
+            display: inline-block;
+            margin: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        /* SECTIONS */
+        .section {
+            padding: 100px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: 3em;
+            text-align: center;
+            margin-bottom: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+        }
+
+        /* EXPERIENCE SECTION */
+        .experience-section {
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a2e 100%);
+        }
+
+        .experience-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .exp-card {
+            background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(240,147,251,0.1) 100%);
+            border: 1px solid rgba(102,126,234,0.3);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            transition: all 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .exp-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #f093fb);
+        }
+
+        .exp-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 60px rgba(102,126,234,0.3);
+            border-color: #f093fb;
+        }
+
+        .exp-card .number {
+            font-size: 4em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .exp-card .label {
+            font-size: 1.2em;
+            color: #ccc;
+            margin-bottom: 15px;
+        }
+
+        .exp-card .description {
+            font-size: 0.95em;
+            color: #999;
+            line-height: 1.6;
+        }
+
+        /* JOURNEY SECTION */
+        .journey-section {
+            background: #0a0a0a;
+        }
+
+        .timeline {
+            position: relative;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .timeline::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(180deg, #667eea 0%, #f093fb 100%);
+            transform: translateX(-50%);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 60px;
+            width: 50%;
+            padding: 0 40px;
+        }
+
+        .timeline-item:nth-child(odd) {
+            left: 0;
+            text-align: right;
+        }
+
+        .timeline-item:nth-child(even) {
+            left: 50%;
+            text-align: left;
+        }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            top: 20px;
+            width: 20px;
+            height: 20px;
+            background: #f093fb;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(240,147,251,0.5);
+        }
+
+        .timeline-item:nth-child(odd)::before {
+            right: -10px;
+        }
+
+        .timeline-item:nth-child(even)::before {
+            left: -10px;
+        }
+
+        .timeline-content {
+            background: rgba(255,255,255,0.05);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .timeline-content h3 {
+            color: #f093fb;
+            font-size: 1.4em;
+            margin-bottom: 10px;
+        }
+
+        .timeline-content p {
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        /* MINHA AMORA PITCH */
+        .amora-section {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 100px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .amora-section::before {
+            content: "🌸";
+            position: absolute;
+            font-size: 30em;
+            opacity: 0.1;
+            right: -100px;
+            top: -100px;
+        }
+
+        .amora-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .amora-section h2 {
+            font-size: 3.5em;
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+            font-weight: 800;
+        }
+
+        .amora-section .pitch {
+            font-size: 1.5em;
+            text-align: center;
+            margin-bottom: 60px;
+            color: rgba(255,255,255,0.95);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        .market-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .market-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 35px;
+            transition: all 0.3s;
+        }
+
+        .market-card:hover {
+            transform: scale(1.05);
+            background: rgba(255,255,255,0.25);
+        }
+
+        .market-card .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .market-card h3 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        .market-card p {
+            color: rgba(255,255,255,0.9);
+            line-height: 1.6;
+        }
+
+        .market-card .stat {
+            font-size: 2.5em;
+            font-weight: 800;
+            color: white;
+            margin-top: 15px;
+            display: block;
+        }
+
+        /* YOU ARE THE KEY SECTION */
+        .key-section {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 100%);
+            padding: 100px 20px;
+            text-align: center;
+        }
+
+        .key-content {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .key-section h2 {
+            font-size: 3.5em;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+        }
+
+        .key-reasons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+        }
+
+        .reason-card {
+            background: rgba(255,255,255,0.03);
+            border: 2px solid rgba(102,126,234,0.3);
+            border-radius: 20px;
+            padding: 40px 30px;
+            transition: all 0.3s;
+        }
+
+        .reason-card:hover {
+            border-color: #f093fb;
+            background: rgba(240,147,251,0.05);
+            transform: translateY(-5px);
+        }
+
+        .reason-card .number {
+            font-size: 3em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+        }
+
+        .reason-card h3 {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        .reason-card p {
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        /* STRATEGIC ROLE */
+        .role-section {
+            background: #0a0a0a;
+            padding: 100px 20px;
+        }
+
+        .role-content {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            align-items: center;
+            margin-top: 60px;
+        }
+
+        .role-text h3 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            color: #f093fb;
+        }
+
+        .role-text p {
+            font-size: 1.2em;
+            line-height: 1.8;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        .role-visual {
+            background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(240,147,251,0.1) 100%);
+            border: 2px solid rgba(240,147,251,0.3);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .role-visual .big-icon {
+            font-size: 6em;
+            margin-bottom: 20px;
+        }
+
+        .role-visual h4 {
+            font-size: 1.8em;
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .role-visual p {
+            color: #ccc;
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+
+        /* CTA FINAL */
+        .cta-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            padding: 120px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 70% 30%, rgba(255,255,255,0.2) 0%, transparent 50%);
+        }
+
+        .cta-content {
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-section h2 {
+            font-size: 3.5em;
+            margin-bottom: 30px;
+            color: white;
+            font-weight: 800;
+        }
+
+        .cta-section p {
+            font-size: 1.5em;
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: white;
+            color: #764ba2;
+            padding: 20px 60px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.3em;
+            transition: all 0.3s;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .cta-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.4);
+        }
+
+        /* QUOTE */
+        .quote-section {
+            background: #0a0a0a;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .quote {
+            max-width: 900px;
+            margin: 0 auto;
+            font-size: 2em;
+            font-style: italic;
+            color: #ccc;
+            line-height: 1.6;
+            position: relative;
+            padding: 0 40px;
+        }
+
+        .quote::before,
+        .quote::after {
+            content: '"';
+            font-size: 4em;
+            color: #f093fb;
+            position: absolute;
+            font-family: Georgia, serif;
+        }
+
+        .quote::before {
+            top: -20px;
+            left: 0;
+        }
+
+        .quote::after {
+            bottom: -60px;
+            right: 0;
+        }
+
+        .quote-author {
+            margin-top: 30px;
+            font-size: 1em;
+            color: #f093fb;
+            font-style: normal;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5em; }
+            .hero .subtitle { font-size: 1.3em; }
+            .section-title { font-size: 2em; }
+            .amora-section h2 { font-size: 2.5em; }
+            .key-section h2 { font-size: 2.5em; }
+            .cta-section h2 { font-size: 2.5em; }
+            .timeline::before { left: 20px; }
+            .timeline-item { width: 100%; left: 0 !important; padding-left: 50px; text-align: left !important; }
+            .timeline-item::before { left: 10px !important; right: auto !important; }
+            .role-grid { grid-template-columns: 1fr; }
+            .quote { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Iris, você é muito mais valiosa do que imagina</h1>
+            <p class="subtitle">Sua experiência não acabou em janeiro de 2026.<br>Ela está apenas começando.</p>
+            <div>
+                <span class="highlight">👥 300+ consultoras lideradas</span>
+                <span class="highlight">📅 5 anos de Natura</span>
+                <span class="highlight">🎓 Administradora UNEB</span>
+                <span class="highlight">🌸 Power User Minha Amora</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- EXPERIENCE NUMBERS -->
+    <section class="experience-section">
+        <div class="section">
+            <h2 class="section-title">Olha só o que você já conquistou</h2>
+            <p style="text-align: center; font-size: 1.3em; color: #ccc; max-width: 800px; margin: 0 auto 50px;">
+                Muita gente passa a vida inteira sem construir nem metade do que você construiu. 
+                Vamos colocar em números o que você talvez não esteja enxergando:
+            </p>
+            <div class="experience-grid">
+                <div class="exp-card">
+                    <span class="number">300+</span>
+                    <div class="label">Consultoras Lideradas</div>
+                    <div class="description">
+                        Você não gerenciou planilhas. Você gerenciou PESSOAS. 
+                        Sonhos, dificuldades, vitórias. Isso é liderança real.
+                    </div>
+                </div>
+                <div class="exp-card">
+                    <span class="number">5</span>
+                    <div class="label">Anos na Natura</div>
+                    <div class="description">
+                        Meia década construindo uma das maiores redes de vendas 
+                        diretas do Brasil. Consistência que poucos têm.
+                    </div>
+                </div>
+                <div class="exp-card">
+                    <span class="number">63</span>
+                    <div class="label">Meses de Experiência</div>
+                    <div class="description">
+                        63 ciclos. 63 campanhas. 63 vezes entregando resultados 
+                        sob pressão. Isso não se aprende em curso.
+                    </div>
+                </div>
+                <div class="exp-card">
+                    <span class="number">3</span>
+                    <div class="label">Marcas Dominadas</div>
+                    <div class="description">
+                        Natura, Avon e O Boticário. Você conhece o mercado de 
+                        beleza como poucas pessoas no Brasil.
+                    </div>
+                </div>
+                <div class="exp-card">
+                    <span class="number">∞</span>
+                    <div class="label">Relacionamentos</div>
+                    <div class="description">
+                        Cada consultora, cada cliente. Uma rede de contatos que 
+                        vale mais que qualquer diploma.
+                    </div>
+                </div>
+                <div class="exp-card">
+                    <span class="number">1</span>
+                    <div class="label">Formação Sólida</div>
+                    <div class="description">
+                        Administração na UNEB + experiência prática. A combinação 
+                        perfeita entre teoria e realidade.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- JOURNEY TIMELINE -->
+    <section class="journey-section">
+        <div class="section">
+            <h2 class="section-title">Sua Jornada Te Trouxe Até Aqui</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <h3>🎓 2014-2018</h3>
+                        <p>Formação em Administração na UNEB. Base teórica sólida, visão de negócios, gestão de pessoas.</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <h3>💼 Experiências CLT</h3>
+                        <p>Diversas empresas. Aprendizado corporativo. Entendimento de como o mercado funciona por dentro.</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <h3>🌟 Novembro 2020</h3>
+                        <p>O grande salto: Líder de Negócios na Natura. 300+ consultoras sob sua responsabilidade.</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <h3>🚀 2020-2026</h3>
+                        <p>5 anos desenvolvendo equipes, criando estratégias, formando líderes. Uma escola de negócios na prática.</p>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-content">
+                        <h3>🌸 2026 - HOJE</h3>
+                        <p>Power User do Minha Amora. Gestão multimarca com IA. O próximo capítulo está começando.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MINHA AMORA PITCH -->
+    <section class="amora-section">
+        <div class="amora-content">
+            <h2>Agora vem o que realmente importa</h2>
+            <p class="pitch">
+                Existe um mercado ENORME esperando por uma solução como o <strong>Minha Amora</strong>. 
+                E você, Iris, está sentada no lugar certo, na hora certa, com a experiência certa.
+            </p>
+
+            <div class="market-grid">
+                <div class="market-card">
+                    <div class="icon">💄</div>
+                    <h3>Mercado de Beleza no Brasil</h3>
+                    <p>O Brasil é o 4º maior mercado de beleza do mundo. Milhões de consultoras vendendo Natura, Avon, Boticário...</p>
+                    <span class="stat">R$ 130 bi/ano</span>
+                </div>
+                <div class="market-card">
+                    <div class="icon">👩‍💼</div>
+                    <h3>Consultoras Independentes</h3>
+                    <p>Mais de 5 milhões de pessoas vendendo cosméticos no Brasil. A maioria usa caderninho ou planilha do Excel...</p>
+                    <span class="stat">5M+ profissionais</span>
+                </div>
+                <div class="market-card">
+                    <div class="icon">📱</div>
+                    <h3>O Problema Real</h3>
+                    <p>Consultoras perdem vendas, esquecem clientes, não controlam estoque. Precisam de tecnologia simples e acessível.</p>
+                    <span class="stat">Dor real = oportunidade</span>
+                </div>
+                <div class="market-card">
+                    <div class="icon">🤖</div>
+                    <h3>A Solução: Minha Amora</h3>
+                    <p>IA integrada, gestão multimarca, controle inteligente. Exatamente o que o mercado precisa. E você JÁ USA.</p>
+                    <span class="stat">Você é o case</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- YOU ARE THE KEY -->
+    <section class="key-section">
+        <div class="key-content">
+            <h2>Por que VOCÊ é a peça-chave?</h2>
+            <p style="font-size: 1.3em; color: #ccc; max-width: 800px; margin: 0 auto; line-height: 1.8;">
+                Eu posso desenvolver o Minha Amora. Posso criar a tecnologia mais avançada do mundo. 
+                Mas sem você, ele não vai pra frente. E vou te mostrar o porquê:
+            </p>
+
+            <div class="key-reasons">
+                <div class="reason-card">
+                    <div class="number">01</div>
+                    <h3>Você É A Cliente Perfeita</h3>
+                    <p>
+                        Você usa Natura, Avon e Boticário ao mesmo tempo. Você conhece as dores reais. 
+                        Você testa o produto todo dia. Nenhum desenvolvedor no mundo substitui isso.
+                    </p>
+                </div>
+                <div class="reason-card">
+                    <div class="number">02</div>
+                    <h3>Você Tem A Rede</h3>
+                    <p>
+                        300+ consultoras. Você conhece elas. Elas confiam em você. Quando você falar 
+                        "testa o Minha Amora", elas vão testar. Isso vale milhões em marketing.
+                    </p>
+                </div>
+                <div class="reason-card">
+                    <div class="number">03</div>
+                    <h3>Você Tem Autoridade</h3>
+                    <p>
+                        Ex-líder Natura com 5 anos de experiência. Quando você fala sobre gestão de 
+                        consultoras, o mercado escuta. Você é referência natural.
+                    </p>
+                </div>
+                <div class="reason-card">
+                    <div class="number">04</div>
+                    <h3>Você É Prova Real</h3>
+                    <p>
+                        "Eu uso e funciona" vale mais que qualquer anúncio. Você é o case de sucesso 
+                        vivo. Sua experiência vende o produto sozinha.
+                    </p>
+                </div>
+                <div class="reason-card">
+                    <div class="number">05</div>
+                    <h3>Você Entende O Cliente</h3>
+                    <p>
+                        Você sabe como uma consultora pensa, quais são as dificuldades, o que ela precisa. 
+                        Nenhum MBA ensina isso. Só quem viveu.
+                    </p>
+                </div>
+                <div class="reason-card">
+                    <div class="number">06</div>
+                    <h3>Você Completa O Time</h3>
+                    <p>
+                        Eu cuido da tecnologia. Você cuida do mercado. Juntos, somos o time perfeito 
+                        para fazer o Minha Amora decolar.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- STRATEGIC ROLE -->
+    <section class="role-section">
+        <div class="role-content">
+            <h2 class="section-title">Seu Papel Estratégico</h2>
+            
+            <div class="role-grid">
+                <div class="role-text">
+                    <h3>O Que Você Pode Fazer (e só você pode)</h3>
+                    <p>
+                        <strong>1. Validar o Produto:</strong> Testar cada funcionalidade, dar feedback real, 
+                        dizer o que funciona e o que não funciona.
+                    </p>
+                    <p>
+                        <strong>2. Criar Cases Reais:</strong> Documentar como você usa, quanto tempo economiza, 
+                        quanto vende a mais. Números reais vendem.
+                    </p>
+                    <p>
+                        <strong>3. Conectar Com A Rede:</strong> Apresentar o Minha Amora para as 300+ consultoras 
+                        que você conhece. Ser a ponte entre o produto e o mercado.
+                    </p>
+                    <p>
+                        <strong>4. Ser A Face Do Produto:</strong> Criar conteúdo, mostrar sua rotina, inspirar 
+                        outras consultoras a usarem tecnologia.
+                    </p>
+                </div>
+                <div class="role-visual">
+                    <div class="big-icon">🎯</div>
+                    <h4>De Consultora Para Líder Tech</h4>
+                    <p>
+                        Você não vai mais apenas vender cosméticos.<br>
+                        Você vai liderar uma revolução tecnológica<br>
+                        no mercado de beleza brasileiro.
+                    </p>
+                </div>
+            </div>
+
+            <div class="role-grid" style="margin-top: 80px;">
+                <div class="role-visual">
+                    <div class="big-icon">💼</div>
+                    <h4>Fora Do Mercado Formal</h4>
+                    <p>
+                        Você não está "em casa parada".<br>
+                        Você está no lugar certo para<br>
+                        construir algo muito maior que um CLT.
+                    </p>
+                </div>
+                <div class="role-text">
+                    <h3>O Que Isso Significa Na Prática</h3>
+                    <p>
+                        <strong>Curto Prazo (0-3 meses):</strong> Consolidar seu uso do Minha Amora, documentar 
+                        resultados, conversar com 10-20 consultoras da sua rede.
+                    </p>
+                    <p>
+                        <strong>Médio Prazo (3-6 meses):</strong> Criar conteúdo nas redes, fazer as primeiras 
+                        indicações, começar a ser reconhecida como "consultora tech".
+                    </p>
+                    <p>
+                        <strong>Longo Prazo (6-12 meses):</strong> Ter uma rede ativa de usuárias, gerar receita 
+                        com o produto, construir uma nova carreira.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- QUOTE -->
+    <section class="quote-section">
+        <div class="quote">
+            Você não perdeu seu emprego em janeiro de 2026. 
+            O universo te deu 4 horas livres por dia para construir algo que vai muito além de um salário.
+            <div class="quote-author">— A verdade que você precisa ouvir</div>
+        </div>
+    </section>
+
+    <!-- CTA FINAL -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Bora fazer isso acontecer?</h2>
+            <p>
+                Eu cuido do código. Você cuida do mercado.<br>
+                Juntos, a gente faz o Minha Amora virar referência no Brasil.
+            </p>
+            <a href="#" class="cta-button">💜 Vamos juntos, Iris!</a>
+        </div>
+    </section>
+
+</body>
+</html>

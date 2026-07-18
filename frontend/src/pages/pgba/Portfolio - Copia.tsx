@@ -240,8 +240,7 @@ Modelo híbrido (Software + Educação) aumenta retenção e valida a hipótese 
   status: 'Em desenvolvimento',
   statusColor: 'violet' as ColorKey,
   color: 'pink' as ColorKey,
-  // TODO: preencher com link real quando existir, ex: links: { demo: 'https://...' }
-  links: {},
+  links: { demo: '#', github: '#', docs: '#' },
   highlights: [
     'Gestão preditiva: alertas de reposição e vencimento reduzem perdas financeiras',
     'Dashboard de desempenho por marca e período com análise de margem',
@@ -270,8 +269,7 @@ A interface touch foi projetada para alta usabilidade em ambientes comerciais, i
   status: 'Protótipo Validado',
   statusColor: 'emerald',
   color: 'cyan',
-  // TODO: preencher com link real quando existir, ex: links: { demo: 'https://...' }
-  links: {},
+  links: { demo: '#', github: '#', docs: '#' },
   highlights: [
     'Monitoramento centralizado: dashboard web com status, estoque e faturamento em tempo real',
     'Controle físico via GPIO: integração de sensores e atuadores para automação da entrega',
@@ -283,8 +281,7 @@ A interface touch foi projetada para alta usabilidade em ambientes comerciais, i
     { label: 'Uptime estimado', value: '99.9%' },
     { label: 'Custo hardware', value: '~R$ 1200' },
   ],
-  // TODO: adicionar vídeo real quando disponível, ex:
-  // media: [{ type: 'video', source: 'youtube', url: 'ID_REAL_DO_VIDEO', alt: 'Demo Smart Kiosk IoT' }],
+  media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo Smart Kiosk IoT' }],
 },
   {
   id: 'power-platform-erp',
@@ -302,8 +299,7 @@ O resultado final é consolidado em dashboards Power BI interativos, oferecendo 
   status: 'Em Produção',
   statusColor: 'blue',
   color: 'blue',
-  // TODO: preencher com link real quando existir, ex: links: { demo: 'https://...' }
-  links: {},
+  links: { demo: '#', docs: '#' },
   highlights: [
     'Modernização de Legado: Substituição total de macros VBA locais por Office Scripts (TypeScript) na nuvem',
     'Orquestração Inteligente: Power Automate conectando ERP, SharePoint e notificações proativas',
@@ -315,8 +311,7 @@ O resultado final é consolidado em dashboards Power BI interativos, oferecendo 
     { label: 'Confiabilidade dos dados', value: '100%' },
     { label: 'Processos automatizados', value: '15+' },
   ],
-  // TODO: adicionar vídeo real quando disponível, ex:
-  // media: [{ type: 'video', source: 'youtube', url: 'ID_REAL_DO_VIDEO', alt: 'Demo Power Platform & ERP' }],
+  media: [{ type: 'video', source: 'youtube', url: 'SEU_ID_AQUI', alt: 'Demo Power Platform & ERP' }],
 },
   {
   id: 'rpa-supply-chain',
@@ -338,8 +333,7 @@ A arquitetura híbrida permitiu modernizar processos sem depender exclusivamente
   status: 'Em Produção',
   statusColor: 'emerald',
   color: 'emerald',
-  // TODO: preencher com link real quando existir, ex: links: { docs: 'https://...' }
-  links: {},
+  links: { docs: '#' },
   highlights: [
     'Híbrido Python/VBA: Flexibilidade para atuar tanto em ambientes web/cloud quanto em sistemas legados locais',
     'Web Scraping Estratégico: Monitoramento automático de cotações e disponibilidade em portais externos',
@@ -367,7 +361,7 @@ const PROJECT_CATEGORIES = [
 const CASE_STUDIES: CaseStudy[] = [
   {
     id: 'case-absolut-bi',
-    client: '',
+    client: 'Absolut Technologies',
     sector: 'Controladoria & Finanças',
     problem: 'Consolidação manual de DRE e Fluxo de Caixa levava dias. Dados fragmentados entre SAP Business One, Bitrix24 e planilhas Excel causavam divergências e falta de visibilidade em tempo real para a diretoria.',
     solution: 'Arquitetura completa em Power Platform: Power Apps para entrada padronizada, SharePoint como base estruturada, Office Scripts (TypeScript) substituindo VBA legado para ETL complexo e Power BI para dashboards executivos atualizados automaticamente.',
@@ -382,7 +376,7 @@ const CASE_STUDIES: CaseStudy[] = [
   },
   {
     id: 'case-braskem-rpa',
-    client: '',
+    client: 'Braskem S.A.',
     sector: 'Suprimentos & MRO',
     problem: 'Analistas gastavam +40h/mês em tarefas repetitivas: diligenciamento de pedidos, extração de dados do SAP/COUPA e consolidação de relatórios de backlog para Paradas de Manutenção. Alto risco de erro humano em dados críticos.',
     solution: 'Desenvolvimento de RPA híbrido (Python + VBA) para automação de extração de dados web (Scraping), leitura de PDFs de fornecedores e integração direta com SAP MM. Criação de dashboards Power BI para monitoramento de KPIs de suprimentos.',
@@ -393,7 +387,7 @@ const CASE_STUDIES: CaseStudy[] = [
       { label: 'Precisão de dados', value: '99.9%' },
     ],
     tags: ['Python', 'RPA', 'SAP MM', 'Web Scraping', 'Power BI'],
-    color: 'emerald', 
+    color: 'emerald',
   },
   {
     id: 'case-pgba-iot',
@@ -493,12 +487,6 @@ const EXPERIENCES: Experience[] = [
   },
 ];
 
-/* ─── HELPERS ─── */
-// Evita renderizar botões de link "mortos" (undefined, vazio ou placeholder '#')
-function isValidLink(url?: string): url is string {
-  return !!url && url.trim() !== '' && url.trim() !== '#';
-}
-
 /* ─── COMPONENTES AUXILIARES ─── */
 
 function SkillBadge({ skill }: { skill: Skill }) {
@@ -544,7 +532,6 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
   const dc = (dark: string, light: string) => (isDark ? dark : light);
   const colors = COLOR_MAP[project.color];
   const statusColors = COLOR_MAP[project.statusColor];
-  const [imgError, setImgError] = useState(false);
 
   return (
     <motion.div
@@ -555,24 +542,17 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
       onClick={onClick}
       className={`group cursor-pointer rounded-2xl border overflow-hidden transition-all duration-300 ${
         isDark
-          ? `bg-slate-900/40 border-slate-800/50 hover:bg-slate-900/60 ${colors.hoverBorder}`
-          : `bg-white border-slate-200 hover:bg-slate-50 ${colors.hoverBorderLight} hover:shadow-lg`
+          ? `bg-slate-900/40 border-slate-800/50 hover:bg-slate-900/60 hover:border-${project.color}-500/30`
+          : `bg-white border-slate-200 hover:bg-slate-50 hover:border-${project.color}-300 hover:shadow-lg`
       }`}
     >
       {/* Imagem/Thumbnail */}
       <div className="relative aspect-video overflow-hidden">
-        {imgError ? (
-          <div className={`w-full h-full flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-            <Code2 className={`w-10 h-10 ${dc('text-slate-600', 'text-slate-300')}`} />
-          </div>
-        ) : (
-          <img
-            src={project.image}
-            alt={project.title}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        )}
+        <img 
+          src={project.image} 
+          alt={project.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
         <div className={`absolute inset-0 bg-gradient-to-t ${isDark ? 'from-slate-900/80' : 'from-white/80'} to-transparent`} />
         
         {/* Badge de Status */}
@@ -768,7 +748,6 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
   const colors = COLOR_MAP[project.color];
   const [mediaIndex, setMediaIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [modalImgError, setModalImgError] = useState(false);
 
   const currentMedia = project.media?.[mediaIndex];
 
@@ -875,17 +854,8 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
               )}
             </div>
           ) : (
-            <div className={`aspect-video rounded-xl mb-6 overflow-hidden flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-              {modalImgError ? (
-                <Code2 className={`w-12 h-12 ${dc('text-slate-600', 'text-slate-400')}`} />
-              ) : (
-                <img
-                  src={project.image}
-                  alt={project.title}
-                  onError={() => setModalImgError(true)}
-                  className="w-full h-full object-cover rounded-xl"
-                />
-              )}
+            <div className={`aspect-video rounded-xl mb-6 flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+              <img src={project.image} alt={project.title} className="w-full h-full object-cover rounded-xl" />
             </div>
           )}
 
@@ -917,25 +887,18 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
 
           {/* Links */}
           <div className="flex flex-wrap gap-2 pt-4 border-t border-dashed border-slate-700/30">
-            {isValidLink(project.links.demo) && (
-              <a href={project.links.demo} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium ${
+            {project.links.demo && (
+              <a href={project.links.demo} className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium ${
                 isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'
               }`}>
                 <Globe className="w-3.5 h-3.5" /> Demo
               </a>
             )}
-            {isValidLink(project.links.github) && (
-              <a href={project.links.github} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium ${
+            {project.links.github && (
+              <a href={project.links.github} className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium ${
                 isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}>
                 <Github className="w-3.5 h-3.5" /> Código
-              </a>
-            )}
-            {isValidLink(project.links.docs) && (
-              <a href={project.links.docs} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium ${
-                isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}>
-                <FileText className="w-3.5 h-3.5" /> Documentação
               </a>
             )}
           </div>
@@ -1268,7 +1231,7 @@ export default function Portfolio() {
                 }`}>
                   <Phone className="w-4 h-4" /> WhatsApp
                 </a>
-                <a href="https://www.linkedin.com/in/igor-guimaraes-barros" target="_blank" rel="noopener noreferrer" className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium text-sm ${
+                <a href="https://www.linkedin.com/in/igor-guimarães-barros" target="_blank" rel="noopener noreferrer" className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-medium text-sm ${
                   dc('text-cyan-400 hover:text-cyan-300', 'text-cyan-600 hover:text-cyan-500')
                 }`}>
                   <Linkedin className="w-4 h-4" /> LinkedIn

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minha Amora – Pitch de Negócio</title>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --primary: #8b5cf6;
+      --primary-dark: #7c3aed;
+      --primary-light: #f3e8ff;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --success: #10b981;
+      --success-dark: #059669;
+      --success-light: #ecfdf5;
+      --accent: #ec4899;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+    header { text-align: center; padding: 48px 0 32px; }
+    header h1 {
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 8px;
+    }
+    header p { color: var(--text-muted); font-size: 1.05rem; max-width: 600px; margin: 0 auto; }
+
+    section { margin: 40px 0; }
+    h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    .emoji { font-style: normal; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+      transition: transform 0.2s ease;
+    }
+    .card:hover { transform: translateY(-2px); }
+    .card h3 { font-size: 1.1rem; margin-bottom: 8px; color: var(--primary-dark); }
+    .card p, .card ul { color: var(--text-muted); font-size: 0.95rem; }
+    .card ul { padding-left: 20px; margin-top: 6px; }
+    .card li { margin-bottom: 4px; }
+
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .metric {
+      text-align: center; padding: 16px;
+      background: var(--primary-light); border-radius: var(--radius); border: 1px solid var(--border);
+    }
+    .metric strong { font-size: 1.8rem; color: var(--primary-dark); display: block; margin-bottom: 4px; }
+    .metric span { font-size: 0.85rem; color: var(--text-muted); }
+
+    .highlight { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; margin: 16px 0; font-size: 0.95rem; }
+    .highlight strong { color: #92400e; }
+
+    .btn {
+      display: inline-block; background: var(--primary); color: white; padding: 12px 24px;
+      border-radius: var(--radius); text-decoration: none; font-weight: 600; transition: background 0.2s;
+      border: none; cursor: pointer; font-size: 1rem;
+    }
+    .btn:hover { background: var(--primary-dark); }
+    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+    .btn-outline:hover { background: var(--primary-light); }
+
+    .why-you {
+      background: linear-gradient(135deg, #f0f9ff, #faf5ff);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; text-align: center;
+    }
+    .why-you h2 { justify-content: center; }
+    .why-you p { max-width: 650px; margin: 0 auto 16px; }
+
+    footer {
+      text-align: center; padding: 40px 0; color: var(--text-muted); font-size: 0.85rem;
+      border-top: 1px solid var(--border); margin-top: 40px;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 16px; }
+      section { margin: 28px 0; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Minha Amora</h1>
+      <p>A plataforma que transforma consultoras de beleza em empreendedoras digitais, com gestão inteligente, vitrine compartilhável e CRM que vende por elas.</p>
+    </header>
+
+    <section id="problema">
+      <h2><span class="emoji">⚠️</span> O Problema Real</h2>
+      <div class="card">
+        <p>Mais de <strong>3,5 milhões de consultoras</strong> no Brasil ainda gerenciam estoques, vendas e clientes no caderno, WhatsApp ou planilhas. O resultado é previsível:</p>
+        <ul>
+          <li>Perda de <strong>R$ 150–300/mês</strong> com produtos vencidos ou parados</li>
+          <li>Impossibilidade de medir lucro real ou projetar compras</li>
+          <li>Base de clientes dispersa e sem reengajamento estruturado</li>
+          <li>Venda dependente 100% do catálogo físico e da memória da consultora</li>
+        </ul>
+      </div>
+      <div class="highlight">
+        <strong>💡 Dado de mercado:</strong> 78% das consultoras afirmam que perderiam vendas se pudessem mostrar seu estoque online de forma profissional.
+      </div>
+    </section>
+
+    <section id="solucao">
+      <h2><span class="emoji">✨</span> A Solução: Minha Amora</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>📦 Estoque Inteligente</h3>
+          <p>Entrada por scanner, controle por lote e validade, baixa automática FIFO. Alertas antes do vencimento.</p>
+        </div>
+        <div class="card">
+          <h3>🌐 Vitrine Digital</h3>
+          <p>Link público <code>/v/nome</code> com estoque em tempo real, busca por marca/categoria e botão de pedido direto no WhatsApp.</p>
+        </div>
+        <div class="card">
+          <h3>🤖 CRM Invisible</h3>
+          <p>Captura orgânica de leads no checkout suave. Reengajamento via WhatsApp com templates pré-prontos e LGPD nativo.</p>
+        </div>
+        <div class="card">
+          <h3>📊 Dashboard Financeiro</h3>
+          <p>Capital investido, receita potencial, margem projetada e DRE simplificado. Tudo no celular.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="mercado">
+      <h2><span class="emoji">📈</span> Por que Agora?</h2>
+      <div class="grid">
+        <div class="metric"><strong>3.5M+</strong><span>Consultoras ativas no Brasil</span></div>
+        <div class="metric"><strong>8% a.a.</strong><span>Crescimento do setor de beleza direta</span></div>
+        <div class="metric"><strong>~85%</strong><span>Ainda usam gestão manual ou inexistente</span></div>
+        <div class="metric"><strong>R$ 29,90</strong><span>Preço base do plano Pro</span></div>
+      </div>
+      <p style="margin-top:16px; color:var(--text-muted);">A digitalização é inevitável. Poucas soluções são <strong>específicas para o nicho</strong>, <strong>mobile-first</strong> e <strong>compatíveis com WhatsApp</strong> (canal #1 de vendas). O Minha Amora nasceu para preencher exatamente essa lacuna.</p>
+    </section>
+
+    <section id="modelo-negocio">
+      <h2><span class="emoji">💰</span> Modelo de Negócio</h2>
+      <div class="card">
+        <h3>Freemium → SaaS Recorrente</h3>
+        <ul>
+          <li><strong>Free:</strong> Até 100 produtos, vitrine básica, CRM limitado</li>
+          <li><strong>Pro:</strong> Produtos ilimitados, OCR, IA de reposição, relatórios avançados, API</li>
+        </ul>
+        <p style="margin-top:12px; font-size:0.9rem; color:var(--text-muted);">Margem bruta >80% após 500 tenants. CAC baixo (orgânico via indicações e parcerias). LTV alto porque o sistema vira <strong>infraestrutura operacional</strong> da consultora.</p>
+      </div>
+    </section>
+
+    <section id="planos">
+      <h2><span class="emoji">💎</span> Planos & Preços</h2>
+      <div class="grid">
+        <div class="card" style="border-top: 4px solid var(--primary);">
+          <h3>📅 Plano Mensal</h3>
+          <p style="font-size: 1.8rem; font-weight: 800; color: var(--primary-dark); margin: 12px 0;">
+            R$ 29,90<span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 400;">/mês</span>
+          </p>
+          <ul>
+            <li>Acesso completo a todas as features Pro</li>
+            <li>Sem compromisso de longo prazo</li>
+            <li>Ideal para testar ou uso sazonal</li>
+            <li>Cancele quando quiser</li>
+          </ul>
+          <p style="margin-top: 16px; font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+            Total em 12 meses: <strong>R$ 358,80</strong>
+          </p>
+        </div>
+
+        <div class="card" style="border-top: 4px solid var(--success); position: relative; overflow: hidden;">
+          <div style="position: absolute; top: 12px; right: -32px; background: var(--success); color: white; padding: 4px 40px; transform: rotate(45deg); font-size: 0.75rem; font-weight: 700;">MAIS POPULAR</div>
+          <h3>🚀 Plano Anual</h3>
+          <p style="font-size: 1.8rem; font-weight: 800; color: var(--success-dark); margin: 12px 0;">
+            R$ 249,00<span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 400;">/ano</span>
+          </p>
+          <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 12px;">
+            Equivale a <strong style="color: var(--text);">R$ 20,75/mês</strong>
+          </p>
+          <ul>
+            <li><strong>Economia de R$ 109,80/ano</strong> (quase 4 meses grátis)</li>
+            <li>Preço congelado por 12 meses (proteção contra reajuste)</li>
+            <li>Suporte prioritário + onboarding personalizado</li>
+            <li>Relatórios avançados e API liberados</li>
+            <li>Ideal para consultoras que já faturam com vendas diretas</li>
+          </ul>
+          <div style="margin-top: 16px; padding: 12px; background: var(--success-light); border-radius: 8px; border: 1px dashed #86efac;">
+            <p style="font-size: 0.85rem; color: #166534; margin: 0;">
+              💡 <strong>Vale a pena?</strong> Se a consultora vender apenas <strong>2 produtos a mais por mês</strong> usando a vitrine e o CRM, o plano já se paga. O anual transforma custo fixo em <strong>investimento estratégico com ROI previsível</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="diferenciais">
+      <h2><span class="emoji">🛡️</span> Vantagens Competitivas</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>✅ CRM Invisible</h3>
+          <p>Captura sem fricção. O lead só informa nome e WhatsApp ao fechar pedido. Opt-in LGPD explícito.</p>
+        </div>
+        <div class="card">
+          <h3>✅ Catálogo Alimentado por Robô</h3>
+          <p>Não precisa cadastrar produtos manualmente. Crawler atualiza preços, imagens e categorias automaticamente.</p>
+        </div>
+        <div class="card">
+          <h3>✅ LGPD desde o Design</h3>
+          <p>Consentimento granular, exportação, anonimização e logs de auditoria. Blindagem jurídica inclusa.</p>
+        </div>
+        <div class="card">
+          <h3>✅ Multi-Tenant Seguro</h3>
+          <p>Isolamento real de dados. Nenhuma consultora acessa informações de outra. Escalável para milhares de lojas.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="proximo">
+      <h2><span class="emoji">🚀</span> Próximos Passos</h2>
+      <div class="card">
+        <ol style="padding-left:20px; color:var(--text-muted);">
+          <li><strong>Piloto Controlado (30 dias):</strong> 50 consultoras reais. Coleta de feedback, ajuste de UX e validação de retenção.</li>
+          <li><strong>Lançamento Público:</strong> Página de captação, onboarding guiado, integração PIX e templates de WhatsApp.</li>
+          <li><strong>Escala:</strong> Crawler para Avon/Boticário, app mobile, programa de indicação (consultora indica consultora).</li>
+          <li><strong>Monetização Secundária:</strong> API pública de dados de beleza (B2B), white-label para redes maiores.</li>
+        </ol>
+        <div class="highlight" style="margin-top:16px;">
+          <strong>⏱️ Time-to-value:</strong> MVP já está funcional. Faltam ajustes finais, testes com usuárias reais e estruturação de suporte.
+        </div>
+      </div>
+    </section>
+
+    <!-- 🆕 SEÇÃO NOVA: O DIFERENCIAL ESTRATÉGICO DELA -->
+    <section id="seu-diferencial">
+      <h2><span class="emoji">👑</span> O Diferencial Estratégico: Você</h2>
+      <div class="card" style="background: linear-gradient(135deg, #fef9f3, #f0fdf4); border-left: 4px solid #f59e0b;">
+        <h3>Por que sua experiência vale mais que código?</h3>
+        <p>Você não é apenas uma usuária. Você é <strong>o persona perfeito</strong> e a <strong>maior vantagem competitiva</strong> do Minha Amora:</p>
+        <ul style="margin-top: 12px;">
+          <li><strong>🎓 Formação em Administração:</strong> Visão estruturada de processos, métricas e gestão comercial.</li>
+          <li><strong>🌿 5+ anos liderando 300+ consultoras na Natura:</strong> Você viveu na pele o que o sistema resolve.</li>
+          <li><strong>💡 Entendimento profundo do mercado:</strong> Sabe exatamente o que cada consultora pensa, teme, deseja e como ela realmente vende no dia a dia.</li>
+          <li><strong>📱 Já é Power User:</strong> Organiza Natura + Avon + Boticário no sistema diariamente. Sua validação é real, não teórica.</li>
+        </ul>
+      </div>
+
+      <div class="grid" style="margin-top: 20px;">
+        <div class="card">
+          <h3>🎯 Sinergia Imediata (0-3 meses)</h3>
+          <p>Suas 4 horas livres diárias podem ser o motor de validação e renda:</p>
+          <ul>
+            <li><strong>1h:</strong> Organizar vendas no Minha Amora (virar referência de uso)</li>
+            <li><strong>1h:</strong> Conversar com ex-colegas consultoras (pesquisa de mercado gratuita)</li>
+            <li><strong>2h:</strong> Estudar produto, dar feedback e testar novas features</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🚀 Novas Fontes de Renda & Carreira</h3>
+          <p>Com sua experiência + tecnologia, você pode:</p>
+          <ul>
+            <li><strong>Mentoria para iniciantes:</strong> R$ 150-300/hora para novas consultoras</li>
+            <li><strong>Revenda multimarca tech:</strong> Usar o sistema para gerenciar estoques de várias marcas com profissionalismo</li>
+            <li><strong>Consultoria de prospecção:</strong> Ajudar profissionais autônomos a construir carteira de clientes</li>
+            <li><strong>Face humana da marca:</strong> Criar conteúdo mostrando a rotina de uma "consultora tech"</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="highlight" style="margin-top: 20px; background: #eff6ff; border-left-color: #3b82f6;">
+        <strong>💡 Insight Estratégico:</strong> Enquanto eu desenvolvo a arquitetura, integrações e evolução técnica, você valida as dores reais, testa com sua rede de contatos e cria cases de sucesso. <br>
+        <em>Isso não é "ajudar no projeto" — é acelerar a PGBA juntos, com divisão clara de papéis, retorno financeiro previsível e impacto real na vida de milhares de mulheres.</em>
+      </div>
+    </section>
+
+    <section id="porque-voce">
+      <div class="why-you">
+        <h2><span class="emoji">💜</span> Vamos Construir Juntos?</h2>
+        <p>Você não precisa entender de código. Precisa de <strong>visão de negócio, organização e sensibilidade com o público</strong>. E você tem tudo isso.</p>
+        <p>Enquanto eu cuido da arquitetura e evolução técnica, você lidera:</p>
+        <ul style="text-align:left; max-width:600px; margin:0 auto 16px; padding-left:20px;">
+          <li>Onboarding e treinamento das primeiras consultoras</li>
+          <li>Coleta de feedback → tradução em melhorias do produto</li>
+          <li>Marketing orgânico, parcerias e gestão de comunidade</li>
+          <li>Operação do suporte, plano Pro e retenção</li>
+        </ul>
+        <p>Isso é um <strong>ativo digital recorrente</strong>. Com sua gestão, podemos escalar de forma previsível.</p>
+        <div style="margin-top:24px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn">Vamos pilotar juntas(os)?</button>
+          <button class="btn btn-outline">Ver protótipo ao vivo</button>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Minha Amora © 2026 | Desenvolvido pela PGBA Solutions</p>
+      <p style="margin-top:6px;">Feito com tecnologia, empatia e foco em resultado real para quem vende beleza.</p>
+    </footer>
+  </div>
+</body>
+</html>

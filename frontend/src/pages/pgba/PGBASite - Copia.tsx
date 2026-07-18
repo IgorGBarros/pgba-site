@@ -561,17 +561,13 @@ export default function PGBASite() {
               fundamenta a missão da PGBA: levar inteligência tecnológica real
               para empresas que precisam crescer."
             </p>
+            <a href="/portfolio" target="_blank" rel="noopener noreferrer" className="underline hover:text-cyan-500 transition-colors">
+              Portfólio Completo
+              </a>
             <p className={`mt-6 text-sm font-bold uppercase tracking-widest ${dc('text-cyan-400', 'text-cyan-600')}`}>
-              — Igor Guimarães Barros, Fundador da PGBA Solutions Technologies
+              
+              — Fundador, PGBA Solutions Technologies
             </p>
-            <a
-              href="/portfolio"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`inline-flex items-center gap-1.5 mt-4 text-sm font-semibold underline underline-offset-4 hover:text-cyan-500 transition-colors ${dc('text-slate-300', 'text-slate-600')}`}
-            >
-              Ver portfólio completo
-            </a>
           </motion.div>
         </div>
       </section>
