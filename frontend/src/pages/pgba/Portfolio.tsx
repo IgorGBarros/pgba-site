@@ -1050,7 +1050,7 @@ export default function Portfolio() {
                 }`}>
                   <img 
                     // Caminho relativo: sobe dois níveis (pgba -> pages -> src) e entra em assets
-                    src="/public/Igor.png" 
+                    src="/Igor/.png" 
                     alt="Igor Guimarães Barros" 
                     // object-cover garante que preencha o círculo sem distorcer
                     // object-center tenta centralizar. Se cortar a cabeça, mude para 'object-top'
