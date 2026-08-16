@@ -226,31 +226,31 @@ const PROJECTS: Project[] = [
   id: 'minha-amora',
   title: 'Minha Amora',
   subtitle: 'SaaS de Inteligência Comercial para Consultoras de Beleza',
-  description: 'Plataforma SaaS que profissionaliza a gestão de consultoras (Natura, Avon, Boticário), substituindo planilhas por controle inteligente de estoque, validade e margem de lucro.',
-  longDescription: `O Minha Amora nasceu da necessidade real de consultoras que gerenciavam seus negócios em planilhas complexas e propensas a erros. Desenvolvi uma solução fullstack (Django + React) que combina simplicidade na interface com inteligência nos dados.
+  description: 'Plataforma SaaS que profissionaliza a gestão de consultoras (Natura, Avon, Boticário, Eudora, Mary Kay, Quem Disse Berenice), substituindo planilhas por controle inteligente de estoque, validade e margem de lucro.',
+  longDescription: `O Minha Amora nasceu da necessidade real de consultoras que gerenciavam seus negócios em planilhas complexas e propensas a erros. Uma solução fullstack (Django + React) que combina simplicidade na interface com inteligência nos dados.
 
-O sistema oferece gestão preditiva com alertas automáticos de reposição e vencimento, análise de margem por marca/período e relatórios automatizados. A arquitetura foi projetada para escalabilidade, conformidade com LGPD e futura integração com APIs de pagamento (PIX).
+O sistema oferece controle de estoque por lote com FIFO (sempre vende primeiro o que vence antes), dashboard de lucro real — não só faturamento, já descontando o custo de cada venda — e um assistente de IA (Amorinha) que consulta os dados da própria loja e responde dúvida com base numa central de ajuda, sem alucinar fora do que está publicado.
 
-Além do SaaS, a plataforma coleta dados anonimizados sobre comportamento de consumo, criando uma base estratégica para evolução em API de inteligência de mercado , visando futuros clientes corporativos do setor de beleza.
+O catálogo de produto é populado automaticamente por um crawler multi-marca, e o cadastro conta com autopreenchimento por código de barras. Pagamento recorrente integrado via Asaas (PIX, cartão, boleto), com teste grátis de 14 dias e modelo somente-leitura pra quem não assina depois disso.
 
-Modelo híbrido (Software + Educação) aumenta retenção e valida a hipótese de que pequenas vendedoras necessitam de ferramentas enterprise simplificadas.`,
+Além do SaaS, a plataforma também expõe um produto de API para desenvolvedores terceiros, com autenticação isolada da autenticação do usuário final, cota e cobrança próprias — uma segunda frente de receita sobre a mesma base de dados.`,
   image: '/assets/projects/minha-amora-preview.png',
-  tags: ['SaaS', 'Django', 'React', 'PostgreSQL', 'LGPD', 'API Design','IA Generativa'],
+  tags: ['SaaS', 'Django', 'React', 'PostgreSQL', 'LGPD', 'IA Generativa', 'API Design', 'Asaas'],
   category: 'produto-proprio',
-  status: 'Em desenvolvimento',
-  statusColor: 'violet' as ColorKey,
+  status: 'Em Produção',
+  statusColor: 'emerald' as ColorKey,
   color: 'pink' as ColorKey,
-  // TODO: preencher com link real quando existir, ex: links: { demo: 'https://...' }
-  links: {},
+  links: { demo: 'https://minhaamora.com.br' },
   highlights: [
-    'Gestão preditiva: alertas de reposição e vencimento reduzem perdas financeiras',
-    'Dashboard de desempenho por marca e período com análise de margem',
-    'Arquitetura escalável (Django/React) preparada para LGPD e alta concorrência',
-    'Base de dados estruturada para evolução em API de inteligência de mercado',
+    'Estoque por lote com FIFO real — prioriza vender o que vence primeiro, reduzindo perda',
+    'Dashboard de lucro real (desconta custo de cada venda), não só faturamento bruto',
+    'Assistente de IA que consulta dados da loja e responde dúvida sem alucinar fora do publicado',
+    'Catálogo de 6 marcas populado automaticamente, com autopreenchimento por código de barras',
+    'Produto de API para desenvolvedores terceiros, com autenticação isolada e cobrança própria',
   ],
   metrics: [
-    { label: 'Consultoras na lista', value: '150+' },
-    { label: 'Marcas suportadas', value: '5+' },
+    { label: 'Marcas suportadas', value: '6' },
+    { label: 'Teste grátis', value: '14 dias' },
     { label: 'Setup médio', value: '< 5 min' },
   ],
 },
