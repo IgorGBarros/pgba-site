@@ -216,10 +216,12 @@ const CASES = [
 ];
 
 const MINHA_AMORA_FEATURES = [
-  { icon: ShoppingBag, title: 'Gestão de Estoque Inteligente', description: 'Controle completo do seu estoque com alertas automáticos e sugestões de reposição.' },
-  { icon: TrendingUp, title: 'Apoio à Decisão', description: 'Saiba exatamente o que comprar, quando comprar e quanto investir baseado nos seus dados.' },
-  { icon: Users, title: 'Feito para Consultoras', description: 'Interface simples e intuitiva, pensada para quem não é técnica mas precisa de controle.' },
-  { icon: Sparkles, title: 'Diferente de Tudo', description: 'Não é planilha, não é genérico. É inteligência real para o seu negócio de revenda.' },
+  { icon: Layers, title: 'Estoque por Lote e Validade', description: 'Controle FIFO de verdade — sempre sugere vender primeiro o que vence antes, evitando perda por produto parado.' },
+  { icon: TrendingUp, title: 'Lucro Real, Não Só Faturamento', description: 'O dashboard desconta o custo de cada produto vendido — mostra o que realmente sobra, não só o total que entrou.' },
+  { icon: Brain, title: 'Assistente de IA (Amorinha)', description: 'Consulta estoque e vendas em linguagem natural, e responde dúvida com base na Central de Ajuda — nunca inventa fora disso.' },
+  { icon: ShoppingBag, title: 'Vitrine Online', description: 'Link próprio da loja pra compartilhar no WhatsApp — a cliente monta o pedido, o estoque desconta certo sozinho.' },
+  { icon: Users, title: 'CRM com Fiado', description: 'Histórico de compra por cliente, incluindo venda a prazo — nunca perde o controle de quem ainda deve.' },
+  { icon: Database, title: 'Catálogo Multi-Marca Automático', description: 'Natura, Avon, Boticário, Eudora, Mary Kay e Quem Disse Berenice — nome, preço e foto já vêm preenchidos ao escanear.' },
 ];
 
 const IOT_KIOSK_FEATURES = [
@@ -814,28 +816,35 @@ export default function PGBASite() {
                     </span>
                   </h3>
                   <p className={`text-base md:text-lg leading-relaxed ${dc('text-slate-300', 'text-slate-600')}`}>
-                    Pensado para consultoras da Natura, Avon, Boticário, Mary
-                    Kay e outras marcas. Não é planilha, não é genérico. É uma
-                    ferramenta que entende o seu negócio e te ajuda a tomar
-                    decisões melhores todos os dias.
+                    Pensado para consultoras da Natura, Avon, Boticário, Eudora,
+                    Mary Kay e Quem Disse Berenice. Controle de estoque por lote
+                    e validade, lucro real (não só faturamento), vitrine online
+                    e assistente de IA — tudo numa ferramenta que entende o
+                    negócio de revenda de verdade.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
                     <a
-                      href="#contato"
+                      href="https://minhaamora.com.br/lp"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-bold text-sm transition-all duration-300 shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 hover:scale-105 group"
                     >
-                      Quero Conhecer
+                      Testar Grátis
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </a>
                     <span
-                      className={`inline-flex items-center justify-center px-8 py-4 rounded-full text-sm font-bold ${
+                      className={`inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full text-sm font-bold ${
                         dc(
-                          'text-slate-400 bg-slate-800/50 ring-1 ring-slate-700/50',
-                          'text-slate-500 bg-slate-100 ring-1 ring-slate-200'
+                          'text-emerald-400 bg-emerald-500/10 ring-1 ring-emerald-500/20',
+                          'text-emerald-600 bg-emerald-50 ring-1 ring-emerald-200'
                         )
                       }`}
                     >
-                      Em breve — Lista de espera aberta
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      No ar — 14 dias grátis
                     </span>
                   </div>
                 </div>
