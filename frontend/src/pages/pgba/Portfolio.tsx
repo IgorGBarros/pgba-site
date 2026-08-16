@@ -240,7 +240,7 @@ Além do SaaS, a plataforma também expõe um produto de API para desenvolvedore
   status: 'Em Produção',
   statusColor: 'emerald' as ColorKey,
   color: 'pink' as ColorKey,
-  links: { demo: 'https://minhaamora.com.br' },
+  links: { demo: 'https://minhaamora.com.br/lp' },
   highlights: [
     'Estoque por lote com FIFO real — prioriza vender o que vence primeiro, reduzindo perda',
     'Dashboard de lucro real (desconta custo de cada venda), não só faturamento bruto',
